@@ -1,0 +1,20 @@
+{
+  "name": "Phan Thuần Xtra",
+  "short_name": "Phan Thuần Xtra",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#111111",
+  "theme_color": "#111111",
+  "icons": [
+    {
+      "src": "/android-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/android-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

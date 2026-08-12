@@ -1,0 +1,17 @@
+{
+  "name": "Phan Thuần Xtra – Phan Thuần Xtra",
+  "short_name": "Phan Thuần Xtra",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f4f1",
+  "theme_color": "#111111",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "description": "Phan Thuần Xtra – Phan Thuần Xtra",
+  "lang": "vi-VN"
+}

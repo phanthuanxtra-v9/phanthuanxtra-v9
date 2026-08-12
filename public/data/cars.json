@@ -1,0 +1,50 @@
+[
+  {
+    "id": "lx600-urban",
+    "brand": "Lexus",
+    "name": "Lexus LX600 Urban",
+    "category": "suv",
+    "year": "2026",
+    "odo": "1.800 km",
+    "seats": "7 chỗ",
+    "engine": "V6 3.4 Twin Turbo",
+    "drive": "4WD",
+    "price": "Liên hệ",
+    "tag": "FEATURED",
+    "page": "car-lx600.html",
+    "imageClass": "lx",
+    "contact": "0866997891"
+  },
+  {
+    "id": "gx460-luxury",
+    "brand": "Lexus",
+    "name": "Lexus GX 460 Luxury",
+    "category": "suv",
+    "year": "2021",
+    "odo": "Đã kiểm tra",
+    "seats": "7 chỗ",
+    "engine": "V8 4.6L",
+    "drive": "4WD",
+    "price": "Liên hệ",
+    "tag": "NEW ARRIVAL",
+    "page": "car-gx460.html",
+    "imageClass": "gx",
+    "contact": "0866997891"
+  },
+  {
+    "id": "porsche-718-boxster",
+    "brand": "Porsche",
+    "name": "Porsche 718 Boxster",
+    "category": "sport",
+    "year": "2025",
+    "odo": "Liên hệ",
+    "seats": "2 chỗ",
+    "engine": "2.0 Turbo",
+    "drive": "RWD",
+    "price": "Liên hệ",
+    "tag": "SPORT",
+    "page": "car-boxster.html",
+    "imageClass": "sport",
+    "contact": "0866997891"
+  }
+]

@@ -1,0 +1,23 @@
+{
+  "name": "phanthuanxtra",
+  "version": "9.5.0",
+  "private": true,
+  "description": "Phan Thuần Xtra - Luxury Cars | Cloudflare Workers Production",
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "echo \"Build completed successfully\"",
+    "deploy": "wrangler deploy",
+    "preview": "wrangler dev --remote",
+    "check": "wrangler deploy --dry-run",
+    "d1:create": "wrangler d1 create phanthuanxtra-db",
+    "d1:migrate": "wrangler d1 migrations apply phanthuanxtra-db --remote",
+    "d1:local": "wrangler d1 migrations apply phanthuanxtra-db --local"
+  },
+  "devDependencies": {
+    "wrangler": "^4.121.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
