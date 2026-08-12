@@ -34,6 +34,34 @@ async function getStaticCars(env, request) {
   return cars;
 }
 
+function normalizeDbCar(car) {
+  let images = [];
+  let features = [];
+  try { images = JSON.parse(car.images_json || "[]"); } catch {}
+  try { features = JSON.parse(car.features_json || "[]"); } catch {}
+
+  return {
+    id: car.id,
+    brand: car.brand || "",
+    name: car.model || car.id || "Xe",
+    category: car.category || "other",
+    year: car.year == null ? "" : String(car.year),
+    odo: car.mileage == null ? "Liên hệ" : `${Number(car.mileage).toLocaleString("vi-VN")} km`,
+    seats: car.seats || "Liên hệ",
+    engine: car.engine || car.fuel || "Liên hệ",
+    drive: car.drive || "Liên hệ",
+    price: car.price ? `${Number(car.price).toLocaleString("vi-VN")} đ` : "Liên hệ",
+    tag: car.status === "available" ? "AVAILABLE" : String(car.status || "").toUpperCase(),
+    page: car.page || `car-${String(car.id || "").toLowerCase()}.html`,
+    imageClass: car.imageClass || "",
+    contact: "0866997891",
+    color: car.color || "",
+    description: car.description || "",
+    images,
+    features
+  };
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -57,10 +85,15 @@ export default {
         if (env.DB) {
           try {
             const result = await env.DB.prepare(
-              "SELECT id, brand, model, year, mileage, price, fuel, category, color, status, description, images_json, features_json, created_at, updated_at FROM cars ORDER BY created_at DESC"
+              "SELECT * FROM cars ORDER BY created_at DESC"
             ).all();
+            const rows = Array.isArray(result.results) ? result.results : [];
 
-            return json({ source: "d1", cars: result.results || [] }, 200, SECURITY_HEADERS);
+            // Only use D1 when it actually contains compatible inventory.
+            // An empty/new D1 must not make the public catalogue disappear.
+            if (rows.length > 0) {
+              return json({ source: "d1", cars: rows.map(normalizeDbCar) }, 200, SECURITY_HEADERS);
+            }
           } catch (err) {
             console.error("D1 cars error:", err);
           }
