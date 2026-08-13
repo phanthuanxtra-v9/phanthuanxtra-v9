@@ -1,0 +1,163 @@
+openapi: 3.1.0
+info:
+  title: Phan Thuần Xtra ChatGPT CMS API
+  version: 1.0.0
+  description: >-
+    API bảo mật cho phép trợ lý AI quản lý kho xe và CRM của Phan Thuần Xtra.
+    Không dùng API này để quản lý DNS hoặc cấu hình Cloudflare.
+servers:
+  - url: https://phanthuanxtra.com
+security:
+  - bearerAuth: []
+paths:
+  /api/cms/v1/health:
+    get:
+      operationId: cmsHealth
+      summary: Kiểm tra CMS API
+      responses:
+        '200': { description: OK }
+  /api/cms/v1/dashboard:
+    get:
+      operationId: getDashboard
+      summary: Xem thống kê CMS
+      responses:
+        '200': { description: Dashboard }
+  /api/cms/v1/cars:
+    get:
+      operationId: listCars
+      summary: Danh sách xe
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string, enum: [available, reserved, sold, hidden] } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0 } }
+      responses:
+        '200': { description: Danh sách xe }
+    post:
+      operationId: createCar
+      summary: Đăng xe mới
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CarWrite' }
+      responses:
+        '201': { description: Đã tạo }
+  /api/cms/v1/cars/{id}:
+    get:
+      operationId: getCar
+      summary: Xem chi tiết xe
+      parameters: [{ $ref: '#/components/parameters/CarId' }]
+      responses:
+        '200': { description: Xe }
+    put:
+      operationId: updateCar
+      summary: Cập nhật bài xe
+      parameters: [{ $ref: '#/components/parameters/CarId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CarWrite' }
+      responses:
+        '200': { description: Đã cập nhật }
+    delete:
+      operationId: deleteCar
+      summary: Xóa bài xe
+      description: >-
+        Chỉ xóa khi yêu cầu người dùng đã xác nhận rõ ràng. API yêu cầu header
+        X-CMS-Confirm: delete để giảm nguy cơ xóa nhầm.
+      parameters: [{ $ref: '#/components/parameters/CarId' }]
+      responses:
+        '200': { description: Đã xóa }
+  /api/cms/v1/leads:
+    get:
+      operationId: listLeads
+      summary: Xem khách hàng/lead
+      responses:
+        '200': { description: Danh sách lead }
+  /api/cms/v1/leads/{id}:
+    put:
+      operationId: updateLead
+      summary: Cập nhật trạng thái và ghi chú lead
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [new, contacted, qualified, won, lost] }
+                note: { type: string, maxLength: 3000 }
+      responses:
+        '200': { description: Đã cập nhật }
+    delete:
+      operationId: deleteLead
+      summary: Xóa lead
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Đã xóa }
+  /api/cms/v1/audit:
+    get:
+      operationId: listAuditEvents
+      summary: Xem nhật ký thao tác CMS
+      responses:
+        '200': { description: Nhật ký }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: CMS_API_KEY
+  parameters:
+    CarId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^[a-zA-Z0-9][a-zA-Z0-9_-]{2,80}$'
+  schemas:
+    CarWrite:
+      type: object
+      required: [id, brand, model]
+      properties:
+        id: { type: string, minLength: 3, maxLength: 81 }
+        brand: { type: string, maxLength: 100 }
+        model: { type: string, maxLength: 160 }
+        year: { type: [integer, 'null'] }
+        mileage: { type: integer, minimum: 0 }
+        price: { type: integer, minimum: 0 }
+        fuel: { type: string, maxLength: 100 }
+        category: { type: string, maxLength: 40 }
+        color: { type: string, maxLength: 80 }
+        status: { type: string, enum: [available, reserved, sold, hidden] }
+        description: { type: string, maxLength: 10000 }
+        features:
+          type: array
+          maxItems: 80
+          items: { type: string, maxLength: 300 }
+        featured: { type: boolean }
+        cover_image: { type: string, maxLength: 200000 }
+        images:
+          type: array
+          maxItems: 30
+          items:
+            oneOf:
+              - type: string
+              - type: object
+                required: [url]
+                properties:
+                  url: { type: string, format: uri }
+                  sort_order: { type: integer, minimum: 0 }
+                  is_cover: { type: boolean }
