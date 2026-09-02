@@ -1,28 +1,38 @@
 {
   "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
-  "name": "phanthuanxtra",
+  "name": "phanthuanxtra-v2",
   "main": "src/entry.js",
   "compatibility_date": "2026-08-11",
   "compatibility_flags": [
     "nodejs_compat"
   ],
   "minify": true,
-
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
     "not_found_handling": "404-page"
   },
-
   "observability": {
     "enabled": true
   },
-
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "phanthuanxtra-db",
       "database_id": "8b6c0fc8-c278-4797-9cfa-3ec93d0c1b7d"
+    }
+  ],
+  "ai": {
+    "binding": "AI"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "CUSTOMER_DATA",
+      "id": "a1a0054badf6444482cda9ae0b053686"
+    },
+    {
+      "binding": "LUXURY_UI_CACHE",
+      "id": "590689d86c1b40808c56a1eed7ead880"
     }
   ]
 }
