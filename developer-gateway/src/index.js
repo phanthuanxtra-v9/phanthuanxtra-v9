@@ -1,5 +1,3 @@
-const ALLOWED_ORIGINS = new Set((env => (env?.GATEWAY_ALLOWED_ORIGINS || '').split(',').map(v => v.trim()).filter(Boolean)))(globalThis.__gatewayEnv));
-
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), {
     status,
@@ -8,8 +6,9 @@ function json(data, status = 200, headers = {}) {
 }
 
 function cors(request, env) {
+  const allowed = new Set((env.GATEWAY_ALLOWED_ORIGINS || '').split(',').map(v => v.trim()).filter(Boolean));
   const origin = request.headers.get('Origin');
-  if (!origin || !ALLOWED_ORIGINS.has(origin)) return {};
+  if (!origin || !allowed.has(origin)) return {};
   return {
     'access-control-allow-origin': origin,
     'access-control-allow-headers': 'authorization,content-type,x-request-id',
