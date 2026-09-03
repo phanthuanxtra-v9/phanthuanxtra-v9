@@ -6,10 +6,10 @@
   "license": "UNLICENSED",
   "scripts": {
     "dev": "wrangler dev",
-    "build": "echo \"Build completed successfully\"",
+    "build": "npm run check",
+    "check": "node scripts/validate-local.mjs && node --check src/entry.js && node --check src/index.js && node --check src/cms.js && node --check developer-gateway/src/index.js && node --test tests/developer-gateway.test.mjs",
     "deploy": "wrangler deploy",
     "preview": "wrangler dev --remote",
-    "check": "wrangler deploy --dry-run",
     "d1:create": "wrangler d1 create phanthuanxtra-db",
     "d1:migrate": "wrangler d1 migrations apply phanthuanxtra-db --remote",
     "d1:local": "wrangler d1 migrations apply phanthuanxtra-db --local"

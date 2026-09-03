@@ -1,25 +1,18 @@
 # Full-System Backup
 
-A production-safe backup must cover source, configuration, database, object storage metadata/content where permitted, deployment metadata and documentation.
+A repository snapshot is not a verified production backup.
 
-## Backup scope
+## Required archive scope
 
-1. Git repository: all tracked source/configuration on the selected commit.
-2. Cloudflare Worker configuration and deployment metadata.
-3. D1 schema and migrations; production database export must be performed with authenticated Wrangler/Cloudflare access.
-4. R2 object inventory and permitted object export.
-5. DNS/route configuration metadata.
-6. Gateway configuration and API contracts.
-7. Secrets: record secret names only; NEVER export secret values into the backup or GitHub.
+- Selected Git commit, Worker source, Wrangler configuration, migrations, API contracts and documentation.
+- Worker deployment/version metadata and routes.
+- D1 schema and separately authenticated D1 data export.
+- R2 inventory and permitted object content export.
+- DNS and route metadata.
+- Secret names only—never secret values, tokens, passwords or private keys.
 
-## Safety
+## Required procedure
 
-- Backups must be timestamped.
-- Verify archive integrity after creation.
-- Store an offline/local encrypted copy before destructive changes.
-- Do not place API tokens, private keys, passwords or secret values in this repository.
-- A Git repository backup alone is NOT a full Cloudflare backup.
+Create a timestamped archive outside Git, record cryptographic hashes, encrypt it, retain an offline/local copy, and document restore verification against a non-production target. Record operator, source commit, tool versions, scope exclusions, hash and restore result.
 
-## Current phase
-
-The gateway branch is not production and no production mutation is enabled. The actual Cloudflare/D1/R2 archive must be generated from an authenticated Cloudflare environment after the account credentials are connected.
+Cloudflare exports and restoration require separately approved authenticated access. This repository makes no claim those steps occurred.

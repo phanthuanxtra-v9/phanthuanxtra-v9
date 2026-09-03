@@ -19,12 +19,8 @@ const integer = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number
 const bool = value => value === true || value === 1 || value === "1" || value === "true";
 const safeId = value => /^[a-z0-9][a-z0-9_-]{2,80}$/i.test(String(value ?? ""));
 
-function authorized(request, env) {
-  const key = env.CMS_API_KEY;
-  if (!key) return false;
-  const auth = request.headers.get("Authorization") || "";
-  return auth.startsWith("Bearer ") && auth.slice(7) === key;
-}
+const tokenEquals = (a, b) => { const n = Math.max(a.length, b.length, 1); let d = a.length ^ b.length; for (let i = 0; i < n; i += 1) d |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0); return d === 0; };
+function authorized(request, env) { const key = env.CMS_API_KEY; const auth = request.headers.get("Authorization") || ""; return !!key && auth.startsWith("Bearer ") && tokenEquals(auth.slice(7), key); }
 
 async function readJson(request) {
   const length = Number(request.headers.get("content-length") || 0);
@@ -32,22 +28,7 @@ async function readJson(request) {
   return request.json().catch(() => null);
 }
 
-async function initCmsDb(db) {
-  await db.batch([
-    db.prepare(`CREATE TABLE IF NOT EXISTS car_images (id INTEGER PRIMARY KEY AUTOINCREMENT, car_id TEXT NOT NULL, url TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, is_cover INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`),
-    db.prepare(`CREATE INDEX IF NOT EXISTS idx_car_images_car_sort ON car_images(car_id, sort_order)`),
-    db.prepare(`CREATE TABLE IF NOT EXISTS leads (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, phone TEXT NOT NULL, car_id TEXT, message TEXT, status TEXT NOT NULL DEFAULT 'new', note TEXT DEFAULT '', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT)`),
-    db.prepare(`CREATE TABLE IF NOT EXISTS cms_audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, actor TEXT NOT NULL, action TEXT NOT NULL, resource TEXT NOT NULL, resource_id TEXT, summary TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`),
-    db.prepare(`CREATE INDEX IF NOT EXISTS idx_cms_audit_created ON cms_audit_log(created_at)`)
-  ]);
-  for (const sql of [
-    "ALTER TABLE cars ADD COLUMN featured INTEGER NOT NULL DEFAULT 0",
-    "ALTER TABLE cars ADD COLUMN cover_image TEXT DEFAULT ''",
-    "ALTER TABLE leads ADD COLUMN status TEXT NOT NULL DEFAULT 'new'",
-    "ALTER TABLE leads ADD COLUMN note TEXT DEFAULT ''",
-    "ALTER TABLE leads ADD COLUMN updated_at TEXT"
-  ]) { try { await db.prepare(sql).run(); } catch {} }
-}
+const logError = code => console.error(`[${code}]`);
 
 async function audit(db, action, resource, resourceId, summary) {
   await db.prepare("INSERT INTO cms_audit_log (actor,action,resource,resource_id,summary) VALUES (?,?,?,?,?)")
@@ -169,7 +150,7 @@ async function handleCars(request, env, parts) {
     return response({ ok: true, id: carId, car: { ...(await db.prepare("SELECT * FROM cars WHERE id=?").bind(carId).first()), images: await imagesFor(db, carId) } }, request.method === "POST" ? 201 : 200);
   } catch (error) {
     if (String(error?.message || error).includes("UNIQUE")) return response({ error: "ID bài đăng đã tồn tại" }, 409);
-    console.error(error);
+    logError('cms_operation_failed');
     return response({ error: "Không thể lưu bài xe" }, 500);
   }
 }
@@ -226,7 +207,6 @@ export async function handleCmsApi(request, env) {
   if (!authorized(request, env)) return response({ error: "Unauthorized" }, 401, { "WWW-Authenticate": "Bearer" });
   if (!env.DB) return response({ error: "D1 chưa được kết nối" }, 503);
   try {
-    await initCmsDb(env.DB);
     const rest = url.pathname.replace(/^\/api\/cms\/v1\/?/, "").split("/").filter(Boolean);
     const resource = rest[0] || "";
     const parts = rest.slice(1);
@@ -237,7 +217,7 @@ export async function handleCmsApi(request, env) {
     if (resource === "leads") return handleLeads(request, env, parts);
     return response({ error: "CMS endpoint not found" }, 404);
   } catch (error) {
-    console.error("CMS API error", error);
+    logError('cms_request_failed');
     return response({ error: "Internal Server Error" }, 500);
   }
 }
