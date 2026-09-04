@@ -1,0 +1,40 @@
+name: Developer Gateway
+
+on:
+  pull_request:
+    paths:
+      - 'developer-gateway/**'
+      - '.github/workflows/developer-gateway.yml'
+  push:
+    branches:
+      - feature/developer-gateway-clean
+    paths:
+      - 'developer-gateway/**'
+      - '.github/workflows/developer-gateway.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Validate gateway tests
+        run: node --test developer-gateway/test/index.test.mjs
+
+      - name: Validate Wrangler dry-run
+        run: npx --yes wrangler deploy --dry-run --config developer-gateway/wrangler.jsonc
+
+      - name: Verify no production mutation commands in CI
+        run: |
+          forbidden='d1 migrations apply|d1 execute|git (push|merge|reset|rebase)|wrangler delete|--force'
+          ! grep -RniE "$forbidden" .github/workflows/developer-gateway.yml | grep -v 'forbidden='

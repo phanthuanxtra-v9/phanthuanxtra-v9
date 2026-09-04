@@ -1,0 +1,79 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Phan Thuần Xtra Developer Gateway",
+    "version": "0.1.0",
+    "description": "Read-only developer control-plane contract for GitHub, Devbox/Codex and Cloudflare observability. Production mutation is disabled."
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Gateway health",
+        "responses": { "200": { "description": "Healthy" } }
+      }
+    },
+    "/v1/project/status": {
+      "get": {
+        "summary": "Project integration status",
+        "responses": { "200": { "description": "Status summary" } }
+      }
+    },
+    "/v1/github/status": {
+      "get": {
+        "summary": "GitHub repository status",
+        "responses": { "200": { "description": "Repository/branch/CI summary" } }
+      }
+    },
+    "/v1/devbox/status": {
+      "get": {
+        "summary": "Remote Devbox status",
+        "responses": { "200": { "description": "Devbox connectivity summary" } }
+      }
+    },
+    "/v1/cloudflare/observability": {
+      "get": {
+        "summary": "Cloudflare observability summary",
+        "responses": { "200": { "description": "Non-secret Worker health/log summary" } }
+      }
+    },
+    "/v1/codex/tasks": {
+      "post": {
+        "summary": "Submit a Codex task",
+        "description": "Creates a task request for an authenticated Devbox agent. The gateway does not execute arbitrary code itself.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["instruction"],
+                "additionalProperties": false,
+                "properties": {
+                  "instruction": { "type": "string", "minLength": 1, "maxLength": 12000 },
+                  "repository": { "type": "string", "maxLength": 200, "default": "phanthuanxtra-v9/phanthuanxtra-v9" },
+                  "branch": { "type": "string", "maxLength": 200, "default": "feature/developer-gateway-clean" },
+                  "mode": { "type": "string", "enum": ["audit", "test", "propose-fix"], "default": "audit" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "202": { "description": "Task accepted" } }
+      }
+    },
+    "/v1/production/deploy": {
+      "post": {
+        "summary": "Production deploy",
+        "description": "Intentionally disabled in phase 1.",
+        "responses": { "403": { "description": "Production mutation disabled" } }
+      }
+    },
+    "/v1/production/rollback": {
+      "post": {
+        "summary": "Production rollback",
+        "description": "Intentionally disabled in phase 1.",
+        "responses": { "403": { "description": "Production mutation disabled" } }
+      }
+    }
+  }
+}

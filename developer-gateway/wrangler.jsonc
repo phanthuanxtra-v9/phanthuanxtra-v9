@@ -1,0 +1,14 @@
+{
+  "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
+  "name": "phanthuanxtra-developer-gateway",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-11",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "vars": {
+    "GATEWAY_MODE": "readonly",
+    "PRODUCTION_MUTATIONS_ENABLED": "false"
+  }
+  // Set GATEWAY_READ_TOKEN as a Cloudflare secret; never commit it.
+  // Set GATEWAY_ALLOWED_ORIGINS as a secret/variable with exact APK/web origins.
+}
