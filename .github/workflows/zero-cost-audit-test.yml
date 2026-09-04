@@ -36,13 +36,27 @@ jobs:
           INSTRUCTION: ${{ inputs.instruction }}
           MODE: ${{ inputs.mode }}
         run: |
-          set -euo pipefail
-          [[ "$TASK_ID" =~ ^[0-9a-f-]{36}$ ]]
-          [[ -n "$INSTRUCTION" ]]
-          [[ "$MODE" == "audit" || "$MODE" == "test" ]]
+          set -u
+          echo '## Dispatch validation'
+          echo "mode=${MODE:-<empty>}"
+          echo "task_id_length=${#TASK_ID}"
           echo "task_id=$TASK_ID"
-          echo "mode=$MODE"
-          echo "openai_api_calls=0"
+          echo "instruction_length=${#INSTRUCTION}"
+          echo 'openai_api_calls=0'
+
+          if [[ ! "$TASK_ID" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+            echo 'ERROR: task_id is not a canonical UUID.'
+            exit 1
+          fi
+          if [[ -z "$INSTRUCTION" ]]; then
+            echo 'ERROR: instruction is empty.'
+            exit 1
+          fi
+          if [[ "$MODE" != 'audit' && "$MODE" != 'test' ]]; then
+            echo "ERROR: unsupported mode: $MODE"
+            exit 1
+          fi
+          echo 'dispatch_inputs=valid'
 
       - name: Checkout main
         uses: actions/checkout@v5
