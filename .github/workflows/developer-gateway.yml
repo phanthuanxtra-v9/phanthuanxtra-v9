@@ -36,4 +36,5 @@ jobs:
 
       - name: Verify no production mutation commands in CI
         run: |
-          ! grep -RniE '(d1 migrations apply|d1 execute|git (push|merge|reset|rebase)|wrangler delete|--force)' .github/workflows/developer-gateway.yml
+          forbidden='d1 migrations apply|d1 execute|git (push|merge|reset|rebase)|wrangler delete|--force'
+          ! grep -RniE "$forbidden" .github/workflows/developer-gateway.yml | grep -v 'forbidden='
