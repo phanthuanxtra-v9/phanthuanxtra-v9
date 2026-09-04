@@ -1,5 +1,7 @@
 const MAX_INSTRUCTION_LENGTH = 12000;
 const MODES = new Set(['audit', 'test', 'propose-fix']);
+const REPOSITORY = 'phanthuanxtra-v9/phanthuanxtra-v9';
+const DEFAULT_BRANCH = 'main';
 
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), {
@@ -57,17 +59,17 @@ export default {
 
     const url = new URL(request.url);
     if (url.pathname === '/health' && request.method === 'GET') {
-      return json({ ok: true, service: 'developer-gateway', mode: 'read-only', production_mutations: false }, 200, headers);
+      return json({ ok: true, service: 'developer-gateway', mode: env.GATEWAY_MODE || 'readonly', production_mutations: env.PRODUCTION_MUTATIONS_ENABLED === 'true' }, 200, headers);
     }
 
     if (!auth(request, env)) return unauthorized(headers);
 
     if (request.method === 'GET' && url.pathname === '/v1/project/status') {
-      return json({ ok: true, repository: 'phanthuanxtra-v9/phanthuanxtra-v9', branch: 'feature/developer-gateway-clean', production_mutations: false }, 200, headers);
+      return json({ ok: true, repository: REPOSITORY, branch: DEFAULT_BRANCH, production_mutations: env.PRODUCTION_MUTATIONS_ENABLED === 'true' }, 200, headers);
     }
 
     if (request.method === 'GET' && url.pathname === '/v1/github/status') {
-      return json({ ok: true, provider: 'github', repository: 'phanthuanxtra-v9/phanthuanxtra-v9', access: 'pending-github-app' }, 200, headers);
+      return json({ ok: true, provider: 'github', repository: REPOSITORY, access: 'pending-github-app' }, 200, headers);
     }
 
     if (request.method === 'GET' && url.pathname === '/v1/devbox/status') {
@@ -105,7 +107,14 @@ export default {
       if (body.mode !== undefined && (typeof body.mode !== 'string' || !MODES.has(body.mode))) {
         return json({ ok: false, error: 'invalid_mode' }, 400, headers);
       }
-      return json({ ok: true, accepted: true, mode: body.mode || 'audit', execution: 'pending-devbox-connection' }, 202, headers);
+      return json({
+        ok: true,
+        accepted: true,
+        mode: body.mode || 'audit',
+        repository: body.repository || REPOSITORY,
+        branch: body.branch || DEFAULT_BRANCH,
+        execution: 'pending-devbox-connection'
+      }, 202, headers);
     }
 
     if (url.pathname === '/v1/production/deploy' || url.pathname === '/v1/production/rollback') {
