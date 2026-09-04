@@ -1,0 +1,127 @@
+name: Zero-Cost Audit Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      instruction:
+        description: 'Optional audit/test instruction'
+        required: false
+        default: 'Validate repository structure and run safe repository checks. Do not modify files or production infrastructure.'
+        type: string
+      mode:
+        description: 'Zero-cost execution mode'
+        required: true
+        type: choice
+        options:
+          - audit
+          - test
+      task_id:
+        description: 'Gateway task ID'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  zero-cost:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Validate dispatch inputs
+        shell: bash
+        env:
+          TASK_ID: ${{ inputs.task_id }}
+          INSTRUCTION: ${{ inputs.instruction }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+          [[ "$TASK_ID" =~ ^[0-9a-f-]{36}$ ]]
+          [[ -n "$INSTRUCTION" ]]
+          [[ "$MODE" == "audit" || "$MODE" == "test" ]]
+          echo "task_id=$TASK_ID"
+          echo "mode=$MODE"
+          echo "openai_api_calls=0"
+
+      - name: Checkout main
+        uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Zero-cost repository audit
+        if: ${{ inputs.mode == 'audit' }}
+        shell: bash
+        env:
+          INSTRUCTION: ${{ inputs.instruction }}
+        run: |
+          set -euo pipefail
+          {
+            echo '# Zero-Cost Repository Audit'
+            echo
+            echo '- OpenAI API calls: **0**'
+            echo '- Source modifications: **0**'
+            echo '- Production deploy/rollback: **not attempted**'
+            echo
+            echo '## Repository'
+            git remote -v | sed 's/[[:space:]]\+/(redacted-remote-url)/g'
+            git branch --show-current
+            git rev-parse HEAD
+            echo
+            echo '## Top-level structure'
+            find . -maxdepth 2 -type f -not -path './.git/*' | sort | head -n 250
+            echo
+            echo '## Cloudflare configuration'
+            if [ -f wrangler.json ]; then
+              node -e "JSON.parse(require('fs').readFileSync('wrangler.json','utf8')); console.log('wrangler.json: valid JSON')"
+            else
+              echo 'wrangler.json: missing'
+            fi
+            echo
+            echo '## GitHub workflows'
+            find .github/workflows -maxdepth 1 -type f -name '*.yml' -o -name '*.yaml' 2>/dev/null | sort || true
+            echo
+            echo '## Package configuration'
+            node -e "const p=require('./package.json'); console.log(JSON.stringify({name:p.name,version:p.version,scripts:Object.keys(p.scripts||{}),engines:p.engines},null,2))"
+            echo
+            echo '## Gateway configuration checks'
+            grep -nE "GATEWAY_READ_TOKEN|GITHUB_ACTIONS_DISPATCH_TOKEN|PRODUCTION_MUTATIONS_ENABLED|production_mutation_disabled|MODES" developer-gateway/src/index.js || true
+            echo
+            echo '## Tracked working-tree changes'
+            if git diff --quiet && git diff --cached --quiet; then echo 'clean'; else git diff --stat; fi
+            echo
+            echo '## User instruction'
+            printf '%s\n' "$INSTRUCTION"
+          } | tee zero-cost-audit.md
+
+      - name: Zero-cost repository test
+        if: ${{ inputs.mode == 'test' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '## Zero-Cost Repository Test' | tee zero-cost-test.md
+          echo '- OpenAI API calls: **0**' | tee -a zero-cost-test.md
+          echo '- Production deploy/rollback: **not attempted**' | tee -a zero-cost-test.md
+          echo | tee -a zero-cost-test.md
+          echo '### package.json' | tee -a zero-cost-test.md
+          node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('valid JSON')" | tee -a zero-cost-test.md
+          echo '### wrangler.json' | tee -a zero-cost-test.md
+          node -e "JSON.parse(require('fs').readFileSync('wrangler.json','utf8')); console.log('valid JSON')" | tee -a zero-cost-test.md
+          echo '### Developer Gateway unit tests' | tee -a zero-cost-test.md
+          node --test developer-gateway/test/index.test.mjs | tee -a zero-cost-test.md
+          echo '### Wrangler dry-run check' | tee -a zero-cost-test.md
+          npm ci --ignore-scripts | tee -a zero-cost-test.md
+          npm run check | tee -a zero-cost-test.md
+
+      - name: Publish zero-cost result
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.mode }}" = 'audit' ]; then
+            cat zero-cost-audit.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            cat zero-cost-test.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo | tee -a "$GITHUB_STEP_SUMMARY"
+          echo 'ZERO_COST_OPENAI_CALLS=0' >> "$GITHUB_STEP_SUMMARY"
