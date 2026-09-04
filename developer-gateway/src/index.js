@@ -2,6 +2,7 @@ const MAX_INSTRUCTION_LENGTH = 12000;
 const MODES = new Set(['audit', 'test', 'propose-fix']);
 const REPOSITORY = 'phanthuanxtra-v9/phanthuanxtra-v9';
 const DEFAULT_BRANCH = 'main';
+const CODEX_WORKFLOW = 'codex-agent.yml';
 
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), {
@@ -28,9 +29,7 @@ function constantTimeEqual(a, b) {
   const right = encoder.encode(b);
   let diff = left.length ^ right.length;
   const length = Math.max(left.length, right.length);
-  for (let i = 0; i < length; i += 1) {
-    diff |= (left[i] || 0) ^ (right[i] || 0);
-  }
+  for (let i = 0; i < length; i += 1) diff |= (left[i] || 0) ^ (right[i] || 0);
   return diff === 0;
 }
 
@@ -41,8 +40,31 @@ function unauthorized(headers) {
 function auth(request, env) {
   const expected = env.GATEWAY_READ_TOKEN;
   if (!expected) return false;
-  const value = request.headers.get('Authorization') || '';
-  return constantTimeEqual(value, `Bearer ${expected}`);
+  return constantTimeEqual(request.headers.get('Authorization') || '', `Bearer ${expected}`);
+}
+
+function validRepository(value) { return value === undefined || value === REPOSITORY; }
+function validBranch(value) { return value === undefined || value === DEFAULT_BRANCH; }
+
+async function dispatchCodexTask(env, task) {
+  const token = env.GITHUB_ACTIONS_DISPATCH_TOKEN;
+  if (!token) return { ok: false, error: 'github_dispatch_not_configured' };
+
+  const response = await fetch(`https://api.github.com/repos/${REPOSITORY}/actions/workflows/${CODEX_WORKFLOW}/dispatches`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'User-Agent': 'phanthuanxtra-developer-gateway',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ ref: DEFAULT_BRANCH, inputs: { instruction: task.instruction, mode: task.mode, task_id: task.taskId } })
+  });
+
+  if (response.status === 204) return { ok: true };
+  const detail = await response.text().catch(() => '');
+  return { ok: false, error: 'github_dispatch_failed', status: response.status, detail: detail.slice(0, 500) };
 }
 
 export default {
@@ -51,9 +73,7 @@ export default {
     const origin = request.headers.get('Origin');
 
     if (request.method === 'OPTIONS') {
-      if (origin && !headers['access-control-allow-origin']) {
-        return json({ ok: false, error: 'cors_origin_denied' }, 403);
-      }
+      if (origin && !headers['access-control-allow-origin']) return json({ ok: false, error: 'cors_origin_denied' }, 403);
       return new Response(null, { status: 204, headers });
     }
 
@@ -69,11 +89,11 @@ export default {
     }
 
     if (request.method === 'GET' && url.pathname === '/v1/github/status') {
-      return json({ ok: true, provider: 'github', repository: REPOSITORY, access: 'pending-github-app' }, 200, headers);
+      return json({ ok: true, provider: 'github', repository: REPOSITORY, access: env.GITHUB_ACTIONS_DISPATCH_TOKEN ? 'configured' : 'pending-github-dispatch-credential', workflow: CODEX_WORKFLOW }, 200, headers);
     }
 
     if (request.method === 'GET' && url.pathname === '/v1/devbox/status') {
-      return json({ ok: true, provider: 'remote-devbox', status: 'pending-connection' }, 200, headers);
+      return json({ ok: true, provider: 'github-actions-codex-runner', status: 'not-required-for-phase-2a' }, 200, headers);
     }
 
     if (request.method === 'GET' && url.pathname === '/v1/cloudflare/observability') {
@@ -81,40 +101,27 @@ export default {
     }
 
     if (request.method === 'POST' && url.pathname === '/v1/codex/tasks') {
-      if (!request.headers.get('content-type')?.toLowerCase().includes('application/json')) {
-        return json({ ok: false, error: 'content_type_required' }, 415, headers);
-      }
+      if (!request.headers.get('content-type')?.toLowerCase().includes('application/json')) return json({ ok: false, error: 'content_type_required' }, 415, headers);
       const body = await request.json().catch(() => null);
-      if (!body || typeof body !== 'object' || Array.isArray(body)) {
-        return json({ ok: false, error: 'invalid_json' }, 400, headers);
-      }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return json({ ok: false, error: 'invalid_json' }, 400, headers);
+
       const allowedFields = new Set(['instruction', 'repository', 'branch', 'mode']);
-      if (Object.keys(body).some(key => !allowedFields.has(key))) {
-        return json({ ok: false, error: 'unexpected_field' }, 400, headers);
+      if (Object.keys(body).some(key => !allowedFields.has(key))) return json({ ok: false, error: 'unexpected_field' }, 400, headers);
+      if (typeof body.instruction !== 'string' || !body.instruction.trim()) return json({ ok: false, error: 'instruction_required' }, 400, headers);
+      if (body.instruction.length > MAX_INSTRUCTION_LENGTH) return json({ ok: false, error: 'instruction_too_long' }, 400, headers);
+      if (body.repository !== undefined && (typeof body.repository !== 'string' || body.repository.length > 200 || !validRepository(body.repository))) return json({ ok: false, error: 'invalid_repository' }, 400, headers);
+      if (body.branch !== undefined && (typeof body.branch !== 'string' || body.branch.length > 200 || !validBranch(body.branch))) return json({ ok: false, error: 'invalid_branch' }, 400, headers);
+      if (body.mode !== undefined && (typeof body.mode !== 'string' || !MODES.has(body.mode))) return json({ ok: false, error: 'invalid_mode' }, 400, headers);
+
+      const taskId = crypto.randomUUID();
+      const task = { taskId, instruction: body.instruction.trim(), mode: body.mode || 'audit' };
+      const dispatched = await dispatchCodexTask(env, task);
+      if (!dispatched.ok) {
+        const status = dispatched.error === 'github_dispatch_not_configured' ? 503 : 502;
+        return json({ ok: false, task_id: taskId, ...dispatched }, status, headers);
       }
-      if (typeof body.instruction !== 'string' || !body.instruction.trim()) {
-        return json({ ok: false, error: 'instruction_required' }, 400, headers);
-      }
-      if (body.instruction.length > MAX_INSTRUCTION_LENGTH) {
-        return json({ ok: false, error: 'instruction_too_long' }, 400, headers);
-      }
-      if (body.repository !== undefined && (typeof body.repository !== 'string' || body.repository.length > 200)) {
-        return json({ ok: false, error: 'invalid_repository' }, 400, headers);
-      }
-      if (body.branch !== undefined && (typeof body.branch !== 'string' || body.branch.length > 200)) {
-        return json({ ok: false, error: 'invalid_branch' }, 400, headers);
-      }
-      if (body.mode !== undefined && (typeof body.mode !== 'string' || !MODES.has(body.mode))) {
-        return json({ ok: false, error: 'invalid_mode' }, 400, headers);
-      }
-      return json({
-        ok: true,
-        accepted: true,
-        mode: body.mode || 'audit',
-        repository: body.repository || REPOSITORY,
-        branch: body.branch || DEFAULT_BRANCH,
-        execution: 'pending-devbox-connection'
-      }, 202, headers);
+
+      return json({ ok: true, accepted: true, task_id: taskId, mode: task.mode, repository: REPOSITORY, branch: DEFAULT_BRANCH, execution: 'github-actions-codex', workflow: CODEX_WORKFLOW }, 202, headers);
     }
 
     if (url.pathname === '/v1/production/deploy' || url.pathname === '/v1/production/rollback') {
