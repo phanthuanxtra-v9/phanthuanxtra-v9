@@ -17,7 +17,13 @@ async function withGithubDispatchMock(callback) {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input, init = {}) => {
     const url = String(input);
-    if (url.includes('/actions/workflows/codex-agent.yml/dispatches')) {
+    const workflow = url.includes('/actions/workflows/codex-agent.yml/dispatches')
+      ? 'codex-agent.yml'
+      : url.includes('/actions/workflows/zero-cost-audit-test.yml/dispatches')
+        ? 'zero-cost-audit-test.yml'
+        : null;
+
+    if (workflow) {
       assert.equal(init.method, 'POST');
       assert.match(init.headers.Authorization, /^Bearer /);
       const payload = JSON.parse(init.body);
@@ -25,6 +31,12 @@ async function withGithubDispatchMock(callback) {
       assert.ok(payload.inputs.task_id);
       assert.ok(payload.inputs.instruction);
       assert.ok(['audit', 'test', 'propose-fix'].includes(payload.inputs.mode));
+      if (workflow === 'zero-cost-audit-test.yml') {
+        assert.ok(['audit', 'test'].includes(payload.inputs.mode));
+      }
+      if (workflow === 'codex-agent.yml') {
+        assert.equal(payload.inputs.mode, 'propose-fix');
+      }
       return new Response(null, { status: 204 });
     }
     return originalFetch(input, init);
@@ -64,7 +76,7 @@ function postTask(body, headers = {}) {
   });
 }
 
-test('valid Codex task is dispatched', async () => {
+test('audit task is dispatched to zero-cost workflow', async () => {
   await withGithubDispatchMock(async () => {
     const response = await postTask({ instruction: 'Run an audit' });
     assert.equal(response.status, 202);
@@ -72,15 +84,29 @@ test('valid Codex task is dispatched', async () => {
     assert.equal(body.ok, true);
     assert.equal(body.accepted, true);
     assert.equal(body.mode, 'audit');
-    assert.equal(body.execution, 'github-actions-codex');
+    assert.equal(body.execution, 'github-actions-zero-cost');
+    assert.equal(body.workflow, 'zero-cost-audit-test.yml');
     assert.match(body.task_id, /^[0-9a-f-]{36}$/);
   });
 });
 
-test('Codex task accepts supported mode and fields', async () => {
+test('test task is dispatched to zero-cost workflow', async () => {
   await withGithubDispatchMock(async () => {
     const response = await postTask({ instruction: 'Run tests', repository: 'phanthuanxtra-v9/phanthuanxtra-v9', branch: 'main', mode: 'test' });
     assert.equal(response.status, 202);
+    const body = await response.json();
+    assert.equal(body.execution, 'github-actions-zero-cost');
+    assert.equal(body.workflow, 'zero-cost-audit-test.yml');
+  });
+});
+
+test('propose-fix task remains on Codex workflow', async () => {
+  await withGithubDispatchMock(async () => {
+    const response = await postTask({ instruction: 'Prepare a fix', mode: 'propose-fix' });
+    assert.equal(response.status, 202);
+    const body = await response.json();
+    assert.equal(body.execution, 'github-actions-codex');
+    assert.equal(body.workflow, 'codex-agent.yml');
   });
 });
 
