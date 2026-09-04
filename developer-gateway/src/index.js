@@ -3,6 +3,7 @@ const MAX_INSTRUCTION_LENGTH = 12000;
 const REPOSITORY = 'phanthuanxtra-v9/phanthuanxtra-v9';
 const DEFAULT_BRANCH = 'main';
 const CODEX_WORKFLOW = 'codex-agent.yml';
+const ZERO_COST_WORKFLOW = 'zero-cost-audit-test.yml';
 
 const MODES = new Set([
   'audit',
@@ -18,7 +19,8 @@ const MODES = new Set([
  * - All other endpoints require Bearer authentication.
  * - Repository is hard-pinned.
  * - Branch is hard-pinned to main.
- * - Codex execution is delegated to GitHub Actions.
+ * - audit/test use the zero-cost GitHub Actions workflow and never call OpenAI.
+ * - propose-fix is delegated to the Codex GitHub Actions workflow.
  * - Production deploy/rollback remain disabled.
  * - Secrets are never returned in API responses.
  */
@@ -127,10 +129,16 @@ function productionMutationsEnabled(env) {
   return env.PRODUCTION_MUTATIONS_ENABLED === 'true';
 }
 
+function workflowForMode(mode) {
+  return mode === 'propose-fix'
+    ? CODEX_WORKFLOW
+    : ZERO_COST_WORKFLOW;
+}
+
 /**
- * Dispatch Codex through GitHub Actions.
+ * Dispatch a task through the selected GitHub Actions workflow.
  */
-async function dispatchCodexTask(env, task) {
+async function dispatchTask(env, task) {
   const token =
     env.GITHUB_ACTIONS_DISPATCH_TOKEN;
 
@@ -141,9 +149,11 @@ async function dispatchCodexTask(env, task) {
     };
   }
 
+  const workflow = workflowForMode(task.mode);
+
   const githubUrl =
     `https://api.github.com/repos/${REPOSITORY}` +
-    `/actions/workflows/${CODEX_WORKFLOW}/dispatches`;
+    `/actions/workflows/${workflow}/dispatches`;
 
   const response = await fetch(
     githubUrl,
@@ -171,13 +181,10 @@ async function dispatchCodexTask(env, task) {
     }
   );
 
-  /**
-   * GitHub workflow_dispatch returns HTTP 204
-   * when the dispatch request is accepted.
-   */
   if (response.status === 204) {
     return {
-      ok: true
+      ok: true,
+      workflow
     };
   }
 
@@ -199,11 +206,6 @@ export default {
     const headers = cors(request, env);
     const origin = request.headers.get('Origin');
 
-    /**
-     * ---------------------------------------------------------
-     * CORS PREFLIGHT
-     * ---------------------------------------------------------
-     */
     if (request.method === 'OPTIONS') {
       if (
         origin &&
@@ -229,11 +231,6 @@ export default {
 
     const url = new URL(request.url);
 
-    /**
-     * ---------------------------------------------------------
-     * PUBLIC HEALTH CHECK
-     * ---------------------------------------------------------
-     */
     if (
       url.pathname === '/health' &&
       request.method === 'GET'
@@ -253,20 +250,10 @@ export default {
       );
     }
 
-    /**
-     * ---------------------------------------------------------
-     * AUTHENTICATION
-     * ---------------------------------------------------------
-     */
     if (!authenticate(request, env)) {
       return unauthorized(headers);
     }
 
-    /**
-     * ---------------------------------------------------------
-     * PROJECT STATUS
-     * ---------------------------------------------------------
-     */
     if (
       request.method === 'GET' &&
       url.pathname === '/v1/project/status'
@@ -284,11 +271,6 @@ export default {
       );
     }
 
-    /**
-     * ---------------------------------------------------------
-     * GITHUB STATUS
-     * ---------------------------------------------------------
-     */
     if (
       request.method === 'GET' &&
       url.pathname === '/v1/github/status'
@@ -299,24 +281,18 @@ export default {
           provider: 'github',
           repository: REPOSITORY,
           branch: DEFAULT_BRANCH,
-
           access:
             env.GITHUB_ACTIONS_DISPATCH_TOKEN
               ? 'configured'
               : 'pending-github-dispatch-credential',
-
-          workflow: CODEX_WORKFLOW
+          workflow: CODEX_WORKFLOW,
+          zero_cost_workflow: ZERO_COST_WORKFLOW
         },
         200,
         headers
       );
     }
 
-    /**
-     * ---------------------------------------------------------
-     * DEVBOX STATUS
-     * ---------------------------------------------------------
-     */
     if (
       request.method === 'GET' &&
       url.pathname === '/v1/devbox/status'
@@ -334,11 +310,6 @@ export default {
       );
     }
 
-    /**
-     * ---------------------------------------------------------
-     * CLOUDFLARE OBSERVABILITY
-     * ---------------------------------------------------------
-     */
     if (
       request.method === 'GET' &&
       url.pathname ===
@@ -357,18 +328,10 @@ export default {
       );
     }
 
-    /**
-     * ---------------------------------------------------------
-     * CREATE CODEX TASK
-     * ---------------------------------------------------------
-     */
     if (
       request.method === 'POST' &&
       url.pathname === '/v1/codex/tasks'
     ) {
-      /**
-       * Require JSON.
-       */
       const contentType =
         request.headers
           .get('content-type')
@@ -385,9 +348,6 @@ export default {
         );
       }
 
-      /**
-       * Parse JSON safely.
-       */
       const body =
         await request
           .json()
@@ -408,9 +368,6 @@ export default {
         );
       }
 
-      /**
-       * Only these fields are allowed.
-       */
       const allowedFields = new Set([
         'instruction',
         'repository',
@@ -433,9 +390,6 @@ export default {
         );
       }
 
-      /**
-       * Instruction validation.
-       */
       if (
         typeof body.instruction !== 'string' ||
         !body.instruction.trim()
@@ -466,9 +420,6 @@ export default {
         );
       }
 
-      /**
-       * Repository validation.
-       */
       if (
         body.repository !== undefined &&
         (
@@ -487,9 +438,6 @@ export default {
         );
       }
 
-      /**
-       * Branch validation.
-       */
       if (
         body.branch !== undefined &&
         (
@@ -508,9 +456,6 @@ export default {
         );
       }
 
-      /**
-       * Mode validation.
-       */
       if (
         body.mode !== undefined &&
         (
@@ -528,27 +473,19 @@ export default {
         );
       }
 
-      /**
-       * Generate server-side task ID.
-       */
       const taskId =
         crypto.randomUUID();
 
       const task = {
         taskId,
-
         instruction:
           body.instruction.trim(),
-
         mode:
           body.mode || 'audit'
       };
 
-      /**
-       * Dispatch to GitHub Actions.
-       */
       const dispatched =
-        await dispatchCodexTask(
+        await dispatchTask(
           env,
           task
         );
@@ -571,40 +508,26 @@ export default {
         );
       }
 
-      /**
-       * Accepted by GitHub Actions.
-       */
       return json(
         {
           ok: true,
           accepted: true,
-
           task_id: taskId,
-
           mode: task.mode,
-
           repository: REPOSITORY,
-
           branch: DEFAULT_BRANCH,
-
           execution:
-            'github-actions-codex',
-
+            task.mode === 'propose-fix'
+              ? 'github-actions-codex'
+              : 'github-actions-zero-cost',
           workflow:
-            CODEX_WORKFLOW
+            dispatched.workflow
         },
         202,
         headers
       );
     }
 
-    /**
-     * ---------------------------------------------------------
-     * PRODUCTION MUTATIONS
-     * ---------------------------------------------------------
-     *
-     * Deliberately disabled during Phase 2A.
-     */
     if (
       url.pathname ===
         '/v1/production/deploy' ||
@@ -624,11 +547,6 @@ export default {
       );
     }
 
-    /**
-     * ---------------------------------------------------------
-     * NOT FOUND
-     * ---------------------------------------------------------
-     */
     return json(
       {
         ok: false,
