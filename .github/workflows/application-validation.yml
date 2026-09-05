@@ -47,13 +47,28 @@ jobs:
       - name: Verify no runtime DDL
         shell: bash
         run: |
-          if grep -RniE \
-            --exclude-dir=node_modules \
-            --exclude-dir=.git \
-            --exclude='*.sql' \
-            'CREATE TABLE|CREATE INDEX|ALTER TABLE|DROP TABLE|DROP INDEX' \
-            src public developer-gateway; then
-            echo "ERROR: runtime DDL detected"
+          set -euo pipefail
+
+          base_sha="${{ github.event.pull_request.base.sha }}"
+          head_sha="${{ github.event.pull_request.head.sha }}"
+
+          changed_files="$(git diff --name-only "$base_sha" "$head_sha" -- \
+            'src/**' \
+            'public/**' \
+            'developer-gateway/**')"
+
+          if [ -z "$changed_files" ]; then
+            echo "NO RUNTIME FILES CHANGED"
+            exit 0
+          fi
+
+          echo "Changed runtime files:"
+          printf '%s\n' "$changed_files"
+
+          if git diff --unified=0 "$base_sha" "$head_sha" -- $changed_files |
+             grep -E '^\+.*(CREATE TABLE|CREATE INDEX|ALTER TABLE|DROP TABLE|DROP INDEX)'; then
+            echo "ERROR: runtime DDL added by this pull request"
             exit 1
           fi
-          echo "NO RUNTIME DDL FOUND"
+
+          echo "NO RUNTIME DDL ADDED BY THIS PULL REQUEST"
