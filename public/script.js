@@ -4,9 +4,69 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function save(){localStorage.setItem("ptx:favorites",JSON.stringify([...state.favorites]));localStorage.setItem("ptx:compare",JSON.stringify([...state.compare]));updateCounters()}
 function updateCounters(){$("#favCount").textContent=state.favorites.size;$("#compareCount").textContent=state.compare.size}
-function filtered(){let q=state.query.toLowerCase().trim();let list=state.cars.filter(c=>{let hay=[c.brand,c.name,c.year,c.odo,c.engine,c.category,c.drive].join(" ").toLowerCase();return(state.filter==="all"||c.category===state.filter)&&(!q||hay.includes(q))&&(!state.favoritesOnly||state.favorites.has(c.id))});if(state.sort==="year-desc")list.sort((a,b)=>Number(b.year)-Number(a.year));if(state.sort==="year-asc")list.sort((a,b)=>Number(a.year)-Number(b.year));if(state.sort==="name")list.sort((a,b)=>a.name.localeCompare(b.name));return list}
-function render(){let list=filtered();$("#cars").innerHTML=list.length?list.map(c=>`<article class="car-card"><div class="car-img ${esc(c.imageClass)}"><span>${esc(c.tag)}</span></div><div class="car-body"><p class="muted">${esc(c.brand)} • ${esc(c.category)}</p><h3>${esc(c.name)}</h3><div class="spec"><span>${esc(c.year)}</span><span>${esc(c.odo)}</span><span>${esc(c.seats)}</span></div><div class="price">${esc(c.price)}</div><div class="card-actions"><a class="btn primary small" href="${esc(c.page)}">Xem chi tiết</a><button class="icon-btn ${state.favorites.has(c.id)?"active":""}" data-fav="${esc(c.id)}" title="Lưu xe">♡</button><button class="icon-btn ${state.compare.has(c.id)?"active":""}" data-compare="${esc(c.id)}" title="Thêm vào so sánh">⇄</button></div></div></article>`).join(""):'<p class="notice">Không tìm thấy xe phù hợp. Gọi 08 6699 7891 để tìm mẫu xe khác.</p>';$$("[data-fav]").forEach(b=>b.onclick=()=>{let id=b.dataset.fav;state.favorites.has(id)?state.favorites.delete(id):state.favorites.add(id);save();render()});$$("[data-compare]").forEach(b=>b.onclick=()=>{let id=b.dataset.compare;if(state.compare.has(id))state.compare.delete(id);else if(state.compare.size<3)state.compare.add(id);else alert("Bạn chỉ có thể so sánh tối đa 3 xe.");save();render()});updateCounters()}
-function showCompare(){let selected=state.cars.filter(c=>state.compare.has(c.id));let body=$("#compareBody");if(!selected.length){body.innerHTML='<p class="fav-empty">Chưa có xe nào. Hãy bấm ⇄ trên thẻ xe để thêm.</p>'}else{let rows=[['Hãng','brand'],['Mẫu xe','name'],['Năm','year'],['ODO','odo'],['Động cơ','engine'],['Dẫn động','drive'],['Số chỗ','seats'],['Giá','price']];body.innerHTML='<table class="compare-table"><thead><tr><th>Thông tin</th>'+selected.map(c=>`<th>${esc(c.name)}</th>`).join('')+'</tr></thead><tbody>'+rows.map(r=>`<tr><th>${r[0]}</th>${selected.map(c=>`<td>${esc(c[r[1]])}</td>`).join('')}</tr>`).join('')+'</tbody></table><div class="actions"><a class="btn primary" href="tel:+84866997891">Gọi tư vấn</a><a class="btn zalo" href="https://zalo.me/0866997891" target="_blank" rel="noopener noreferrer">Nhắn Zalo</a></div>'}$("#compareModal").hidden=false}
+
+function normalizeCar(c){
+  return {
+    id:c.id,
+    brand:c.brand??"",
+    name:c.name??c.model??"",
+    year:c.year??"",
+    odo:c.odo??c.mileage??"",
+    seats:c.seats??"",
+    engine:c.engine??c.fuel??"",
+    drive:c.drive??"",
+    category:c.category??"",
+    price:c.price??"",
+    imageClass:c.imageClass??"",
+    tag:c.tag??"",
+    page:c.page??"#",
+    image:c.cover_image??c.image??"",
+    featured:Boolean(c.featured)
+  };
+}
+
+function updateFeatured(){
+  const countEl=document.querySelector("#featuredCount");
+  const card=document.querySelector("#featuredCard");
+  const image=document.querySelector("#featuredImage");
+  const eyebrow=document.querySelector("#featuredEyebrow");
+  const title=document.querySelector("#featuredTitle");
+  const meta=document.querySelector("#featuredMeta");
+
+  if(!countEl||!card||!image||!eyebrow||!title||!meta)return;
+
+  countEl.textContent=String(state.cars.length);
+
+  const car=state.cars.find(x=>x.featured)||state.cars[0];
+
+  if(!car){
+    card.classList.add("empty");
+    image.style.background="";
+    eyebrow.textContent="KHO XE";
+    title.textContent="Kho xe ?ang c?p nh?t";
+    meta.textContent="Ch?a c? m?u xe ?ang tr?ng b?y.";
+    return;
+  }
+
+  card.classList.remove("empty");
+
+  if(car.image){
+    image.style.backgroundImage='url("' + esc(car.image) + '")';
+    image.style.backgroundPosition="center";
+    image.style.backgroundSize="cover";
+    image.style.backgroundRepeat="no-repeat";
+  }else{
+    image.style.background="";
+  }
+
+  eyebrow.textContent="FEATURED VEHICLE";
+  title.textContent=car.name||"Xe n?i b?t";
+  meta.textContent=[car.engine,car.drive,car.seats].filter(Boolean).join(" ? ")||"Th?ng tin xe ?ang ???c c?p nh?t.";
+}
+
+function filtered(){let q=state.query.toLowerCase().trim();let list=state.cars.filter(c=>{let hay=[c.brand,c.name,c.year,c.odo,c.engine,c.category,c.drive,c.price].join(" ").toLowerCase();return(state.filter==="all"||c.category===state.filter)&&(!q||hay.includes(q))&&(!state.favoritesOnly||state.favorites.has(c.id))});if(state.sort==="year-desc")list.sort((a,b)=>Number(b.year)-Number(a.year));if(state.sort==="year-asc")list.sort((a,b)=>Number(a.year)-Number(b.year));if(state.sort==="name")list.sort((a,b)=>a.name.localeCompare(b.name));return list}
+function render(){let list=filtered();$("#cars").innerHTML=list.length?list.map(c=>`<article class="car-card"><div class="car-img ${esc(c.imageClass)}"><span>${esc(c.tag)}</span></div><div class="car-body"><p class="muted">${esc(c.brand)} • ${esc(c.category)}</p><h3>${esc(c.name)}</h3><div class="spec"><span>${esc(c.year)}</span><span>${esc(c.odo)}</span><span>${esc(c.seats)}</span></div><div class="price"><span class="price-label">Gi? tham kh?o</span><strong>${esc(c.price)}</strong></div><div class="card-actions"><a class="btn primary small" href="${esc(c.page)}">Xem chi tiết</a><button class="icon-btn ${state.favorites.has(c.id)?"active":""}" data-fav="${esc(c.id)}" title="Lưu xe">♡</button><button class="icon-btn ${state.compare.has(c.id)?"active":""}" data-compare="${esc(c.id)}" title="Thêm vào so sánh">⇄</button></div></div></article>`).join(""):'<p class="notice">Không tìm thấy xe phù hợp. Gọi 08 6699 7891 để tìm mẫu xe khác.</p>';$$("[data-fav]").forEach(b=>b.onclick=()=>{let id=b.dataset.fav;state.favorites.has(id)?state.favorites.delete(id):state.favorites.add(id);save();render()});$$("[data-compare]").forEach(b=>b.onclick=()=>{let id=b.dataset.compare;if(state.compare.has(id))state.compare.delete(id);else if(state.compare.size<3)state.compare.add(id);else alert("Bạn chỉ có thể so sánh tối đa 3 xe.");save();render()});updateCounters()}
+function showCompare(){let selected=state.cars.filter(c=>state.compare.has(c.id));let body=$("#compareBody");if(!selected.length){body.innerHTML='<p class="fav-empty">Chưa có xe nào. Hãy bấm ⇄ trên thẻ xe để thêm.</p>'}else{let rows=[['Hãng','brand'],['Mẫu xe','name'],['Năm','year'],['ODO','odo'],['Động cơ','engine'],['Dẫn động','drive'],['Số chỗ','seats'],['Giá tham khảo','price']];body.innerHTML='<table class="compare-table"><thead><tr><th>Thông tin</th>'+selected.map(c=>`<th>${esc(c.name)}</th>`).join('')+'</tr></thead><tbody>'+rows.map(r=>`<tr><th>${r[0]}</th>${selected.map(c=>`<td>${esc(c[r[1]])}</td>`).join('')}</tr>`).join('')+'</tbody></table><div class="actions"><a class="btn primary" href="tel:+84866997891">Gọi tư vấn</a><a class="btn zalo" href="https://zalo.me/0866997891" target="_blank" rel="noopener noreferrer">Nhắn Zalo</a></div>'}$("#compareModal").hidden=false}
 const menu=$(".menu-toggle"),nav=$("#site-nav");if(menu){menu.onclick=()=>{let open=nav.classList.toggle("open");menu.setAttribute("aria-expanded",String(open))};$$('#site-nav a').forEach(a=>a.onclick=()=>nav.classList.remove('open'))}
 $$('.filter').forEach(b=>b.onclick=()=>{$$('.filter').forEach(x=>x.classList.remove('active'));b.classList.add('active');state.filter=b.dataset.filter;render()});$("#search").oninput=e=>{state.query=e.target.value.slice(0,80);render()};$("#sort").onchange=e=>{state.sort=e.target.value;render()};$("#favoritesOnly").onclick=()=>{state.favoritesOnly=!state.favoritesOnly;$("#favoritesOnly").classList.toggle('active',state.favoritesOnly);render()};$("#compareOpen").onclick=showCompare;$$('[data-close]').forEach(x=>x.onclick=()=>$("#compareModal").hidden=true);document.addEventListener('keydown',e=>{if(e.key==='Escape')$("#compareModal").hidden=true});
 fetch('/api/cars',{cache:'no-store',credentials:'same-origin'})
