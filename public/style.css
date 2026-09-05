@@ -18,3 +18,89 @@
   background-size: cover;
   background-position: center;
 }
+
+/* PHANTHUANXTRA LUXURY UI V1 */
+:root{
+  --bg:#f4f1e9;
+  --ink:#0b0b0b;
+  --muted:#707070;
+  --line:#ded8cc;
+  --dark:#0a0a0a;
+  --accent:#c8a96b;
+  --accent-bright:#e2c98f;
+  --blue:#0a84ff;
+  --white:#fff;
+  --shadow:0 22px 60px rgba(0,0,0,.12);
+}
+
+body,button,input,select,textarea{
+  font-family:"Be Vietnam Pro",Arial,sans-serif;
+}
+
+h1,h2,h3,h4,.logo,.eyebrow,.brand{
+  font-family:"Manrope","Be Vietnam Pro",Arial,sans-serif;
+}
+
+.header{
+  background:rgba(10,10,10,.96);
+  border-bottom:1px solid rgba(200,169,107,.28);
+}
+
+.header .logo,.header nav a,.header .hotline{color:#fff}
+.header nav a:hover{color:var(--accent-bright)}
+.logo span{color:var(--accent-bright)}
+.hotline{color:#fff}
+
+.eyebrow{color:var(--accent)}
+.hero{background:linear-gradient(135deg,#0a0a0a 0%,#161616 58%,#25221c 100%);color:#fff}
+.hero h1 em{color:var(--accent-bright)}
+.hero-copy{color:#c9c9c9}
+
+.btn.primary{background:#0a0a0a;color:#fff;border-color:#0a0a0a}
+.btn.primary:hover{background:#1a1a1a}
+.btn.zalo,.zalo{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.ghost{color:inherit;border-color:rgba(255,255,255,.5)}
+
+.stats b{color:var(--accent-bright)}
+.hero-label span,.tool-cards b,.services b{color:var(--accent-bright)}
+
+.section h2,.dark h2{font-family:"Manrope","Be Vietnam Pro",Arial,sans-serif}
+.car-card{box-shadow:0 8px 30px rgba(0,0,0,.06)}
+.car-card:hover{box-shadow:0 16px 42px rgba(0,0,0,.12)}
+
+.price{display:flex;flex-direction:column;gap:3px}
+.price-label{font-size:10px;line-height:1.2;letter-spacing:.13em;text-transform:uppercase;color:#8a7651;font-weight:800}
+.price strong{font-size:1.15em}
+
+/* Font-independent luxury icons: hide the old glyph and draw with CSS masks. */
+.menu-toggle,.icon-btn{font-size:0;position:relative}
+.menu-toggle::before,.icon-btn::before{
+  content:"";display:block;width:18px;height:18px;
+  background:currentColor;
+  -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;
+  -webkit-mask-position:center;mask-position:center;
+  -webkit-mask-size:contain;mask-size:contain;
+}
+.menu-toggle::before{
+  width:20px;height:20px;
+  -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 7h16M4 12h16M4 17h16' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
+  mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 7h16M4 12h16M4 17h16' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+[data-fav]::before{
+  -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 20s-7-4.6-9.1-8.7C1.4 8.3 3.4 5 6.8 5c1.8 0 3.1 1 4 2.3C11.1 6 12.4 5 14.2 5 17.6 5 19.6 8.3 19.1 11.3 19 15.4 12 20 12 20Z' fill='none' stroke='black' stroke-width='1.7'/%3E%3C/svg%3E");
+  mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 20s-7-4.6-9.1-8.7C1.4 8.3 3.4 5 6.8 5c1.8 0 3.1 1 4 2.3C11.1 6 12.4 5 14.2 5 17.6 5 19.6 8.3 19.1 11.3 19 15.4 12 20 12 20Z' fill='none' stroke='black' stroke-width='1.7'/%3E%3C/svg%3E");
+}
+[data-compare]::before{
+  -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8 6 4 10l4 4M4 10h11M16 10l4 4-4 4M20 14H9' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8 6 4 10l4 4M4 10h11M16 10l4 4-4 4M20 14H9' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.dark{background:#0a0a0a}
+.contact{background:linear-gradient(135deg,#c8a96b,#e2c98f)}
+footer{background:#070707}
+
+@media(max-width:800px){
+  .header{background:rgba(10,10,10,.98)}
+  nav{background:#111!important;border-color:#2b2b2b!important}
+  nav a{color:#fff!important}
+}
