@@ -6,6 +6,7 @@ on:
       - 'src/**'
       - 'public/**'
       - 'migrations/**'
+      - 'scripts/**'
       - 'package.json'
       - 'package-lock.json'
       - 'wrangler.json'
