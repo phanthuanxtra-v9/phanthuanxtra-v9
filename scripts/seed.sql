@@ -1,3 +1,0 @@
--- Import the existing JSON inventory manually or with the migration script.
--- Example:
--- INSERT INTO cars (id,brand,model,year,mileage,price,status,description) VALUES (...);
