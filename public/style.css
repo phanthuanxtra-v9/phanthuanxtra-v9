@@ -105,3 +105,18 @@ footer{background:#070707}
   nav{background:#111!important;border-color:#2b2b2b!important}
   nav a{color:#fff!important}
 }
+.hero-card.empty{
+  display:flex;
+  align-items:flex-end;
+  background:linear-gradient(145deg,#111 0%,#050505 100%);
+}
+.hero-card.empty .hero-car{
+  display:none;
+}
+.hero-card.empty .hero-label{
+  width:100%;
+  min-height:260px;
+  display:flex;
+  justify-content:flex-end;
+  flex-direction:column;
+}
