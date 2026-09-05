@@ -3,7 +3,11 @@ const SEC={"X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Referrer
 const secure=r=>{const o=new Response(r.body,r);for(const[k,v]of Object.entries(SEC))o.headers.set(k,v);return o};
 const auth=(r,e)=>{const t=e.ADMIN_TOKEN,a=r.headers.get("Authorization")||"";return !!t&&a.startsWith("Bearer ")&&a.slice(7)===t};
 const body=async r=>r.json().catch(()=>null);const text=(v,n)=>String(v??"").trim().slice(0,n);const num=v=>Number.isFinite(Number(v))?Number(v):0;
-async function initDb(db){await db.batch([db.prepare(`CREATE TABLE IF NOT EXISTS car_images (id INTEGER PRIMARY KEY AUTOINCREMENT, car_id TEXT NOT NULL, url TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, is_cover INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`),db.prepare(`CREATE INDEX IF NOT EXISTS idx_car_images_car ON car_images(car_id,sort_order)`),db.prepare(`CREATE TABLE IF NOT EXISTS leads (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, phone TEXT NOT NULL, car_id TEXT, message TEXT, status TEXT NOT NULL DEFAULT 'new', note TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT)`)]);for(const sql of ["ALTER TABLE cars ADD COLUMN featured INTEGER NOT NULL DEFAULT 0","ALTER TABLE cars ADD COLUMN cover_image TEXT DEFAULT ''","ALTER TABLE leads ADD COLUMN status TEXT NOT NULL DEFAULT 'new'","ALTER TABLE leads ADD COLUMN note TEXT DEFAULT ''","ALTER TABLE leads ADD COLUMN updated_at TEXT"]){try{await db.prepare(sql).run()}catch{}}}
+async function initDb(db) {
+  // Database schema is managed exclusively through D1 migrations.
+  // No runtime DDL or schema mutation is performed here.
+}
+
 async function getImages(db,carId){const q=await db.prepare("SELECT id,url,sort_order,is_cover FROM car_images WHERE car_id=? ORDER BY sort_order,id").bind(carId).all();return q.results||[]}
 async function saveImages(db,carId,images){await db.prepare("DELETE FROM car_images WHERE car_id=?").bind(carId).run();if(!Array.isArray(images)||!images.length)return;const rows=images.slice(0,30).map((x,i)=>typeof x==='string'?{url:x,sort_order:i,is_cover:i===0}:x);await db.batch(rows.map((x,i)=>db.prepare("INSERT INTO car_images (car_id,url,sort_order,is_cover) VALUES (?,?,?,?)").bind(carId,text(x.url,200000),Number.isFinite(Number(x.sort_order))?Number(x.sort_order):i,x.is_cover?1:0)))}
 function validCar(b){if(!b||!/^[a-z0-9][a-z0-9-_]{2,80}$/i.test(String(b.id||"")))return"ID bài đăng không hợp lệ";if(!text(b.brand,100)||!text(b.model,160))return"Hãng và mẫu xe là bắt buộc";return null}
