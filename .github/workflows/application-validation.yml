@@ -1,0 +1,76 @@
+name: Application Validation
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'migrations/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'wrangler.json'
+      - '.github/workflows/application-validation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Validate JavaScript syntax
+        run: |
+          node --check src/entry.js
+          node --check src/cms.js
+          node --check src/index.js
+
+      - name: Developer Gateway tests
+        run: node --test developer-gateway/test/index.test.mjs
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Wrangler dry-run
+        run: npx --yes wrangler deploy --dry-run
+
+      - name: Verify no runtime DDL
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          base_sha="${{ github.event.pull_request.base.sha }}"
+          head_sha="${{ github.event.pull_request.head.sha }}"
+
+          changed_files="$(git diff --name-only "$base_sha" "$head_sha" -- \
+            'src/**' \
+            'public/**' \
+            'developer-gateway/**')"
+
+          if [ -z "$changed_files" ]; then
+            echo "NO RUNTIME FILES CHANGED"
+            exit 0
+          fi
+
+          echo "Changed runtime files:"
+          printf '%s\n' "$changed_files"
+
+          if git diff --unified=0 "$base_sha" "$head_sha" -- $changed_files |
+             grep -E '^\+.*(CREATE TABLE|CREATE INDEX|ALTER TABLE|DROP TABLE|DROP INDEX)'; then
+            echo "ERROR: runtime DDL added by this pull request"
+            exit 1
+          fi
+
+          echo "NO RUNTIME DDL ADDED BY THIS PULL REQUEST"
