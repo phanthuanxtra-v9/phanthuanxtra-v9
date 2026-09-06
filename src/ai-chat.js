@@ -1,5 +1,5 @@
 const MODEL = "@cf/meta/llama-3.1-8b-instruct";
-const AI_SEARCH_ID = "phan-thuan";
+const AI_SEARCH_IDS = ["ai-search-mcp", "ai-search-auto"];
 const MAX_MESSAGE = 4000;
 const MAX_HISTORY = 12;
 const MAX_CARS = 20;
@@ -20,7 +20,7 @@ const id = () => crypto.randomUUID();
 
 const BRAND_KNOWLEDGE = `# PHAN THUẦN XTRA — nguồn kiến thức chính thức
 
-PHAN THUẦN XTRA là thương hiệu/website mà chatbot đang tư vấn. Khi khách hỏi về Phan Thuần, PHAN THUẦN XTRA hoặc thương hiệu này, chỉ sử dụng thông tin có trong tài liệu này và nội dung đã được lập chỉ mục từ website phanthuanxtra.com.
+PHAN THUẦN XTRA là thương hiệu/website mà chatbot đang tư vấn. Khi khách hỏi về Phan Thuần, PHAN THUẦN XTRA hoặc thương hiệu này, chỉ sử dụng thông tin có trong tài liệu được lập chỉ mục từ AI Search và nội dung website phanthuanxtra.com.
 
 Website chính thức: https://phanthuanxtra.com/
 Hotline tư vấn: 0866 997 891
@@ -59,60 +59,35 @@ async function loadCars(env) {
   } catch { return []; }
 }
 
-async function ensureKnowledge(env) {
-  if (!env.AI_SEARCH) return null;
-  try {
-    let instance;
-    try {
-      instance = env.AI_SEARCH.get(AI_SEARCH_ID);
-      await instance.info();
-    } catch {
-      instance = await env.AI_SEARCH.create({
-        id: AI_SEARCH_ID,
-        type: "web-crawler",
-        source: "phanthuanxtra.com"
-      });
-    }
-
-    try {
-      const items = await instance.items.list({ per_page: 50, search: "phan-thuan.md" });
-      const exists = (items.result || []).some(x => x.key === "phan-thuan.md" || x.metadata?.filename === "phan-thuan.md");
-      if (!exists) {
-        await instance.items.upload("phan-thuan.md", BRAND_KNOWLEDGE, {
-          metadata: { category: "brand", language: "vi", version: "1" }
-        });
-      }
-    } catch (error) {
-      console.warn("ai_search_index", String(error?.message || error));
-    }
-    return instance;
-  } catch (error) {
-    console.warn("ai_search_setup", String(error?.message || error));
-    return null;
-  }
-}
-
 async function searchKnowledge(env, query) {
-  const instance = await ensureKnowledge(env);
-  if (!instance) return "";
+  if (!env.AI_SEARCH) return "";
   try {
-    const result = await instance.search({
+    const result = await env.AI_SEARCH.search({
       messages: [{ role: "user", content: query }],
-      ai_search_options: { retrieval: { max_num_results: MAX_KNOWLEDGE_CHUNKS } }
+      ai_search_options: {
+        instance_ids: AI_SEARCH_IDS,
+        retrieval: { max_num_results: MAX_KNOWLEDGE_CHUNKS }
+      }
     });
-    return (result?.chunks || []).map(chunk => chunk.content || chunk.text || "").filter(Boolean).join("\n\n---\n\n").slice(0, 12000);
+    const chunks = result?.chunks || [];
+    const context = chunks
+      .map(chunk => chunk.content || chunk.text || "")
+      .filter(Boolean)
+      .join("\n\n---\n\n");
+    return `${BRAND_KNOWLEDGE}\n\n${context}`.slice(0, 12000);
   } catch (error) {
     console.warn("ai_search_query", String(error?.message || error));
-    return "";
+    return BRAND_KNOWLEDGE;
   }
 }
 
-async function ensureConversation(env, conversationId, visitorId) {
+async function ensureConversation(env, conversationId, visitorId, channel = "website") {
   const cid = clean(conversationId, 100) || id();
   const vid = clean(visitorId, 160);
+  const normalizedChannel = channel === "telegram" ? "telegram" : "website";
   await env.DB.prepare(`INSERT INTO ai_conversations (id,channel,visitor_id,status,created_at,updated_at)
-    VALUES (?, 'website', ?, 'open', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    ON CONFLICT(id) DO UPDATE SET visitor_id=COALESCE(excluded.visitor_id,ai_conversations.visitor_id),updated_at=CURRENT_TIMESTAMP`).bind(cid, vid || null).run();
+    VALUES (?, ?, ?, 'open', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    ON CONFLICT(id) DO UPDATE SET visitor_id=COALESCE(excluded.visitor_id,ai_conversations.visitor_id),channel=excluded.channel,updated_at=CURRENT_TIMESTAMP`).bind(cid, normalizedChannel, vid || null).run();
   return cid;
 }
 
@@ -152,7 +127,7 @@ export async function handleAiChat(request, env) {
   const body = await request.json().catch(() => null);
   const message = clean(body?.message);
   if (!message) return json({ ok: false, error: "Tin nhắn trống" }, 400);
-  const conversationId = await ensureConversation(env, body?.conversation_id, body?.visitor_id);
+  const conversationId = await ensureConversation(env, body?.conversation_id, body?.visitor_id, body?.channel);
   const history = await loadHistory(env, conversationId);
   await env.DB.prepare("INSERT INTO ai_messages (conversation_id,role,content) VALUES (?,?,?)").bind(conversationId,"user",message).run();
   const [cars, knowledge] = await Promise.all([loadCars(env), searchKnowledge(env, message)]);
