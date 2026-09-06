@@ -41,9 +41,6 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Install dependencies without lifecycle scripts
-        run: npm ci --ignore-scripts
-
       - name: Validate JavaScript syntax
         run: |
           node --check src/entry.js
@@ -52,10 +49,15 @@ jobs:
           node --check public/script.js
 
       - name: Wrangler dry-run
-        run: npx --yes wrangler deploy --dry-run
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --dry-run
 
       - name: Deploy to Cloudflare
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx --yes wrangler deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
