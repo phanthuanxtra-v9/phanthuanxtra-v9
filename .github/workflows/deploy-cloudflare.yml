@@ -45,14 +45,26 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Validate JavaScript syntax
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate JavaScript syntax and tests
         run: |
           node --check src/entry.js
           node --check src/cms.js
           node --check src/index.js
           node --check src/telegram.js
+          node --check src/telegram-ingest.js
+          node --check src/vehicle-ai.js
+          node --check src/media.js
           node --check public/script.js
           node --test tests/telegram.test.mjs
+
+      - name: Ensure R2 media bucket exists
+        run: |
+          if ! npx wrangler r2 bucket info phanthuanxtra-media --json >/dev/null 2>&1; then
+            npx wrangler r2 bucket create phanthuanxtra-media --storage-class Standard
+          fi
 
       - name: Wrangler dry-run
         uses: cloudflare/wrangler-action@v3
