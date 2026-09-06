@@ -1,5 +1,6 @@
 name: Deploy Cloudflare Worker
 
+# Production verification remains GitHub Actions based; do not run Wrangler on Android/Termux.
 on:
   workflow_dispatch:
   pull_request:
