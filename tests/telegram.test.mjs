@@ -23,11 +23,11 @@ test('Telegram caption omits fields that are not present instead of inventing da
   assert.doesNotMatch(caption,/Twin Turbo/);
 });
 
-test('Telegram AI draft auto-publish requires real identity, high confidence and valid plate box',()=>{
+test('Telegram AI draft auto-publish requires real identity and high confidence; plate box is optional branding',()=>{
   assert.equal(canAutoPublish({brand:'Lexus',model:'LX 600',confidence:0.85,plate_bbox:VALID_PLATE_BBOX}),true);
   assert.equal(canAutoPublish({brand:'Lexus',model:'LX 600',confidence:0.849,plate_bbox:VALID_PLATE_BBOX}),false);
   assert.equal(canAutoPublish({brand:'Lexus',model:null,confidence:0.99,plate_bbox:VALID_PLATE_BBOX}),false);
-  assert.equal(canAutoPublish({brand:'Lexus',model:'LX 600',confidence:0.99,plate_bbox:null}),false);
+  assert.equal(canAutoPublish({brand:'Lexus',model:'LX 600',confidence:0.99,plate_bbox:null}),true);
 });
 
 test('Telegram webhook receipt is immediate and independent of downstream processing',()=>{
@@ -42,6 +42,7 @@ test('Telegram webhook receipt is immediate and independent of downstream proces
 
 test('PT Xtra branding is not a vehicle identity gate',()=>{
   assert.equal(canAutoPublish({brand:'Lexus',model:'LX 600',confidence:0.85,plate_bbox:VALID_PLATE_BBOX}),true);
+  assert.equal(canAutoPublish({brand:'Lexus',model:'LX 600',confidence:0.85,plate_bbox:null}),true);
   assert.equal(canAutoPublish({brand:'Lexus',model:'LX 600',confidence:0.85,plate_bbox:VALID_PLATE_BBOX,plate_text:'PT Xtra'}),true);
   assert.equal(canAutoPublish({brand:'Lexus',model:'LX 600',confidence:0.85,plate_bbox:VALID_PLATE_BBOX,plate_text:'12A-123.45'}),true);
 });
