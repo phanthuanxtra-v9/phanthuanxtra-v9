@@ -16,19 +16,14 @@ const schema = {
     confidence: { type: "number" },
     missing_fields: { type: "array", items: { type: "string" } },
     plate_bbox: {
-      anyOf: [
-        { type: "null" },
-        {
-          type: "object",
-          properties: {
-            x: { type: "number" },
-            y: { type: "number" },
-            width: { type: "number" },
-            height: { type: "number" }
-          },
-          required: ["x", "y", "width", "height"]
-        }
-      ]
+      type: ["object", "null"],
+      properties: {
+        x: { type: "number" },
+        y: { type: "number" },
+        width: { type: "number" },
+        height: { type: "number" }
+      },
+      required: ["x", "y", "width", "height"]
     }
   },
   required: ["brand","model","year","mileage","price","fuel","category","color","description","features","confidence","missing_fields","plate_bbox"]
