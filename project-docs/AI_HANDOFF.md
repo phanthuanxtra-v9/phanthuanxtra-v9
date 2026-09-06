@@ -3,26 +3,27 @@
 ## Shared peer model
 AI1, AI2, AI3, AI4 and AI5 are equal peer agents working on the same project. Role labels are specializations/perspectives, not authority or ownership.
 
-## Completed in this cycle
-- Fixed the AI unknown-question CI blocker by making the D1 `run()` result access optional (`r?.meta?.last_row_id`).
-- Completed missing-contact persistence for pending AI unknown questions.
-- Connected Telegram vehicle AI drafts to a guarded auto-publish path.
-- Auto-publish requires real `brand` + `model` and confidence >= 0.85.
-- Deterministic car IDs use the Telegram inbox ID (`tg-<inboxId>`), preventing duplicate car records on webhook retries.
-- Stored R2 vehicle media is exposed through `/media/<key>` and referenced as a public HTTPS `car_images.url` for Telegram media delivery.
-- `telegram_posts` remains the final idempotency gate; a second publish returns `duplicate:true` without another Telegram send.
-- Added tests for confidence gating and duplicate protection.
+## Completed checkpoint — 2026-09-06
+- AI unknown-question mock-D1 blocker fixed with optional `r?.meta?.last_row_id` handling.
+- Identity routing tightened so a customer's name mention does not incorrectly classify an unrelated request as an identity question.
+- Telegram AI draft -> publish is connected behind a safety gate: real `brand` + `model` and confidence >= 0.85.
+- Deterministic car IDs use `tg-<inboxId>`.
+- R2 media is retained and served via `/media/<key>`; the vehicle row gets a public HTTPS `car_images` URL.
+- `telegram_posts` is the final idempotency gate. A second publish returns `duplicate:true` without another Telegram send.
+- Tests cover confidence gating and duplicate protection.
+- CI Run #58 (`34023110015`) is green.
+  - Validate: `101459199272` success.
+  - Production: `101459235528` success.
+  - D1 migrations: no migrations pending.
+- Production Worker deployment succeeded.
+  - Worker: `phanthuanxtra-v2`
+  - Version: `ee69e468-dfc9-45d9-987d-8b2a2e268817`
 
-## Remaining verification gate
-- GitHub Actions must finish green for the latest main commit.
-- Production deployment must complete successfully and provide a Cloudflare Worker version/deployment record.
-- Runtime auto-publish should only be enabled after CI passes.
-
-## Safety
-- No legal license plate number is invented.
+## Current safety boundary
 - No missing vehicle facts are fabricated.
-- Source image is preserved in R2; the current auto-publish path does not synthesize or alter a plate.
-- Existing Telegram webhook idempotence remains based on `source_hash`.
+- No legal license plate number is invented.
+- Source image remains unchanged in R2.
+- The current auto-publish flow does not synthesize a license-plate overlay; any future overlay must use explicit real vehicle data or clearly non-legal branding.
 
 ## Next agent
-Read `PROJECT_STATE.md`, inspect the latest CI run, verify production deployment, then update both shared docs with concrete run/job/version evidence. Do not restart or overwrite valid work.
+Start by reading `PROJECT_STATE.md` and this file. Do not restart the project. Continue from the green production checkpoint, and only make changes that preserve the current idempotence and data-integrity guarantees.
