@@ -4,12 +4,15 @@ import { handleTelegramApi } from "./telegram.js";
 import { handleTelegramIngest } from "./telegram-ingest.js";
 import { handleMediaApi } from "./media.js";
 import { handleAiChat } from "./ai-chat.js";
+import { handleTelegramRouter } from "./telegram-router.js";
 
 export default {
   async fetch(request, env, ctx) {
     try {
       const aiChatResponse = await handleAiChat(request, env);
       if (aiChatResponse) return aiChatResponse;
+      const telegramRouterResponse = await handleTelegramRouter(request, env, ctx);
+      if (telegramRouterResponse) return telegramRouterResponse;
       const ingestResponse = await handleTelegramIngest(request, env, ctx);
       if (ingestResponse) return ingestResponse;
       const mediaResponse = await handleMediaApi(request, env);
