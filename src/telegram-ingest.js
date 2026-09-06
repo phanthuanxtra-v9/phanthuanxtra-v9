@@ -46,7 +46,7 @@ async function promoteDraft(env,inboxId,ai,mediaKey){
   const carId=carIdForInbox(inboxId);
   const description=clean(ai.description,10000)||`Xe ${clean(ai.brand)} ${clean(ai.model)} được nhập từ Telegram và phân tích bởi AI.`;
   const features=Array.isArray(ai.features)?ai.features.map(clean).filter(Boolean).slice(0,80):[];
-  const imageUrl=`https://phanthuanxtra.com/media/${encodeURIComponent(mediaKey)}`;
+  const imageUrl=`https://phanthuanxtra.com/media/${encodeURIComponent(mediaKey)}?branding=pt-xtra`;
   const existing=await env.DB.prepare("SELECT id,status FROM cars WHERE id=? LIMIT 1").bind(carId).first();
   if(!existing){
     await env.DB.prepare("INSERT INTO cars (id,brand,model,year,mileage,price,fuel,category,color,status,description,features_json,featured,cover_image) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
@@ -71,7 +71,7 @@ async function processInbox(env,inboxId,filePath,caption,sourceHash,chatId,messa
     await env.MEDIA.put(mediaKey,bytes,{httpMetadata:{contentType,cacheControl:"public, max-age=31536000, immutable"}});
     const ai=await analyzeVehicleImage(env,bytes,contentType,caption);
     await env.DB.prepare(`INSERT INTO vehicle_ai_drafts (inbox_id,status,ai_json,confidence,missing_fields_json,source_caption,source_file_path,created_at,updated_at) VALUES (?, 'draft', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(inbox_id) DO UPDATE SET ai_json=excluded.ai_json,confidence=excluded.confidence,missing_fields_json=excluded.missing_fields_json,source_caption=excluded.source_caption,source_file_path=excluded.source_file_path,error=NULL,status='draft',updated_at=CURRENT_TIMESTAMP`).bind(inboxId,JSON.stringify({...ai,media_key:mediaKey}),Number(ai.confidence||0),JSON.stringify(ai.missing_fields||[]),caption,filePath).run();
-    await env.DB.prepare(`UPDATE telegram_inbox SET status='analyzed',processed_image_url=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(`/media/${mediaKey}`,inboxId).run();
+    await env.DB.prepare(`UPDATE telegram_inbox SET status='analyzed',processed_image_url=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(`/media/${mediaKey}?branding=pt-xtra`,inboxId).run();
     let promotion={published:false,reason:"not_attempted"};
     try{promotion=await promoteDraft(env,inboxId,ai,mediaKey);if(promotion.published)await env.DB.prepare("UPDATE telegram_inbox SET status='published',updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(inboxId).run();}
     catch(error){promotion={published:false,reason:clean(error?.message||error)||"publish_failed"};await env.DB.prepare("UPDATE vehicle_ai_drafts SET status='publish_failed',error=?,updated_at=CURRENT_TIMESTAMP WHERE inbox_id=?").bind(promotion.reason,inboxId).run().catch(()=>{});}
@@ -94,7 +94,7 @@ export async function handleTelegramIngest(request,env,ctx){
   if(url.pathname!=="/api/telegram/webhook")return null;
   if(request.method!=="POST")return json({error:"Method Not Allowed"},405,{Allow:"POST"});
   const secret=env.TELEGRAM_WEBHOOK_SECRET;
-  if(secret&&request.headers.get("X-Telegram-Bot-Api-Secret-Token")!==secret)return json({error:"Unauthorized"},401);
+  if(secret&&request.headers.get("X-Telegram-Webhook-Secret-Token")!==secret)return json({error:"Unauthorized"},401);
   const update=await request.json().catch(()=>null);
   const message=update?.message||update?.channel_post||null;
   if(!message)return json({ok:true,ignored:true});
