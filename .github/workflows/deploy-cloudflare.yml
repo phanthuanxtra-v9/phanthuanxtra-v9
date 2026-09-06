@@ -60,6 +60,7 @@ jobs:
           node --check src/index.js
           node --check src/telegram.js
           node --check src/telegram-ingest.js
+          node --check src/telegram-router.js
           node --check src/vehicle-ai.js
           node --check src/media.js
           node --check src/ai-chat.js
