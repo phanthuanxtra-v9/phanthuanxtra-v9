@@ -22,6 +22,13 @@
     "binding": "AI"
   },
 
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "phanthuanxtra-media"
+    }
+  ],
+
   "d1_databases": [
     {
       "binding": "DB",
