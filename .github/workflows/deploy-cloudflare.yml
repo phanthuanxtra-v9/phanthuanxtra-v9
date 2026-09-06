@@ -87,11 +87,6 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Ensure R2 media bucket exists
-        run: |
-          if ! npx wrangler r2 bucket info phanthuanxtra-media --json >/dev/null 2>&1; then
-            npx wrangler r2 bucket create phanthuanxtra-media --storage-class Standard
-          fi
       - name: Wrangler dry-run
         uses: cloudflare/wrangler-action@v3
         with:
