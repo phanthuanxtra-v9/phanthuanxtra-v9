@@ -85,7 +85,7 @@ export async function handleAiChat(request,env){
   const identityQuery=IDENTITY_RE.test(message); const vehicleQuery=VEHICLE_RE.test(message); const pending=await pendingUnknown(env,conversationId);
   if(pending && (contact.name||contact.phone)){
     await env.DB.prepare("UPDATE ai_unknown_questions SET name=COALESCE(?,name),phone=COALESCE(?,phone),updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(contact.name||null,contact.phone||null,pending.id).run();
-    await env.DB.prepare("UPDATE ai_conversations SET name=COALESCE(?,name),phone=COALESCE(?,phone),updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(contact.name||null,contact.phone||null,conversationId);
+    await env.DB.prepare("UPDATE ai_conversations SET name=COALESCE(?,name),phone=COALESCE(?,phone),updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(contact.name||null,contact.phone||null,conversationId).run();
   }
   const allowed = identityQuery || vehicleQuery;
   const needsHuman = !allowed || (!identityQuery && !vehicleQuery && !knowledge.evidence);
