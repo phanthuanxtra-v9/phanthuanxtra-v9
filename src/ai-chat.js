@@ -140,6 +140,38 @@ async function saveLead(env, conversationId, phone, name, message) {
     .bind(clean(name,120) || null, clean(phone,30), conversationId).run();
 }
 
+async function notifyTelegram(env, payload) {
+  const token = env.TELEGRAM_CHAT_BOT_TOKEN;
+  const chatId = env.TELEGRAM_AI_NOTIFY_CHAT_ID;
+  if (!token || !chatId) return { sent: false, configured: false };
+  const lines = [
+    "🤖 WEBSITE AI CHAT",
+    `Conversation: ${clean(payload.conversationId,100)}`,
+    payload.name ? `👤 Tên: ${clean(payload.name,120)}` : null,
+    payload.phone ? `📞 SĐT: ${clean(payload.phone,30)}` : null,
+    `💬 Khách: ${clean(payload.message,1800)}`,
+    `🤖 AI: ${clean(payload.reply,1800)}`,
+    payload.channel ? `Kênh: ${clean(payload.channel,40)}` : "Kênh: website",
+    "🔗 https://phanthuanxtra.com/"
+  ].filter(Boolean).join("\n\n");
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text: lines, disable_web_page_preview: true })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.ok) {
+      console.warn("telegram_ai_notify", String(data.description || `HTTP ${response.status}`));
+      return { sent: false, configured: true };
+    }
+    return { sent: true, configured: true };
+  } catch (error) {
+    console.warn("telegram_ai_notify", String(error?.message || error));
+    return { sent: false, configured: true };
+  }
+}
+
 export async function handleAiChat(request, env) {
   const url = new URL(request.url);
   if (url.pathname !== "/api/ai-chat") return null;
@@ -165,5 +197,6 @@ export async function handleAiChat(request, env) {
   const name = clean(body?.name,120);
   if (phone) await saveLead(env, conversationId, phone, name, message);
   else await env.DB.prepare("UPDATE ai_conversations SET name=COALESCE(?,name),updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(name || null, conversationId).run();
+  await notifyTelegram(env, { conversationId, visitorId: body?.visitor_id, name, phone, message, reply, channel: body?.channel || "website" });
   return json({ ok: true, conversation_id: conversationId, reply });
 }
