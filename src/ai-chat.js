@@ -74,7 +74,8 @@ async function loadCars(env) {
 async function searchKnowledge(env, query) {
   if (!env.AI_SEARCH) return BRAND_KNOWLEDGE;
   try {
-    const isIdentityQuery = /phan\s*thu[aâ]n|phanthu[aâ]n|ph[aâ]n\s*thu[aâ]n/i.test(query);
+    const normalizedQuery = query.normalize("NFC").toLowerCase();
+    const isIdentityQuery = /phan\s*thuần|phan\s*thuan|phanthuần|phanthuan/.test(normalizedQuery);
     const searchQuery = isIdentityQuery
       ? `${query}\nPhan Thuần\nPHAN THUẦN XTRA\ngiới thiệu Phan Thuần\nanh Phan Thuần là ai\nthông tin chính thức về Phan Thuần`
       : query;
