@@ -102,8 +102,13 @@ export async function handleTelegramIngest(request,env,ctx){
   if(url.pathname==="/api/admin/telegram/webhook"){
     if(request.method!=="POST")return json({error:"Method Not Allowed"},405,{Allow:"POST"});
     if(!authorized(request,env))return json({error:"Unauthorized"},401,{"WWW-Authenticate":"Bearer"});
-    const result=await setTelegramWebhook(env,`${url.origin}/api/telegram/webhook`);
-    return json({ok:true,webhook:result});
+    try{
+      const result=await setTelegramWebhook(env,`${url.origin}/api/telegram/webhook`);
+      return json({ok:true,webhook:result});
+    }catch(error){
+      console.error("telegram_webhook_setup_failed",String(error?.message||error));
+      return json({ok:false,error:"Telegram setWebhook failed",detail:clean(error?.message||error)||"Unknown Telegram error"},502);
+    }
   }
   if(url.pathname!=="/api/telegram/webhook")return null;
   if(request.method!=="POST")return json({error:"Method Not Allowed"},405,{Allow:"POST"});

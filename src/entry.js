@@ -1,10 +1,12 @@
 import legacy from "./index.js";
 import { handleCmsApi } from "./cms.js";
 import { handleTelegramApi } from "./telegram.js";
-import { handleTelegramIngest } from "./telegram-ingest.js";
+import { handleTelegramIngest, setTelegramWebhook } from "./telegram-ingest.js";
 import { handleMediaApi } from "./media.js";
 import { handleAiChat } from "./ai-chat.js";
 import { handleTelegramRouter } from "./telegram-router.js";
+
+const TELEGRAM_WEBHOOK_URL="https://phanthuanxtra.com/api/telegram/webhook";
 
 export default {
   async fetch(request, env, ctx) {
@@ -25,6 +27,15 @@ export default {
     } catch (error) {
       console.error("telegram_or_worker_request", String(error?.message || error));
       return new Response(JSON.stringify({ok:false,error:"Internal Server Error"}),{status:500,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
+    }
+  },
+
+  async scheduled(controller, env, ctx) {
+    try {
+      const result=await setTelegramWebhook(env,TELEGRAM_WEBHOOK_URL);
+      console.log("telegram_webhook_self_heal_ok",JSON.stringify({url:TELEGRAM_WEBHOOK_URL,result}));
+    } catch (error) {
+      console.error("telegram_webhook_self_heal_failed",String(error?.message||error));
     }
   }
 };
