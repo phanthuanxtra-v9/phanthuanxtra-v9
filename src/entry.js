@@ -2,12 +2,15 @@ import legacy from "./index.js";
 import { handleCmsApi } from "./cms.js";
 import { handleTelegramApi } from "./telegram.js";
 import { handleTelegramIngest } from "./telegram-ingest.js";
+import { handleMediaApi } from "./media.js";
 
 export default {
   async fetch(request, env, ctx) {
     try {
       const ingestResponse = await handleTelegramIngest(request, env, ctx);
       if (ingestResponse) return ingestResponse;
+      const mediaResponse = await handleMediaApi(request, env);
+      if (mediaResponse) return mediaResponse;
       const telegramResponse = await handleTelegramApi(request, env);
       if (telegramResponse) return telegramResponse;
       const cmsResponse = await handleCmsApi(request, env);
