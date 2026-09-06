@@ -57,9 +57,8 @@ async function processBundle(env, bundleKey, chatId) {
 }
 
 async function autoWebhook(request, env, ctx) {
-  if (!env.DB || !env.MEDIA) return json({ ok: false, error: "D1/MEDIA chưa được kết nối" }, 503);
   const secret = env.TELEGRAM_WEBHOOK_SECRET;
-  if (secret && request.headers.get("X-Telegram-Webhook-Secret") !== secret && request.headers.get("X-Telegram-Bot-Api-Secret-Token") !== secret) return json({ error: "Unauthorized" }, 401);
+  if (secret && request.headers.get("X-Telegram-Bot-Api-Secret-Token") !== secret && request.headers.get("X-Telegram-Webhook-Secret") !== secret) return json({ error: "Unauthorized" }, 401);
   const update = await request.json().catch(() => null);
   const message = update?.message || update?.channel_post;
   if (!message?.chat?.id) return json({ ok: true, ignored: true });
@@ -67,6 +66,21 @@ async function autoWebhook(request, env, ctx) {
   const caption = clean(message.caption || message.text);
   if (!photo && !caption) return json({ ok: true, ignored: true });
   const chatId = String(message.chat.id);
+
+  // Acknowledge immediately and independently from D1/R2/AI. A downstream
+  // failure must never make the Telegram bot appear silent.
+  await tg(env.TELEGRAM_BOT_TOKEN, "sendMessage", {
+    chat_id: chatId,
+    reply_to_message_id: Number(message.message_id || 0),
+    text: photo ? "📥 ĐÃ NHẬN ẢNH XE\n⏳ Đang kiểm tra và xử lý..." : "📥 ĐÃ NHẬN THÔNG TIN XE\n⏳ Đang chờ ảnh xe để xử lý..."
+  }).catch(error => console.error("telegram_receipt_failed", clean(error?.message || error)));
+
+  if (!env.DB || !env.MEDIA) {
+    const reason = !env.DB && !env.MEDIA ? "D1/MEDIA" : !env.DB ? "D1" : "MEDIA";
+    await tg(env.TELEGRAM_BOT_TOKEN, "sendMessage", { chat_id: chatId, text: `❌ Hệ thống thiếu binding ${reason}.\n⛔ Chưa phân tích/publish xe.` }).catch(error => console.error("telegram_binding_error_reply_failed", clean(error?.message || error)));
+    return json({ ok: false, error: `${reason} binding missing` }, 503);
+  }
+
   const sourceHash = await sha256(`${chatId}:${message.message_id}:${photo?.file_unique_id || caption}`);
   const isPhoto = Boolean(photo);
   const recent = (await env.DB.prepare("SELECT id,bundle_key,file_id,caption,bundle_status FROM telegram_inbox WHERE chat_id=? AND bundle_status='pending' AND created_at >= datetime('now','-45 seconds') ORDER BY id DESC LIMIT 20").bind(chatId).all()).results || [];
