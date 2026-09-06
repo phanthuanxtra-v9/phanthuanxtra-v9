@@ -4,6 +4,7 @@ import { handleAiChat } from '../src/ai-chat.js';
 
 function mockDb() {
   const rows = [];
+  const unknown = [];
   return {
     prepare(sql) {
       return {
@@ -12,19 +13,26 @@ function mockDb() {
             async run() {
               if (sql.includes('INSERT INTO ai_conversations')) rows.push({type:'conversation',id:args[0]});
               if (sql.includes('INSERT INTO ai_messages')) rows.push({type:'message',role:args[1],content:args[2]});
+              if (sql.includes('INSERT INTO ai_unknown_questions')) unknown.push({id:unknown.length+1,conversation_id:args[0],question:args[1],name:args[2],phone:args[3],status:'pending'});
             },
             async all() {
               if (sql.includes('FROM ai_messages')) return {results: rows.filter(x=>x.type==='message').slice(-12).map(x=>({role:x.role,content:x.content}))};
               return {results:[]};
             },
-            async first() { return null; }
+            async first() {
+              if (sql.includes('FROM ai_unknown_questions')) return unknown.filter(x=>x.status==='pending').at(-1) || null;
+              return null;
+            }
           };
         }
       };
     },
-    _rows: rows
+    _rows: rows,
+    _unknown: unknown
   };
 }
+
+const crmPayloads = [];
 
 test('website AI chat creates a conversation, calls AI and persists reply', async () => {
   const DB = mockDb();
@@ -34,11 +42,11 @@ test('website AI chat creates a conversation, calls AI and persists reply', asyn
       assert.equal(model, '@cf/meta/llama-3.1-8b-instruct');
       assert.equal(payload.messages.at(-1).content, 'Tôi muốn tìm Lexus');
       return { response: 'Tôi có thể hỗ trợ anh tìm Lexus phù hợp.' };
-    } }
+    } },
+    AI_SEARCH: { async search() { return { chunks: [] }; } }
   };
   const request = new Request('https://phanthuanxtra.com/api/ai-chat', {
-    method: 'POST',
-    headers: {'content-type':'application/json'},
+    method: 'POST', headers: {'content-type':'application/json'},
     body: JSON.stringify({conversation_id:'test-conversation',visitor_id:'test-visitor',message:'Tôi muốn tìm Lexus'})
   });
   const response = await handleAiChat(request, env);
@@ -47,6 +55,7 @@ test('website AI chat creates a conversation, calls AI and persists reply', asyn
   assert.equal(data.ok, true);
   assert.equal(data.conversation_id, 'test-conversation');
   assert.match(data.reply, /Lexus/);
+  assert.equal(data.needs_human, false);
   assert.ok(DB._rows.some(x=>x.type==='message' && x.role==='user'));
   assert.ok(DB._rows.some(x=>x.type==='message' && x.role==='assistant'));
 });
@@ -64,15 +73,54 @@ test('Phan Thuần identity knowledge is present when AI Search is unavailable',
     } }
   };
   const request = new Request('https://phanthuanxtra.com/api/ai-chat', {
-    method: 'POST',
-    headers: {'content-type':'application/json'},
+    method: 'POST', headers: {'content-type':'application/json'},
     body: JSON.stringify({conversation_id:'identity-test',visitor_id:'identity-test',message:'Phan Thuần là ai'})
   });
   const response = await handleAiChat(request, env);
   const data = await response.json();
   assert.equal(response.status, 200);
   assert.equal(data.ok, true);
+  assert.equal(data.needs_human, false);
   assert.match(data.reply, /Phan Thuần/);
+});
+
+test('unknown topic is handed to human and stored for later knowledge update', async () => {
+  const DB = mockDb();
+  const env = {
+    DB,
+    AI_SEARCH: { async search() { return { chunks: [] }; } },
+    AI: { async run() { throw new Error('AI must not answer an out-of-scope question'); } }
+  };
+  const request = new Request('https://phanthuanxtra.com/api/ai-chat', {
+    method:'POST', headers:{'content-type':'application/json'},
+    body:JSON.stringify({conversation_id:'unknown-test',visitor_id:'unknown-test',message:'Anh Phan Thuần có những thành tích cá nhân nào?'})
+  });
+  const response = await handleAiChat(request, env);
+  const data = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(data.ok, true);
+  assert.equal(data.needs_human, true);
+  assert.match(data.reply, /thông tin xác thực/);
+  assert.match(data.reply, /số điện thoại/);
+  assert.equal(DB._unknown.length, 1);
+});
+
+test('unknown topic accepts name and phone from the same message', async () => {
+  const DB = mockDb();
+  const env = {
+    DB,
+    AI_SEARCH: { async search() { return { chunks: [] }; } },
+    AI: { async run() { throw new Error('AI must not answer an out-of-scope question'); } }
+  };
+  const request = new Request('https://phanthuanxtra.com/api/ai-chat', {
+    method:'POST', headers:{'content-type':'application/json'},
+    body:JSON.stringify({conversation_id:'contact-test',visitor_id:'contact-test',message:'Tôi tên Phan Thuần, số điện thoại 0866997891. Tôi muốn hỏi thông tin chưa có trên website.'})
+  });
+  const response = await handleAiChat(request, env);
+  const data = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(data.needs_human, true);
+  assert.equal(DB._unknown[0].phone, '0866997891');
 });
 
 test('website AI chat rejects empty messages', async () => {
