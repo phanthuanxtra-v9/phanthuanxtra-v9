@@ -6,6 +6,17 @@ export async function storeMedia(env,key,body,contentType="application/octet-str
   return key;
 }
 
+async function brandedVehicleResponse(request,env,object){
+  if(!env.IMAGES)return json({ok:false,error:"IMAGES binding is not configured"},503);
+  if(!env.ASSETS)return json({ok:false,error:"ASSETS binding is not configured"},503);
+  const overlayResponse=await env.ASSETS.fetch(new Request(new URL("/branding/pt-xtra-plate.svg",request.url)));
+  if(!overlayResponse.ok||!overlayResponse.body)return json({ok:false,error:"PT Xtra overlay asset unavailable"},503);
+  const result=await env.IMAGES.input(object.body)
+    .draw(env.IMAGES.input(overlayResponse.body).transform({width:260}),{bottom:18})
+    .output({format:"image/jpeg",quality:90});
+  return result.response({headers:{"cache-control":"public, max-age=31536000, immutable","x-pt-xtra-branding":"display-overlay"}});
+}
+
 export async function handleMediaApi(request,env){
   const url=new URL(request.url);
   if(!url.pathname.startsWith("/media/"))return null;
@@ -15,6 +26,7 @@ export async function handleMediaApi(request,env){
   if(!key||key.includes(".."))return json({ok:false,error:"Invalid media key"},400);
   const object=await env.MEDIA.get(key);
   if(!object)return json({ok:false,error:"Not Found"},404);
+  if(url.searchParams.get("branding")==="pt-xtra"&&request.method==="GET")return brandedVehicleResponse(request,env,object);
   const headers=new Headers();
   object.writeHttpMetadata(headers);
   headers.set("etag",object.httpEtag);
