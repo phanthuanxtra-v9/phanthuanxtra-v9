@@ -47,5 +47,9 @@
       "database_name": "phanthuanxtra-db",
       "database_id": "8b6c0fc8-c278-4797-9cfa-3ec93d0c1b7d"
     }
-  ]
+  ],
+
+  "cache": {
+    "enabled": true
+  }
 }
