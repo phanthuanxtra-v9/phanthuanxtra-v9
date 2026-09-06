@@ -6,6 +6,7 @@ import { handleMediaApi } from "./media.js";
 import { handleAiChat } from "./ai-chat.js";
 import { handleTelegramRouter } from "./telegram-router.js";
 import { handleVipTelegram } from "./vip-telegram.js";
+import { handleAppApi } from "./app-api.js";
 import { reconcileTelegramNotifications } from "./telegram-notifications.js";
 
 const TELEGRAM_WEBHOOK_URL="https://phanthuanxtra.com/api/telegram/webhook";
@@ -15,6 +16,8 @@ export default {
     try {
       const aiChatResponse = await handleAiChat(request, env);
       if (aiChatResponse) return aiChatResponse;
+      const appApiResponse = await handleAppApi(request, env);
+      if (appApiResponse) return appApiResponse;
       const vipTelegramResponse = await handleVipTelegram(request, env);
       if (vipTelegramResponse) return vipTelegramResponse;
       const telegramRouterResponse = await handleTelegramRouter(request, env, ctx);
@@ -33,7 +36,6 @@ export default {
       return new Response(JSON.stringify({ok:false,error:"Internal Server Error"}),{status:500,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
     }
   },
-
   async scheduled(controller, env, ctx) {
     try {
       const status=await getTelegramWebhookStatus(env,TELEGRAM_WEBHOOK_URL);
@@ -44,14 +46,10 @@ export default {
         const verified=await getTelegramWebhookStatus(env,TELEGRAM_WEBHOOK_URL);
         console.log("telegram_webhook_post_heal_status",JSON.stringify(verified));
       }
-    } catch (error) {
-      console.error("telegram_webhook_self_heal_failed",String(error?.message||error));
-    }
+    } catch (error) { console.error("telegram_webhook_self_heal_failed",String(error?.message||error)); }
     try {
       const result=await reconcileTelegramNotifications(env);
       console.log("telegram_notifications_reconcile",JSON.stringify(result));
-    } catch (error) {
-      console.error("telegram_notifications_reconcile_failed",String(error?.message||error));
-    }
+    } catch (error) { console.error("telegram_notifications_reconcile_failed",String(error?.message||error)); }
   }
 };
