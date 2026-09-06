@@ -1,5 +1,6 @@
 import { analyzeVehicleImage } from "./vehicle-ai.js";
-import { createPtXtraPlateImage, canAutoPublish, promoteDraft } from "./telegram-ingest.js";
+import { createPtXtraPlateImage } from "./plate-branding.js";
+import { canAutoPublish, promoteDraft } from "./telegram-ingest.js";
 import { handleAiChat } from "./ai-chat.js";
 
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
