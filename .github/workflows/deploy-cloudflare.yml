@@ -62,8 +62,9 @@ jobs:
           node --check src/telegram-ingest.js
           node --check src/vehicle-ai.js
           node --check src/media.js
+          node --check src/ai-chat.js
           node --check public/script.js
-          node --test tests/telegram.test.mjs
+          node --test tests/telegram.test.mjs tests/ai-chat.test.mjs
       - name: Wrangler dry-run validation
         run: npx wrangler deploy --dry-run
 
