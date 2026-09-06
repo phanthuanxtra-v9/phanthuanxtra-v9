@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildCaption } from '../src/telegram.js';
 import { canAutoPublish, promoteDraft } from '../src/telegram-ingest.js';
+import { telegramWebhookReceipt } from '../src/telegram-router.js';
 
 const VALID_PLATE_BBOX = { x: 0.25, y: 0.45, width: 0.5, height: 0.12 };
 
@@ -27,6 +28,22 @@ test('Telegram AI draft auto-publish requires real identity, high confidence and
   assert.equal(canAutoPublish({brand:'Lexus',model:'LX 600',confidence:0.849,plate_bbox:VALID_PLATE_BBOX}),false);
   assert.equal(canAutoPublish({brand:'Lexus',model:null,confidence:0.99,plate_bbox:VALID_PLATE_BBOX}),false);
   assert.equal(canAutoPublish({brand:'Lexus',model:'LX 600',confidence:0.99,plate_bbox:null}),false);
+});
+
+test('Telegram webhook receipt is immediate and independent of downstream processing',()=>{
+  const photoReceipt=telegramWebhookReceipt(true);
+  const textReceipt=telegramWebhookReceipt(false);
+  assert.match(photoReceipt,/ĐÃ NHẬN ẢNH XE/);
+  assert.match(textReceipt,/ĐÃ NHẬN THÔNG TIN XE/);
+  assert.doesNotMatch(photoReceipt,/D1|R2|AI|publish/);
+  assert.doesNotMatch(textReceipt,/D1|R2|AI|publish/);
+  assert.match(photoReceipt,/Đang kiểm tra và xử lý/);
+});
+
+test('PT Xtra branding is not a vehicle identity gate',()=>{
+  assert.equal(canAutoPublish({brand:'Lexus',model:'LX 600',confidence:0.85,plate_bbox:VALID_PLATE_BBOX}),true);
+  assert.equal(canAutoPublish({brand:'Lexus',model:'LX 600',confidence:0.85,plate_bbox:VALID_PLATE_BBOX,plate_text:'PT Xtra'}),true);
+  assert.equal(canAutoPublish({brand:'Lexus',model:'LX 600',confidence:0.85,plate_bbox:VALID_PLATE_BBOX,plate_text:'12A-123.45'}),true);
 });
 
 test('Telegram publish duplicate protection sends only once',async()=>{
