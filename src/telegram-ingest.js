@@ -1,4 +1,4 @@
-const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
+const json=(data,status=200,extra={})=>new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store",...extra}});
 const clean=v=>String(v??"").trim();
 const sha256=async value=>{const bytes=new TextEncoder().encode(value),hash=await crypto.subtle.digest("SHA-256",bytes);return[...new Uint8Array(hash)].map(x=>x.toString(16).padStart(2,"0")).join("")};
 
@@ -10,16 +10,19 @@ async function tg(env,method,payload={}){
   return d.result;
 }
 
-function pickPhoto(message){
-  const photos=Array.isArray(message?.photo)?message.photo:[];
-  if(!photos.length)return null;
-  return photos[photos.length-1];
-}
+function pickPhoto(message){const photos=Array.isArray(message?.photo)?message.photo:[];return photos.length?photos[photos.length-1]:null;}
+function authorized(request,env){const h=request.headers.get("Authorization")||"";return Boolean(env.ADMIN_TOKEN&&h===`Bearer ${env.ADMIN_TOKEN}`)}
 
 export async function handleTelegramIngest(request,env){
   const url=new URL(request.url);
+  if(url.pathname==="/api/admin/telegram/webhook"){
+    if(request.method!=="POST")return json({error:"Method Not Allowed"},405,{Allow:"POST"});
+    if(!authorized(request,env))return json({error:"Unauthorized"},401,{"WWW-Authenticate":"Bearer"});
+    const result=await setTelegramWebhook(env,`${url.origin}/api/telegram/webhook`);
+    return json({ok:true,webhook:result});
+  }
   if(url.pathname!=="/api/telegram/webhook")return null;
-  if(request.method!=="POST")return json({error:"Method Not Allowed"},405);
+  if(request.method!=="POST")return json({error:"Method Not Allowed"},405,{Allow:"POST"});
   const secret=env.TELEGRAM_WEBHOOK_SECRET;
   if(secret&&request.headers.get("X-Telegram-Bot-Api-Secret-Token")!==secret)return json({error:"Unauthorized"},401);
   const update=await request.json().catch(()=>null);
@@ -37,7 +40,7 @@ export async function handleTelegramIngest(request,env){
 }
 
 export async function setTelegramWebhook(env,webhookUrl){
-  const payload={url:webhookUrl};
+  const payload={url:webhookUrl,allowed_updates:["message","channel_post"]};
   if(env.TELEGRAM_WEBHOOK_SECRET)payload.secret_token=env.TELEGRAM_WEBHOOK_SECRET;
   return tg(env,"setWebhook",payload);
 }
