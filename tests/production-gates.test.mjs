@@ -31,11 +31,14 @@ function mockDb() {
   };
 }
 
-test('production gate: Telegram auto-publish only accepts identity + confidence >= 0.85', () => {
-  assert.equal(canAutoPublish({ brand:'Lexus', model:'LX 600', confidence:0.85 }), true);
-  assert.equal(canAutoPublish({ brand:'Lexus', model:'LX 600', confidence:0.849 }), false);
-  assert.equal(canAutoPublish({ brand:'Lexus', model:null, confidence:0.99 }), false);
-  assert.equal(canAutoPublish({ brand:null, model:'LX 600', confidence:0.99 }), false);
+const plate = { x:0.42, y:0.58, width:0.16, height:0.06 };
+
+test('production gate: Telegram auto-publish requires identity + confidence >= 0.85 + valid plate box', () => {
+  assert.equal(canAutoPublish({ brand:'Lexus', model:'LX 600', confidence:0.85, plate_bbox:plate }), true);
+  assert.equal(canAutoPublish({ brand:'Lexus', model:'LX 600', confidence:0.849, plate_bbox:plate }), false);
+  assert.equal(canAutoPublish({ brand:'Lexus', model:'LX 600', confidence:0.99, plate_bbox:null }), false);
+  assert.equal(canAutoPublish({ brand:'Lexus', model:null, confidence:0.99, plate_bbox:plate }), false);
+  assert.equal(canAutoPublish({ brand:null, model:'LX 600', confidence:0.99, plate_bbox:plate }), false);
 });
 
 test('production gate: unknown AI Chat is handed to a human and AI is not called', async () => {
