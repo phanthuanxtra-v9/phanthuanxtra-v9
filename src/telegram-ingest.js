@@ -15,14 +15,19 @@ async function tg(env,method,payload={}){
 function pickPhoto(message){const photos=Array.isArray(message?.photo)?message.photo:[];return photos.length?photos[photos.length-1]:null;}
 function authorized(request,env){const h=request.headers.get("Authorization")||"";return Boolean(env.ADMIN_TOKEN&&h===`Bearer ${env.ADMIN_TOKEN}`)}
 
-async function processInbox(env,inboxId,filePath,caption){
+async function processInbox(env,inboxId,filePath,caption,sourceHash){
   try{
+    if(!env.MEDIA)throw new Error("MEDIA binding is not configured");
     const imageResponse=await fetch(`https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${filePath}`);
     if(!imageResponse.ok)throw new Error(`Telegram file download failed: ${imageResponse.status}`);
     const bytes=await imageResponse.arrayBuffer();
-    const ai=await analyzeVehicleImage(env,bytes,imageResponse.headers.get("content-type")||"image/jpeg",caption);
-    await env.DB.prepare(`INSERT INTO vehicle_ai_drafts (inbox_id,status,ai_json,confidence,missing_fields_json,source_caption,source_file_path,created_at,updated_at) VALUES (?, 'draft', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(inbox_id) DO UPDATE SET ai_json=excluded.ai_json,confidence=excluded.confidence,missing_fields_json=excluded.missing_fields_json,source_caption=excluded.source_caption,source_file_path=excluded.source_file_path,error=NULL,status='draft',updated_at=CURRENT_TIMESTAMP`).bind(inboxId,JSON.stringify(ai),Number(ai.confidence||0),JSON.stringify(ai.missing_fields||[]),caption,filePath).run();
-    await env.DB.prepare(`UPDATE telegram_inbox SET status='analyzed',updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(inboxId).run();
+    const contentType=imageResponse.headers.get("content-type")||"image/jpeg";
+    const extension=contentType.includes("png")?"png":contentType.includes("webp")?"webp":"jpg";
+    const mediaKey=`vehicles/inbox-${inboxId}-${sourceHash.slice(0,16)}.${extension}`;
+    await env.MEDIA.put(mediaKey,bytes,{httpMetadata:{contentType,cacheControl:"public, max-age=31536000, immutable"}});
+    const ai=await analyzeVehicleImage(env,bytes,contentType,caption);
+    await env.DB.prepare(`INSERT INTO vehicle_ai_drafts (inbox_id,status,ai_json,confidence,missing_fields_json,source_caption,source_file_path,created_at,updated_at) VALUES (?, 'draft', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(inbox_id) DO UPDATE SET ai_json=excluded.ai_json,confidence=excluded.confidence,missing_fields_json=excluded.missing_fields_json,source_caption=excluded.source_caption,source_file_path=excluded.source_file_path,error=NULL,status='draft',updated_at=CURRENT_TIMESTAMP`).bind(inboxId,JSON.stringify({...ai,media_key:mediaKey}),Number(ai.confidence||0),JSON.stringify(ai.missing_fields||[]),caption,filePath).run();
+    await env.DB.prepare(`UPDATE telegram_inbox SET status='analyzed',processed_image_url=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(`/media/${mediaKey}`,inboxId).run();
   }catch(error){
     await env.DB.prepare(`UPDATE telegram_inbox SET status='failed',error=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(clean(error?.message||error),inboxId).run().catch(()=>{});
   }
@@ -55,9 +60,9 @@ export async function handleTelegramIngest(request,env,ctx){
     if(!filePath)throw new Error("Telegram không trả file_path");
   }
   const sourceHash=await sha256(`${message.chat?.id||""}:${message.message_id}:${photo?.file_unique_id||fileId||caption}`);
-  const result=await env.DB.prepare(`INSERT INTO telegram_inbox (source_hash,chat_id,message_id,file_id,file_unique_id,file_path,caption,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,'received',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(source_hash) DO NOTHING`).bind(sourceHash,String(message.chat?.id||""),Number(message.message_id||0),fileId,photo?.file_unique_id||"",filePath,caption).run();
+  await env.DB.prepare(`INSERT INTO telegram_inbox (source_hash,chat_id,message_id,file_id,file_unique_id,file_path,caption,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,'received',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(source_hash) DO NOTHING`).bind(sourceHash,String(message.chat?.id||""),Number(message.message_id||0),fileId,photo?.file_unique_id||"",filePath,caption).run();
   const inbox=await env.DB.prepare(`SELECT id FROM telegram_inbox WHERE source_hash=? LIMIT 1`).bind(sourceHash).first();
-  if(inbox?.id&&photo&&ctx)ctx.waitUntil(processInbox(env,Number(inbox.id),filePath,caption));
+  if(inbox?.id&&photo&&ctx)ctx.waitUntil(processInbox(env,Number(inbox.id),filePath,caption,sourceHash));
   return json({ok:true,received:true,source_hash:sourceHash,inbox_id:inbox?.id||null,queued:Boolean(photo&&ctx)});
 }
 
