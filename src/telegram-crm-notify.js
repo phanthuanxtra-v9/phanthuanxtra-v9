@@ -7,16 +7,20 @@ export async function notifyTelegramCrm(env, payload) {
   const chatId = env.TELEGRAM_CRM_CHAT_ID;
   if (!token || !chatId) return { sent: false, configured: false };
 
-  const source = payload.source === "test-drive" ? "TEST DRIVE FORM" : "WEBSITE AI CHAT";
+  const unknown = payload.source === "ai-unknown";
+  const testDrive = payload.source === "test-drive";
+  const source = testDrive ? "TEST DRIVE FORM" : unknown ? "AI UNKNOWN — CẦN NGƯỜI THẬT" : "WEBSITE AI CHAT";
   const lines = [
-    payload.source === "test-drive" ? "🚗 LEAD — TRẢI NGHIỆM LÁI THỬ" : "🤖 LEAD — AI CHAT",
+    testDrive ? "🚗 LEAD — TRẢI NGHIỆM LÁI THỬ" : unknown ? "⚠️ AI KHÔNG CÓ THÔNG TIN XÁC THỰC" : "🤖 LEAD — AI CHAT",
     `SOURCE: ${source}`,
+    unknown && payload.unknownId ? `❓ Unknown ID: ${clean(payload.unknownId, 50)}` : null,
     payload.name ? `👤 Tên: ${clean(payload.name, 120)}` : null,
     payload.phone ? `📞 SĐT: ${clean(payload.phone, 30)}` : null,
     payload.car ? `🚘 Xe quan tâm: ${clean(payload.car, 160)}` : null,
     payload.preferredTime ? `📅 Thời gian: ${clean(payload.preferredTime, 120)}` : null,
     payload.location ? `📍 Khu vực: ${clean(payload.location, 160)}` : null,
     payload.message ? `💬 ${clean(payload.message)}` : null,
+    unknown ? "🧠 Cần Phan Thuần bổ sung câu trả lời để cập nhật knowledge base." : null,
     payload.conversationId ? `🆔 Conversation: ${clean(payload.conversationId, 100)}` : null,
     "🔗 https://phanthuanxtra.com/"
   ].filter(Boolean).join("\n\n");
@@ -25,11 +29,7 @@ export async function notifyTelegramCrm(env, payload) {
     const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: lines,
-        disable_web_page_preview: true
-      })
+      body: JSON.stringify({ chat_id: chatId, text: lines, disable_web_page_preview: true })
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.ok) {
