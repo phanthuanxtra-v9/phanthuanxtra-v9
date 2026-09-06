@@ -10,6 +10,8 @@ const sha256 = async value => { const bytes = new TextEncoder().encode(value); c
 async function tg(token, method, payload = {}) { if (!token) throw new Error("Telegram bot token is not configured"); const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) }); const data = await response.json().catch(() => ({})); if (!response.ok || !data.ok) throw new Error(clean(data.description || `Telegram ${method} failed`)); return data.result; }
 const pickPhoto = message => Array.isArray(message?.photo) && message.photo.length ? message.photo[message.photo.length - 1] : null;
 
+export const telegramWebhookReceipt = hasPhoto => hasPhoto ? "📥 ĐÃ NHẬN ẢNH XE\n⏳ Đang kiểm tra và xử lý..." : "📥 ĐÃ NHẬN THÔNG TIN XE\n⏳ Đang chờ ảnh xe để xử lý...";
+
 async function processBundle(env, bundleKey, chatId) {
   const rows = (await env.DB.prepare("SELECT * FROM telegram_inbox WHERE bundle_key=? ORDER BY id ASC").bind(bundleKey).all()).results || [];
   const photoRow = rows.find(row => row.file_id);
@@ -106,7 +108,7 @@ async function autoWebhook(request, env, ctx) {
     await tg(env.TELEGRAM_BOT_TOKEN, "sendMessage", {
       chat_id: chatId,
       reply_to_message_id: Number(message.message_id || 0),
-      text: photo ? "📥 ĐÃ NHẬN ẢNH XE\n⏳ Đang kiểm tra và xử lý..." : "📥 ĐÃ NHẬN THÔNG TIN XE\n⏳ Đang chờ ảnh xe để xử lý..."
+      text: telegramWebhookReceipt(Boolean(photo))
     });
   } catch (error) {
     console.error("telegram_receipt_failed", clean(error?.message || error));
