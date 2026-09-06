@@ -26,3 +26,5 @@ async function handleVipUpdate(request,env){const secret=env.TELEGRAM_VIP_WEBHOO
 }
 
 export async function handleVipTelegram(request,env){const url=new URL(request.url);if(url.pathname==="/api/admin/telegram/vip-webhook"){if(request.method!=="POST")return json({error:"Method Not Allowed"},405,{Allow:"POST"});if(!authorized(request,env))return json({error:"Unauthorized"},401);try{return json({ok:true,webhook:await tg(env,"setWebhook",{url:`${url.origin}/api/telegram/vip-webhook`,allowed_updates:["message","channel_post"],...(env.TELEGRAM_VIP_WEBHOOK_SECRET?{secret_token:env.TELEGRAM_VIP_WEBHOOK_SECRET}:{})})});}catch(error){return json({ok:false,error:clean(error?.message||error)},502);}}if(url.pathname==="/api/telegram/vip-webhook"&&request.method==="POST")return handleVipUpdate(request,env);return null;}
+
+export { docType, safeExt, imageType, downloadTelegramFile };
