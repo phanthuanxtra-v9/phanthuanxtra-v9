@@ -6,7 +6,7 @@ import { handleTelegramIngest } from "./telegram-ingest.js";
 export default {
   async fetch(request, env, ctx) {
     try {
-      const ingestResponse = await handleTelegramIngest(request, env);
+      const ingestResponse = await handleTelegramIngest(request, env, ctx);
       if (ingestResponse) return ingestResponse;
       const telegramResponse = await handleTelegramApi(request, env);
       if (telegramResponse) return telegramResponse;
