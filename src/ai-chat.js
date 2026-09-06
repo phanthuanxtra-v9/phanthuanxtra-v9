@@ -1,3 +1,5 @@
+import { notifyTelegramCrm } from "./telegram-crm-notify.js";
+
 const MODEL = "@cf/meta/llama-3.1-8b-instruct";
 const AI_SEARCH_IDS = ["ai-search-mcp", "ai-search-auto"];
 const MAX_MESSAGE = 4000;
@@ -5,16 +7,7 @@ const MAX_HISTORY = 12;
 const MAX_CARS = 20;
 const MAX_KNOWLEDGE_CHUNKS = 6;
 
-const json = (data, status = 200) => new Response(JSON.stringify(data), {
-  status,
-  headers: {
-    "content-type": "application/json; charset=utf-8",
-    "cache-control": "no-store",
-    "Access-Control-Allow-Origin": "https://phanthuanxtra.com",
-    "Access-Control-Allow-Headers": "content-type",
-    "Access-Control-Allow-Methods": "POST, OPTIONS"
-  }
-});
+const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "Access-Control-Allow-Origin": "https://phanthuanxtra.com", "Access-Control-Allow-Headers": "content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" } });
 const clean = (v, n = MAX_MESSAGE) => String(v ?? "").trim().slice(0, n);
 const id = () => crypto.randomUUID();
 
@@ -44,11 +37,7 @@ Nguyên tắc trả lời:
 `;
 
 function systemPrompt(cars, knowledge) {
-  const catalog = cars.length ? JSON.stringify(cars.map(c => ({
-    id: c.id, brand: c.brand, model: c.model, year: c.year, mileage: c.mileage,
-    price: c.price, fuel: c.fuel, category: c.category, color: c.color,
-    status: c.status, description: c.description
-  }))) : "[]";
+  const catalog = cars.length ? JSON.stringify(cars.map(c => ({ id:c.id,brand:c.brand,model:c.model,year:c.year,mileage:c.mileage,price:c.price,fuel:c.fuel,category:c.category,color:c.color,status:c.status,description:c.description }))) : "[]";
   return `Bạn là XTRA Intelligence, chatbot chính thức của PHAN THUẦN XTRA (Vietnam).
 Nhiệm vụ: tư vấn lịch sự, ngắn gọn, thực tế cho khách về Luxury Automotive, Green Energy, European Yachts, Business Jets và dịch vụ private appointment.
 - Hiểu ngữ cảnh nhiều lượt và trả lời dựa trên lịch sử hội thoại.
@@ -63,140 +52,40 @@ KNOWLEDGE CONTEXT:\n${knowledge || "Chưa có kết quả knowledge base."}
 CATALOG XE HIỆN TẠI:\n${catalog}`;
 }
 
-async function loadCars(env) {
-  if (!env.DB) return [];
-  try {
-    const q = await env.DB.prepare("SELECT id,brand,model,year,mileage,price,fuel,category,color,status,description FROM cars ORDER BY featured DESC,created_at DESC LIMIT ?").bind(MAX_CARS).all();
-    return q.results || [];
-  } catch { return []; }
-}
+async function loadCars(env) { if (!env.DB) return []; try { const q = await env.DB.prepare("SELECT id,brand,model,year,mileage,price,fuel,category,color,status,description FROM cars ORDER BY featured DESC,created_at DESC LIMIT ?").bind(MAX_CARS).all(); return q.results || []; } catch { return []; } }
 
 async function searchKnowledge(env, query) {
   if (!env.AI_SEARCH) return BRAND_KNOWLEDGE;
   try {
     const normalizedQuery = query.normalize("NFC").toLowerCase();
     const isIdentityQuery = /phan\s*thuần|phan\s*thuan|phanthuần|phanthuan/.test(normalizedQuery);
-    const searchQuery = isIdentityQuery
-      ? `${query}\nPhan Thuần\nPHAN THUẦN XTRA\ngiới thiệu Phan Thuần\nanh Phan Thuần là ai\nthông tin chính thức về Phan Thuần`
-      : query;
-    const result = await env.AI_SEARCH.search({
-      messages: [{ role: "user", content: searchQuery }],
-      ai_search_options: {
-        instance_ids: AI_SEARCH_IDS,
-        retrieval: {
-          retrieval_type: "hybrid",
-          keyword_match_mode: "or",
-          match_threshold: isIdentityQuery ? 0.2 : 0.4,
-          max_num_results: MAX_KNOWLEDGE_CHUNKS
-        }
-      }
-    });
-    const chunks = result?.chunks || [];
-    const context = chunks
-      .map(chunk => chunk.content || chunk.text || "")
-      .filter(Boolean)
-      .join("\n\n---\n\n");
-    return `${BRAND_KNOWLEDGE}\n\n${context}`.slice(0, 12000);
-  } catch (error) {
-    console.warn("ai_search_query", String(error?.message || error));
-    return BRAND_KNOWLEDGE;
-  }
+    const searchQuery = isIdentityQuery ? `${query}\nPhan Thuần\nPHAN THUẦN XTRA\ngiới thiệu Phan Thuần\nanh Phan Thuần là ai\nthông tin chính thức về Phan Thuần` : query;
+    const result = await env.AI_SEARCH.search({ messages:[{role:"user",content:searchQuery}], ai_search_options:{instance_ids:AI_SEARCH_IDS,retrieval:{retrieval_type:"hybrid",keyword_match_mode:"or",match_threshold:isIdentityQuery?0.2:0.4,max_num_results:MAX_KNOWLEDGE_CHUNKS}} });
+    const context = (result?.chunks || []).map(chunk=>chunk.content||chunk.text||"").filter(Boolean).join("\n\n---\n\n");
+    return `${BRAND_KNOWLEDGE}\n\n${context}`.slice(0,12000);
+  } catch (error) { console.warn("ai_search_query",String(error?.message||error)); return BRAND_KNOWLEDGE; }
 }
 
-async function ensureConversation(env, conversationId, visitorId, channel = "website") {
-  const cid = clean(conversationId, 100) || id();
-  const vid = clean(visitorId, 160);
-  const normalizedChannel = channel === "telegram" ? "telegram" : "website";
-  await env.DB.prepare(`INSERT INTO ai_conversations (id,channel,visitor_id,status,created_at,updated_at)
-    VALUES (?, ?, ?, 'open', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    ON CONFLICT(id) DO UPDATE SET visitor_id=COALESCE(excluded.visitor_id,ai_conversations.visitor_id),channel=excluded.channel,updated_at=CURRENT_TIMESTAMP`).bind(cid, normalizedChannel, vid || null).run();
+async function ensureConversation(env, conversationId, visitorId, channel="website") {
+  const cid=clean(conversationId,100)||id(); const vid=clean(visitorId,160); const normalizedChannel=channel==="telegram"?"telegram":"website";
+  await env.DB.prepare(`INSERT INTO ai_conversations (id,channel,visitor_id,status,created_at,updated_at) VALUES (?, ?, ?, 'open', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET visitor_id=COALESCE(excluded.visitor_id,ai_conversations.visitor_id),channel=excluded.channel,updated_at=CURRENT_TIMESTAMP`).bind(cid,normalizedChannel,vid||null).run();
   return cid;
 }
+async function loadHistory(env,cid){const q=await env.DB.prepare("SELECT role,content FROM ai_messages WHERE conversation_id=? ORDER BY id DESC LIMIT ?").bind(cid,MAX_HISTORY).all();return(q.results||[]).reverse().map(x=>({role:x.role,content:x.content}));}
+async function runAI(env,messages,cars,knowledge){if(!env.AI)throw new Error("Workers AI binding AI is not configured");const response=await env.AI.run(MODEL,{messages:[{role:"system",content:systemPrompt(cars,knowledge)},...messages],max_tokens:700,temperature:0.2});const text=typeof response==="string"?response:response?.response;if(!text)throw new Error("Workers AI returned no response");return clean(text,8000);}
+async function saveLead(env,conversationId,phone,name,message){if(!phone||!env.DB)return;const normalized=phone.replace(/\D/g,"");if(normalized.length<9)return;await env.DB.prepare("INSERT INTO leads (name,phone,car_id,message) VALUES (?,?,?,?)").bind(clean(name,120),clean(phone,30),"",`[AI CHAT ${conversationId}] ${clean(message,1800)}`).run();await env.DB.prepare("UPDATE ai_conversations SET name=?,phone=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(clean(name,120)||null,clean(phone,30),conversationId).run();}
 
-async function loadHistory(env, cid) {
-  const q = await env.DB.prepare("SELECT role,content FROM ai_messages WHERE conversation_id=? ORDER BY id DESC LIMIT ?").bind(cid, MAX_HISTORY).all();
-  return (q.results || []).reverse().map(x => ({ role: x.role, content: x.content }));
-}
-
-async function runAI(env, messages, cars, knowledge) {
-  if (!env.AI) throw new Error("Workers AI binding AI is not configured");
-  const response = await env.AI.run(MODEL, {
-    messages: [{ role: "system", content: systemPrompt(cars, knowledge) }, ...messages],
-    max_tokens: 700,
-    temperature: 0.2
-  });
-  const text = typeof response === "string" ? response : response?.response;
-  if (!text) throw new Error("Workers AI returned no response");
-  return clean(text, 8000);
-}
-
-async function saveLead(env, conversationId, phone, name, message) {
-  if (!phone || !env.DB) return;
-  const normalized = phone.replace(/\D/g, "");
-  if (normalized.length < 9) return;
-  await env.DB.prepare("INSERT INTO leads (name,phone,car_id,message) VALUES (?,?,?,?)")
-    .bind(clean(name,120), clean(phone,30), "", `[AI CHAT ${conversationId}] ${clean(message,1800)}`).run();
-  await env.DB.prepare("UPDATE ai_conversations SET name=?,phone=?,updated_at=CURRENT_TIMESTAMP WHERE id=?")
-    .bind(clean(name,120) || null, clean(phone,30), conversationId).run();
-}
-
-async function notifyTelegram(env, payload) {
-  const token = env.TELEGRAM_CHAT_BOT_TOKEN;
-  const chatId = env.TELEGRAM_AI_NOTIFY_CHAT_ID;
-  if (!token || !chatId) return { sent: false, configured: false };
-  const lines = [
-    "🤖 WEBSITE AI CHAT",
-    `Conversation: ${clean(payload.conversationId,100)}`,
-    payload.name ? `👤 Tên: ${clean(payload.name,120)}` : null,
-    payload.phone ? `📞 SĐT: ${clean(payload.phone,30)}` : null,
-    `💬 Khách: ${clean(payload.message,1800)}`,
-    `🤖 AI: ${clean(payload.reply,1800)}`,
-    payload.channel ? `Kênh: ${clean(payload.channel,40)}` : "Kênh: website",
-    "🔗 https://phanthuanxtra.com/"
-  ].filter(Boolean).join("\n\n");
-  try {
-    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text: lines, disable_web_page_preview: true })
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.ok) {
-      console.warn("telegram_ai_notify", String(data.description || `HTTP ${response.status}`));
-      return { sent: false, configured: true };
-    }
-    return { sent: true, configured: true };
-  } catch (error) {
-    console.warn("telegram_ai_notify", String(error?.message || error));
-    return { sent: false, configured: true };
-  }
-}
-
-export async function handleAiChat(request, env) {
-  const url = new URL(request.url);
-  if (url.pathname !== "/api/ai-chat") return null;
-  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: { "Access-Control-Allow-Origin": "https://phanthuanxtra.com", "Access-Control-Allow-Headers": "content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" } });
-  if (request.method !== "POST") return json({ ok: false, error: "Method Not Allowed" }, 405);
-  if (!env.DB) return json({ ok: false, error: "D1 chưa được kết nối" }, 503);
-  const body = await request.json().catch(() => null);
-  const message = clean(body?.message);
-  if (!message) return json({ ok: false, error: "Tin nhắn trống" }, 400);
-  const conversationId = await ensureConversation(env, body?.conversation_id, body?.visitor_id, body?.channel);
-  const history = await loadHistory(env, conversationId);
+export async function handleAiChat(request,env){
+  const url=new URL(request.url); if(url.pathname!=="/api/ai-chat")return null;
+  if(request.method==="OPTIONS")return new Response(null,{status:204,headers:{"Access-Control-Allow-Origin":"https://phanthuanxtra.com","Access-Control-Allow-Headers":"content-type","Access-Control-Allow-Methods":"POST, OPTIONS"}});
+  if(request.method!=="POST")return json({ok:false,error:"Method Not Allowed"},405); if(!env.DB)return json({ok:false,error:"D1 chưa được kết nối"},503);
+  const body=await request.json().catch(()=>null); const message=clean(body?.message); if(!message)return json({ok:false,error:"Tin nhắn trống"},400);
+  const conversationId=await ensureConversation(env,body?.conversation_id,body?.visitor_id,body?.channel); const history=await loadHistory(env,conversationId);
   await env.DB.prepare("INSERT INTO ai_messages (conversation_id,role,content) VALUES (?,?,?)").bind(conversationId,"user",message).run();
-  const [cars, knowledge] = await Promise.all([loadCars(env), searchKnowledge(env, message)]);
-  let reply;
-  try {
-    reply = await runAI(env, [...history, { role: "user", content: message }], cars, knowledge);
-  } catch (error) {
-    console.error("ai_chat", String(error?.message || error));
-    reply = "Tôi đã nhận được tin nhắn của anh/chị. Hiện trợ lý AI đang bận xử lý, anh/chị có thể để lại số điện thoại hoặc gọi 0866 997 891 để được hỗ trợ ngay.";
-  }
+  const[cars,knowledge]=await Promise.all([loadCars(env),searchKnowledge(env,message)]); let reply;
+  try{reply=await runAI(env,[...history,{role:"user",content:message}],cars,knowledge)}catch(error){console.error("ai_chat",String(error?.message||error));reply="Tôi đã nhận được tin nhắn của anh/chị. Hiện trợ lý AI đang bận xử lý, anh/chị có thể để lại số điện thoại hoặc gọi 0866 997 891 để được hỗ trợ ngay.";}
   await env.DB.prepare("INSERT INTO ai_messages (conversation_id,role,content) VALUES (?,?,?)").bind(conversationId,"assistant",reply).run();
-  const phone = clean(body?.phone,30);
-  const name = clean(body?.name,120);
-  if (phone) await saveLead(env, conversationId, phone, name, message);
-  else await env.DB.prepare("UPDATE ai_conversations SET name=COALESCE(?,name),updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(name || null, conversationId).run();
-  await notifyTelegram(env, { conversationId, visitorId: body?.visitor_id, name, phone, message, reply, channel: body?.channel || "website" });
-  return json({ ok: true, conversation_id: conversationId, reply });
+  const phone=clean(body?.phone,30); const name=clean(body?.name,120); if(phone)await saveLead(env,conversationId,phone,name,message); else await env.DB.prepare("UPDATE ai_conversations SET name=COALESCE(?,name),updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(name||null,conversationId).run();
+  await notifyTelegramCrm(env,{source:"ai-chat",conversationId,visitorId:body?.visitor_id,name,phone,message,reply});
+  return json({ok:true,conversation_id:conversationId,reply});
 }
