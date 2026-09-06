@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildCaption } from '../src/telegram.js';
+import { canAutoPublish, promoteDraft } from '../src/telegram-ingest.js';
 
 test('Telegram caption keeps Vietnamese Unicode and real vehicle fields',()=>{
   const caption=buildCaption({
@@ -22,4 +23,48 @@ test('Telegram caption omits fields that are not present instead of inventing da
   assert.doesNotMatch(caption,/2025/);
   assert.doesNotMatch(caption,/ODO:/);
   assert.doesNotMatch(caption,/Twin Turbo/);
+});
+
+test('Telegram AI draft auto-publish requires real identity and high confidence',()=>{
+  assert.equal(canAutoPublish({brand:'Lexus',model:'LX 600',confidence:0.85}),true);
+  assert.equal(canAutoPublish({brand:'Lexus',model:'LX 600',confidence:0.849}),false);
+  assert.equal(canAutoPublish({brand:'Lexus',model:null,confidence:0.99}),false);
+});
+
+test('Telegram publish duplicate protection sends only once',async()=>{
+  const cars=new Map();
+  const posts=new Map();
+  const images=new Map();
+  const drafts=new Map();
+  const calls=[];
+  cars.set('tg-101',{id:'tg-101',brand:'Lexus',model:'LX 600',year:2024,mileage:1000,price:9000000000,status:'available',features_json:'[]',description:'Xe thực tế.'});
+  const DB={prepare(sql){return{bind(...args){return{async first(){
+    if(sql.includes('SELECT id,status FROM cars')) return cars.get(args[0])||null;
+    if(sql.includes('SELECT * FROM cars')) return cars.get(args[0])||null;
+    if(sql.includes('SELECT * FROM telegram_posts')) return posts.get(args[0])||null;
+    if(sql.includes('SELECT url FROM car_images')) return {results:[...(images.get(args[0])||[])]};
+    if(sql.includes('SELECT id FROM car_images')) return null;
+    return null;
+  },async all(){if(sql.includes('SELECT url FROM car_images'))return{results:images.get(args[0])||[]};return{results:[]};},async run(){
+    if(sql.includes('INSERT INTO telegram_posts'))posts.set(args[0],{car_id:args[0],status:'pending',attempts:1});
+    if(sql.includes("UPDATE telegram_posts SET status='pending'")){const p=posts.get(args[0]);posts.set(args[0],{...p,status:'pending',attempts:(p?.attempts||0)+1});}
+    if(sql.includes("UPDATE telegram_posts SET status='published'")){const p=posts.get(args[1]);posts.set(args[1],{...p,status:'published',telegram_message_ids:args[0]});}
+    if(sql.includes("UPDATE telegram_posts SET status='failed'")){const p=posts.get(args[1]);posts.set(args[1],{...p,status:'failed',last_error:args[0]});}
+    if(sql.includes('INSERT INTO car_images')){const list=images.get(args[0])||[];list.push({url:args[1]});images.set(args[0],list);}
+    if(sql.includes("UPDATE vehicle_ai_drafts SET status='published'"))drafts.set(args[0],'published');
+    return {};
+  }}};}}};
+  const env={DB,TELEGRAM_BOT_TOKEN:'test-token',TELEGRAM_CHAT_ID:'-1001'};
+  const originalFetch=global.fetch;
+  global.fetch=async()=>{calls.push(1);return new Response(JSON.stringify({ok:true,result:{message_id:calls.length}}),{status:200,headers:{'content-type':'application/json'}})};
+  try{
+    const first=await promoteDraft(env,101,{brand:'Lexus',model:'LX 600',year:2024,mileage:1000,price:9000000000,confidence:0.95,features:[],missing_fields:[]},'vehicles/inbox-101-test.jpg');
+    assert.equal(first.published,true);
+    const callsAfterFirst=calls.length;
+    const second=await promoteDraft(env,101,{brand:'Lexus',model:'LX 600',year:2024,mileage:1000,price:9000000000,confidence:0.95,features:[],missing_fields:[]},'vehicles/inbox-101-test.jpg');
+    assert.equal(second.published,true);
+    assert.equal(second.telegram.duplicate,true);
+    assert.equal(calls.length,callsAfterFirst);
+    assert.equal(posts.get('tg-101').status,'published');
+  }finally{global.fetch=originalFetch;}
 });
