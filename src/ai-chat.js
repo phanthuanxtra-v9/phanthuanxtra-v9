@@ -28,6 +28,7 @@ Lĩnh vực chatbot hỗ trợ: Luxury Automotive, Green Energy, European Yachts
 `;
 
 const IDENTITY_RE = /phan\s*thuần|phan\s*thuan|phanthuần|phanthuan|xtra intelligence|phan thuần xtra/i;
+const IDENTITY_QUERY_RE = /(?:phan\s*thuần|phan\s*thuan|phanthuan|xtra intelligence).{0,80}(?:là ai|ai là|giới thiệu|thông tin về|profile|tiểu sử)/i;
 const VEHICLE_RE = /\b(mua xe|bán xe|xe nào|xe gì|mẫu xe|dòng xe|lái thử|thu đổi|định giá|giá xe|giá bao nhiêu|phù hợp|lexus|porsche|mercedes|bmw|audi|toyota|land rover|landrover|range rover|rolls royce|ferrari|aston martin|cadillac|suv|sport|sedan|coupe|pickup)\b/i;
 const PHONE_RE = /(?:\+?84|0)(?:\D*\d){9,10}/;
 
@@ -82,7 +83,7 @@ export async function handleAiChat(request,env){
   const conversationId=await ensureConversation(env,body?.conversation_id,body?.visitor_id,body?.channel); const history=await loadHistory(env,conversationId); const contact=extractContact(message);
   await env.DB.prepare("INSERT INTO ai_messages (conversation_id,role,content) VALUES (?,?,?)").bind(conversationId,"user",message).run();
   const[cars,knowledge]=await Promise.all([loadCars(env),searchKnowledge(env,message)]);
-  const identityQuery=IDENTITY_RE.test(message); const vehicleQuery=VEHICLE_RE.test(message); const pending=await pendingUnknown(env,conversationId);
+  const identityQuery=IDENTITY_QUERY_RE.test(message); const vehicleQuery=VEHICLE_RE.test(message); const pending=await pendingUnknown(env,conversationId);
   if(pending && (contact.name||contact.phone)){
     await env.DB.prepare("UPDATE ai_unknown_questions SET name=COALESCE(?,name),phone=COALESCE(?,phone),updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(contact.name||null,contact.phone||null,pending.id).run();
     await env.DB.prepare("UPDATE ai_conversations SET name=COALESCE(?,name),phone=COALESCE(?,phone),updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(contact.name||null,contact.phone||null,conversationId).run();
