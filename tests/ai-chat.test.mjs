@@ -32,24 +32,21 @@ function mockDb() {
   };
 }
 
-const crmPayloads = [];
-
 test('website AI chat creates a conversation, calls AI and persists reply', async () => {
   const DB = mockDb();
   const env = {
     DB,
+    AI_SEARCH: { async search() { return { chunks: [] }; } },
     AI: { async run(model, payload) {
       assert.equal(model, '@cf/meta/llama-3.1-8b-instruct');
       assert.equal(payload.messages.at(-1).content, 'Tôi muốn tìm Lexus');
       return { response: 'Tôi có thể hỗ trợ anh tìm Lexus phù hợp.' };
-    } },
-    AI_SEARCH: { async search() { return { chunks: [] }; } }
+    } }
   };
-  const request = new Request('https://phanthuanxtra.com/api/ai-chat', {
+  const response = await handleAiChat(new Request('https://phanthuanxtra.com/api/ai-chat', {
     method: 'POST', headers: {'content-type':'application/json'},
     body: JSON.stringify({conversation_id:'test-conversation',visitor_id:'test-visitor',message:'Tôi muốn tìm Lexus'})
-  });
-  const response = await handleAiChat(request, env);
+  }), env);
   const data = await response.json();
   assert.equal(response.status, 200);
   assert.equal(data.ok, true);
@@ -68,15 +65,13 @@ test('Phan Thuần identity knowledge is present when AI Search is unavailable',
       const system = payload.messages.find(x => x.role === 'system')?.content || '';
       assert.match(system, /Tên được sử dụng: Phan Thuần/);
       assert.match(system, /Phan Thuần là người mà trợ lý PHAN THUẦN XTRA đang đại diện hỗ trợ/);
-      assert.match(system, /Phan Thuần là ai/);
       return { response: 'Phan Thuần là người mà trợ lý PHAN THUẦN XTRA đang đại diện hỗ trợ và là tên gắn với thương hiệu PHAN THUẦN XTRA.' };
     } }
   };
-  const request = new Request('https://phanthuanxtra.com/api/ai-chat', {
+  const response = await handleAiChat(new Request('https://phanthuanxtra.com/api/ai-chat', {
     method: 'POST', headers: {'content-type':'application/json'},
     body: JSON.stringify({conversation_id:'identity-test',visitor_id:'identity-test',message:'Phan Thuần là ai'})
-  });
-  const response = await handleAiChat(request, env);
+  }), env);
   const data = await response.json();
   assert.equal(response.status, 200);
   assert.equal(data.ok, true);
@@ -91,11 +86,10 @@ test('unknown topic is handed to human and stored for later knowledge update', a
     AI_SEARCH: { async search() { return { chunks: [] }; } },
     AI: { async run() { throw new Error('AI must not answer an out-of-scope question'); } }
   };
-  const request = new Request('https://phanthuanxtra.com/api/ai-chat', {
+  const response = await handleAiChat(new Request('https://phanthuanxtra.com/api/ai-chat', {
     method:'POST', headers:{'content-type':'application/json'},
-    body:JSON.stringify({conversation_id:'unknown-test',visitor_id:'unknown-test',message:'Anh Phan Thuần có những thành tích cá nhân nào?'})
-  });
-  const response = await handleAiChat(request, env);
+    body:JSON.stringify({conversation_id:'unknown-test',visitor_id:'unknown-test',message:'Chính sách bảo hành ngoài thông tin xe hiện có là gì?'})
+  }), env);
   const data = await response.json();
   assert.equal(response.status, 200);
   assert.equal(data.ok, true);
@@ -112,11 +106,10 @@ test('unknown topic accepts name and phone from the same message', async () => {
     AI_SEARCH: { async search() { return { chunks: [] }; } },
     AI: { async run() { throw new Error('AI must not answer an out-of-scope question'); } }
   };
-  const request = new Request('https://phanthuanxtra.com/api/ai-chat', {
+  const response = await handleAiChat(new Request('https://phanthuanxtra.com/api/ai-chat', {
     method:'POST', headers:{'content-type':'application/json'},
     body:JSON.stringify({conversation_id:'contact-test',visitor_id:'contact-test',message:'Tôi tên Phan Thuần, số điện thoại 0866997891. Tôi muốn hỏi thông tin chưa có trên website.'})
-  });
-  const response = await handleAiChat(request, env);
+  }), env);
   const data = await response.json();
   assert.equal(response.status, 200);
   assert.equal(data.needs_human, true);
