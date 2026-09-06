@@ -1,6 +1,6 @@
 {
   "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
-  "name": "phanthuanxtra",
+  "name": "phanthuanxtra-v2",
   "main": "src/entry.js",
   "compatibility_date": "2026-08-11",
   "compatibility_flags": [
