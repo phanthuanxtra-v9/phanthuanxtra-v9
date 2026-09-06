@@ -15,7 +15,29 @@ async function tg(env,method,payload={}){
 function pickPhoto(message){const photos=Array.isArray(message?.photo)?message.photo:[];return photos.length?photos[photos.length-1]:null;}
 function authorized(request,env){const h=request.headers.get("Authorization")||"";return Boolean(env.ADMIN_TOKEN&&h===`Bearer ${env.ADMIN_TOKEN}`)}
 
-async function processInbox(env,inboxId,filePath,caption,sourceHash){
+function reportText(ai,inboxId,mediaKey){
+  const a=ai||{};
+  const label=[a.brand,a.model].filter(Boolean).join(" ")||"Chưa xác định tên xe";
+  const lines=[
+    "✅ ĐÃ NHẬN ẢNH + THÔNG TIN XE",
+    `📦 Inbox ID: ${inboxId}`,
+    `🚗 Xe: ${label}`,
+    a.year?`📅 Năm: ${a.year}`:null,
+    a.mileage!=null?`🛣 ODO: ${a.mileage}`:null,
+    a.price!=null?`💰 Giá: ${a.price}`:null,
+    a.fuel?`⛽ Nhiên liệu: ${a.fuel}`:null,
+    a.color?`🎨 Màu: ${a.color}`:null,
+    `🎯 Độ tin cậy AI: ${Math.round(Number(a.confidence||0)*100)}%`,
+    Array.isArray(a.missing_fields)&&a.missing_fields.length?`⚠️ Cần bổ sung: ${a.missing_fields.join(", ")}`:"✅ Không phát hiện trường bắt buộc còn thiếu",
+    "",
+    "📌 Trạng thái: Đã lưu ảnh vào kho MEDIA + tạo bản nháp AI trong D1.",
+    "⏳ Chưa tự đăng bán cho đến khi bước kiểm duyệt/publish hoàn tất.",
+    mediaKey?`🖼 Ảnh: /media/${mediaKey}`:null
+  ].filter(Boolean);
+  return lines.join("\n");
+}
+
+async function processInbox(env,inboxId,filePath,caption,sourceHash,chatId,messageId){
   try{
     if(!env.MEDIA)throw new Error("MEDIA binding is not configured");
     const imageResponse=await fetch(`https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${filePath}`);
@@ -28,8 +50,11 @@ async function processInbox(env,inboxId,filePath,caption,sourceHash){
     const ai=await analyzeVehicleImage(env,bytes,contentType,caption);
     await env.DB.prepare(`INSERT INTO vehicle_ai_drafts (inbox_id,status,ai_json,confidence,missing_fields_json,source_caption,source_file_path,created_at,updated_at) VALUES (?, 'draft', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(inbox_id) DO UPDATE SET ai_json=excluded.ai_json,confidence=excluded.confidence,missing_fields_json=excluded.missing_fields_json,source_caption=excluded.source_caption,source_file_path=excluded.source_file_path,error=NULL,status='draft',updated_at=CURRENT_TIMESTAMP`).bind(inboxId,JSON.stringify({...ai,media_key:mediaKey}),Number(ai.confidence||0),JSON.stringify(ai.missing_fields||[]),caption,filePath).run();
     await env.DB.prepare(`UPDATE telegram_inbox SET status='analyzed',processed_image_url=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(`/media/${mediaKey}`,inboxId).run();
+    if(chatId)await tg(env,"sendMessage",{chat_id:chatId,reply_to_message_id:messageId,text:reportText(ai,inboxId,mediaKey),disable_web_page_preview:true});
   }catch(error){
-    await env.DB.prepare(`UPDATE telegram_inbox SET status='failed',error=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(clean(error?.message||error),inboxId).run().catch(()=>{});
+    const message=clean(error?.message||error);
+    await env.DB.prepare(`UPDATE telegram_inbox SET status='failed',error=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(message,inboxId).run().catch(()=>{});
+    if(chatId)await tg(env,"sendMessage",{chat_id:chatId,reply_to_message_id:messageId,text:["❌ KHÔNG XỬ LÝ ĐƯỢC ẢNH XE",`📦 Inbox ID: ${inboxId}`,`⚠️ Lỗi: ${message}`,"🔄 Hệ thống đã ghi nhận lỗi để kiểm tra lại."].join("\n"),disable_web_page_preview:true}).catch(()=>{});
   }
 }
 
@@ -62,7 +87,7 @@ export async function handleTelegramIngest(request,env,ctx){
   const sourceHash=await sha256(`${message.chat?.id||""}:${message.message_id}:${photo?.file_unique_id||fileId||caption}`);
   await env.DB.prepare(`INSERT INTO telegram_inbox (source_hash,chat_id,message_id,file_id,file_unique_id,file_path,caption,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,'received',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(source_hash) DO NOTHING`).bind(sourceHash,String(message.chat?.id||""),Number(message.message_id||0),fileId,photo?.file_unique_id||"",filePath,caption).run();
   const inbox=await env.DB.prepare(`SELECT id FROM telegram_inbox WHERE source_hash=? LIMIT 1`).bind(sourceHash).first();
-  if(inbox?.id&&photo&&ctx)ctx.waitUntil(processInbox(env,Number(inbox.id),filePath,caption,sourceHash));
+  if(inbox?.id&&photo&&ctx)ctx.waitUntil(processInbox(env,Number(inbox.id),filePath,caption,sourceHash,String(message.chat?.id||""),Number(message.message_id||0)));
   return json({ok:true,received:true,source_hash:sourceHash,inbox_id:inbox?.id||null,queued:Boolean(photo&&ctx)});
 }
 
