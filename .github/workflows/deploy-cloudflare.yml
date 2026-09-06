@@ -2,6 +2,16 @@ name: Deploy Cloudflare Worker
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'migrations/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'wrangler.json'
+      - '.github/workflows/deploy-cloudflare.yml'
   push:
     branches:
       - main
@@ -27,27 +37,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Deploy production Worker
+  validate:
+    name: Validate Worker
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: production
-
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
-
       - name: Install dependencies
         run: npm ci
-
       - name: Validate JavaScript syntax and tests
         run: |
           node --check src/entry.js
@@ -59,13 +64,34 @@ jobs:
           node --check src/media.js
           node --check public/script.js
           node --test tests/telegram.test.mjs
+      - name: Wrangler dry-run validation
+        run: npx wrangler deploy --dry-run
 
+  deploy:
+    name: Deploy production Worker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
       - name: Ensure R2 media bucket exists
         run: |
           if ! npx wrangler r2 bucket info phanthuanxtra-media --json >/dev/null 2>&1; then
             npx wrangler r2 bucket create phanthuanxtra-media --storage-class Standard
           fi
-
       - name: Wrangler dry-run
         uses: cloudflare/wrangler-action@v3
         with:
@@ -73,7 +99,6 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: '4.129.0'
           command: deploy --dry-run
-
       - name: Apply D1 migrations
         uses: cloudflare/wrangler-action@v3
         with:
@@ -81,7 +106,6 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: '4.129.0'
           command: d1 migrations apply phanthuanxtra-db --remote
-
       - name: Deploy to Cloudflare
         uses: cloudflare/wrangler-action@v3
         with:
