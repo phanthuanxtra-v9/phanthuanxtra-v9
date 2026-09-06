@@ -94,7 +94,7 @@ export async function handleTelegramIngest(request,env,ctx){
   if(url.pathname!=="/api/telegram/webhook")return null;
   if(request.method!=="POST")return json({error:"Method Not Allowed"},405,{Allow:"POST"});
   const secret=env.TELEGRAM_WEBHOOK_SECRET;
-  if(secret&&request.headers.get("X-Telegram-Webhook-Secret-Token")!==secret)return json({error:"Unauthorized"},401);
+  if(secret&&request.headers.get("X-Telegram-Bot-Api-Secret-Token")!==secret)return json({error:"Unauthorized"},401);
   const update=await request.json().catch(()=>null);
   const message=update?.message||update?.channel_post||null;
   if(!message)return json({ok:true,ignored:true});
