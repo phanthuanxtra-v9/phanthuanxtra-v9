@@ -87,6 +87,10 @@ export async function handleTelegramIngest(request,env,ctx){
   const sourceHash=await sha256(`${message.chat?.id||""}:${message.message_id}:${photo?.file_unique_id||fileId||caption}`);
   await env.DB.prepare(`INSERT INTO telegram_inbox (source_hash,chat_id,message_id,file_id,file_unique_id,file_path,caption,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,'received',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(source_hash) DO NOTHING`).bind(sourceHash,String(message.chat?.id||""),Number(message.message_id||0),fileId,photo?.file_unique_id||"",filePath,caption).run();
   const inbox=await env.DB.prepare(`SELECT id FROM telegram_inbox WHERE source_hash=? LIMIT 1`).bind(sourceHash).first();
+  if(inbox?.id&&chatId=String(message.chat?.id||"")){
+    const receipt=photo&&caption?"📥 ĐÃ NHẬN ẢNH + THÔNG TIN XE\n⏳ Đang lưu ảnh, phân tích AI và chuẩn bị cập nhật hệ thống...":"📥 ĐÃ NHẬN DỮ LIỆU TỪ TELEGRAM\n⏳ Đang xử lý...";
+    await tg(env,"sendMessage",{chat_id:chatId,reply_to_message_id:Number(message.message_id||0),text:`${receipt}\n📦 Inbox ID: ${inbox.id}`}).catch(()=>{});
+  }
   if(inbox?.id&&photo&&ctx)ctx.waitUntil(processInbox(env,Number(inbox.id),filePath,caption,sourceHash,String(message.chat?.id||""),Number(message.message_id||0)));
   return json({ok:true,received:true,source_hash:sourceHash,inbox_id:inbox?.id||null,queued:Boolean(photo&&ctx)});
 }
