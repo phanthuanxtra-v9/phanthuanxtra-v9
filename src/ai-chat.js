@@ -28,7 +28,7 @@ Lĩnh vực chatbot hỗ trợ: Luxury Automotive, Green Energy, European Yachts
 `;
 
 const IDENTITY_RE = /phan\s*thuần|phan\s*thuan|phanthuần|phanthuan|xtra intelligence|phan thuần xtra/i;
-const VEHICLE_RE = /\b(xe|ô tô|oto|automotive|lexus|porsche|mercedes|bmw|audi|toyota|land rover|landrover|range rover|rolls royce|ferrari|aston martin|cadillac|suv|sport|sedan|coupe|pickup|bán xe|mua xe|lái thử|thu đổi|định giá)\b/i;
+const VEHICLE_RE = /\b(mua xe|bán xe|xe nào|xe gì|mẫu xe|dòng xe|lái thử|thu đổi|định giá|giá xe|giá bao nhiêu|phù hợp|lexus|porsche|mercedes|bmw|audi|toyota|land rover|landrover|range rover|rolls royce|ferrari|aston martin|cadillac|suv|sport|sedan|coupe|pickup)\b/i;
 const PHONE_RE = /(?:\+?84|0)(?:\D*\d){9,10}/;
 
 function systemPrompt(cars, knowledge) {
