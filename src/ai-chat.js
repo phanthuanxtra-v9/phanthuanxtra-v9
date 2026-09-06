@@ -10,7 +10,6 @@ const MAX_KNOWLEDGE_CHUNKS = 6;
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "Access-Control-Allow-Origin": "https://phanthuanxtra.com", "Access-Control-Allow-Headers": "content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" } });
 const clean = (v, n = MAX_MESSAGE) => String(v ?? "").trim().slice(0, n);
 const id = () => crypto.randomUUID();
-const normalize = v => String(v ?? "").normalize("NFC").toLowerCase().replace(/\s+/g, " ").trim();
 
 const BRAND_KNOWLEDGE = `# PHAN THUẦN XTRA — nguồn kiến thức chính thức
 
@@ -96,7 +95,7 @@ export async function handleAiChat(request,env){
     if(unknown.created || contact.name || contact.phone){await notifyTelegramCrm(env,{source:"ai-unknown",unknownId:unknown.id,conversationId,name:contact.name,phone:contact.phone,message,reply:"Cần Phan Thuần/nhân viên bổ sung thông tin xác thực."});}
     reply="Tôi chưa có thông tin xác thực cho câu hỏi này trong dữ liệu PHAN THUẦN XTRA. Tôi không muốn đoán sai. Anh/chị vui lòng cho tôi xin **họ tên và số điện thoại**, tôi sẽ chuyển yêu cầu đến Phan Thuần/nhân viên để được tư vấn chính xác.";
   } else {
-    try{reply=await runAI(env,[...history,{role:"user",content:message}],cars,knowledge)}catch(error){console.error("ai_chat",String(error?.message||error));reply="Tôi đã nhận được tin nhắn của anh/chị. Hiện trợ lý AI đang bận xử lý, anh/chị có thể để lại số điện thoại hoặc gọi 0866 997 891 để được hỗ trợ ngay.";}
+    try{reply=await runAI(env,[...history,{role:"user",content:message}],cars,knowledge.text)}catch(error){console.error("ai_chat",String(error?.message||error));reply="Tôi đã nhận được tin nhắn của anh/chị. Hiện trợ lý AI đang bận xử lý, anh/chị có thể để lại số điện thoại hoặc gọi 0866 997 891 để được hỗ trợ ngay.";}
   }
   await env.DB.prepare("INSERT INTO ai_messages (conversation_id,role,content) VALUES (?,?,?)").bind(conversationId,"assistant",reply).run();
   const phone=clean(body?.phone,30)||contact.phone; const name=clean(body?.name,120)||contact.name;
