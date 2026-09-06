@@ -1,3 +1,5 @@
+import { analyzeVehicleImage } from "./vehicle-ai.js";
+
 const json=(data,status=200,extra={})=>new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store",...extra}});
 const clean=v=>String(v??"").trim();
 const sha256=async value=>{const bytes=new TextEncoder().encode(value),hash=await crypto.subtle.digest("SHA-256",bytes);return[...new Uint8Array(hash)].map(x=>x.toString(16).padStart(2,"0")).join("")};
@@ -13,7 +15,20 @@ async function tg(env,method,payload={}){
 function pickPhoto(message){const photos=Array.isArray(message?.photo)?message.photo:[];return photos.length?photos[photos.length-1]:null;}
 function authorized(request,env){const h=request.headers.get("Authorization")||"";return Boolean(env.ADMIN_TOKEN&&h===`Bearer ${env.ADMIN_TOKEN}`)}
 
-export async function handleTelegramIngest(request,env){
+async function processInbox(env,inboxId,filePath,caption){
+  try{
+    const imageResponse=await fetch(`https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${filePath}`);
+    if(!imageResponse.ok)throw new Error(`Telegram file download failed: ${imageResponse.status}`);
+    const bytes=await imageResponse.arrayBuffer();
+    const ai=await analyzeVehicleImage(env,bytes,imageResponse.headers.get("content-type")||"image/jpeg",caption);
+    await env.DB.prepare(`INSERT INTO vehicle_ai_drafts (inbox_id,status,ai_json,confidence,missing_fields_json,source_caption,source_file_path,created_at,updated_at) VALUES (?, 'draft', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(inbox_id) DO UPDATE SET ai_json=excluded.ai_json,confidence=excluded.confidence,missing_fields_json=excluded.missing_fields_json,source_caption=excluded.source_caption,source_file_path=excluded.source_file_path,error=NULL,status='draft',updated_at=CURRENT_TIMESTAMP`).bind(inboxId,JSON.stringify(ai),Number(ai.confidence||0),JSON.stringify(ai.missing_fields||[]),caption,filePath).run();
+    await env.DB.prepare(`UPDATE telegram_inbox SET status='analyzed',updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(inboxId).run();
+  }catch(error){
+    await env.DB.prepare(`UPDATE telegram_inbox SET status='failed',error=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(clean(error?.message||error),inboxId).run().catch(()=>{});
+  }
+}
+
+export async function handleTelegramIngest(request,env,ctx){
   const url=new URL(request.url);
   if(url.pathname==="/api/admin/telegram/webhook"){
     if(request.method!=="POST")return json({error:"Method Not Allowed"},405,{Allow:"POST"});
@@ -27,16 +42,23 @@ export async function handleTelegramIngest(request,env){
   if(secret&&request.headers.get("X-Telegram-Bot-Api-Secret-Token")!==secret)return json({error:"Unauthorized"},401);
   const update=await request.json().catch(()=>null);
   const message=update?.message||update?.channel_post||null;
-  const photo=pickPhoto(message);
-  if(!message||!photo)return json({ok:true,ignored:true});
+  if(!message)return json({ok:true,ignored:true});
   if(!env.DB)return json({ok:false,error:"D1 chưa được kết nối"},500);
-  const caption=clean(message.caption);
-  const file=await tg(env,"getFile",{file_id:photo.file_id});
-  const filePath=clean(file?.file_path);
-  if(!filePath)throw new Error("Telegram không trả file_path");
-  const sourceHash=await sha256(`${message.chat?.id||""}:${message.message_id}:${photo.file_unique_id||photo.file_id}`);
-  await env.DB.prepare(`INSERT INTO telegram_inbox (source_hash,chat_id,message_id,file_id,file_unique_id,file_path,caption,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,'received',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(source_hash) DO NOTHING`).bind(sourceHash,String(message.chat?.id||""),Number(message.message_id||0),photo.file_id,photo.file_unique_id||"",filePath,caption).run();
-  return json({ok:true,received:true,source_hash:sourceHash,file_path:filePath});
+  const photo=pickPhoto(message);
+  const caption=clean(message.caption||message.text);
+  if(!photo&&!caption)return json({ok:true,ignored:true});
+  const fileId=photo?.file_id||"";
+  let filePath="";
+  if(photo){
+    const file=await tg(env,"getFile",{file_id:photo.file_id});
+    filePath=clean(file?.file_path);
+    if(!filePath)throw new Error("Telegram không trả file_path");
+  }
+  const sourceHash=await sha256(`${message.chat?.id||""}:${message.message_id}:${photo?.file_unique_id||fileId||caption}`);
+  const result=await env.DB.prepare(`INSERT INTO telegram_inbox (source_hash,chat_id,message_id,file_id,file_unique_id,file_path,caption,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,'received',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(source_hash) DO NOTHING`).bind(sourceHash,String(message.chat?.id||""),Number(message.message_id||0),fileId,photo?.file_unique_id||"",filePath,caption).run();
+  const inbox=await env.DB.prepare(`SELECT id FROM telegram_inbox WHERE source_hash=? LIMIT 1`).bind(sourceHash).first();
+  if(inbox?.id&&photo&&ctx)ctx.waitUntil(processInbox(env,Number(inbox.id),filePath,caption));
+  return json({ok:true,received:true,source_hash:sourceHash,inbox_id:inbox?.id||null,queued:Boolean(photo&&ctx)});
 }
 
 export async function setTelegramWebhook(env,webhookUrl){
