@@ -51,7 +51,7 @@ jobs:
           node --check src/ai-chat.js
           node --check src/plate-branding.js
           node --check public/script.js
-          node --test tests/telegram.test.mjs tests/ai-chat.test.mjs tests/pt-xtra-media.test.mjs tests/pt-xtra-plate.test.mjs tests/plate-branding.test.mjs tests/production-gates.test.mjs tests/vip-vehicle-intelligence.test.mjs
+          node --test tests/telegram.test.mjs tests/ai-chat.test.mjs tests/pt-xtra-media.test.mjs tests/pt-xtra-plate.test.mjs tests/plate-branding.test.mjs tests/production-gates.test.mjs tests/vip-vehicle-intelligence.test.mjs tests/vip-telegram.test.mjs
       - name: Wrangler dry-run validation
         run: npx wrangler deploy --dry-run
 
