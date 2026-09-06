@@ -4,6 +4,7 @@ import { handleAiChat } from "./ai-chat.js";
 
 const json=(data,status=200,headers={})=>new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store",...headers}});
 const SEC={"X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Referrer-Policy":"strict-origin-when-cross-origin","Permissions-Policy":"camera=(), microphone=(), geolocation=()","Cross-Origin-Opener-Policy":"same-origin","Strict-Transport-Security":"max-age=31536000; includeSubDomains; preload"};
+const secure=r=>{const o=new Response(r.body,r);for(const[k,v]of Object.entries(SEC))o.headers.set(k,v);return o};
 const auth=(r,e)=>{const t=e.ADMIN_TOKEN,a=r.headers.get("Authorization")||"";return !!t&&a.startsWith("Bearer ")&&a.slice(7)===t};
 const body=async r=>r.json().catch(()=>null);const text=(v,n)=>String(v??"").trim().slice(0,n);const num=v=>Number.isFinite(Number(v))?Number(v):0;
 async function initDb(db) {}
