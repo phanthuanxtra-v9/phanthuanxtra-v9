@@ -22,6 +22,10 @@
     "binding": "AI"
   },
 
+  "images": {
+    "binding": "IMAGES"
+  },
+
   "ai_search_namespaces": [
     {
       "binding": "AI_SEARCH",
