@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { buildCaption } from '../src/telegram.js';
 import { canAutoPublish, promoteDraft } from '../src/telegram-ingest.js';
 
+const VALID_PLATE_BBOX = { x: 0.25, y: 0.45, width: 0.5, height: 0.12 };
+
 test('Telegram caption keeps Vietnamese Unicode and real vehicle fields',()=>{
   const caption=buildCaption({id:'lx600-urban',brand:'Lexus',model:'LX 600 Urban',year:2024,mileage:12000,color:'Trắng ngọc trai',interior:'Đen',engine:'V6 3.5 Twin Turbo',transmission:'10AT',seats:7,origin:'Nhật Bản',price:8650000000,status:'available',features_json:JSON.stringify(['Mark Levinson','Camera 360','Cửa sổ trời']),description:'Xe thực tế tại showroom.'});
   assert.match(caption,/Lexus LX 600 Urban/);
@@ -20,10 +22,11 @@ test('Telegram caption omits fields that are not present instead of inventing da
   assert.doesNotMatch(caption,/Twin Turbo/);
 });
 
-test('Telegram AI draft auto-publish requires real identity and high confidence',()=>{
-  assert.equal(canAutoPublish({brand:'Lexus',model:'LX 600',confidence:0.85}),true);
-  assert.equal(canAutoPublish({brand:'Lexus',model:'LX 600',confidence:0.849}),false);
-  assert.equal(canAutoPublish({brand:'Lexus',model:null,confidence:0.99}),false);
+test('Telegram AI draft auto-publish requires real identity, high confidence and valid plate box',()=>{
+  assert.equal(canAutoPublish({brand:'Lexus',model:'LX 600',confidence:0.85,plate_bbox:VALID_PLATE_BBOX}),true);
+  assert.equal(canAutoPublish({brand:'Lexus',model:'LX 600',confidence:0.849,plate_bbox:VALID_PLATE_BBOX}),false);
+  assert.equal(canAutoPublish({brand:'Lexus',model:null,confidence:0.99,plate_bbox:VALID_PLATE_BBOX}),false);
+  assert.equal(canAutoPublish({brand:'Lexus',model:'LX 600',confidence:0.99,plate_bbox:null}),false);
 });
 
 test('Telegram publish duplicate protection sends only once',async()=>{
@@ -61,11 +64,11 @@ test('Telegram publish duplicate protection sends only once',async()=>{
   const originalFetch=global.fetch;
   global.fetch=async()=>{calls.push(1);return new Response(JSON.stringify({ok:true,result:{message_id:calls.length}}),{status:200,headers:{'content-type':'application/json'}})};
   try{
-    const draft={brand:'Lexus',model:'LX 600',year:2024,mileage:1000,price:9000000000,confidence:0.95,features:[],missing_fields:[]};
-    const first=await promoteDraft(env,101,draft,'vehicles/inbox-101-test.jpg');
+    const draft={brand:'Lexus',model:'LX 600',year:2024,mileage:1000,price:9000000000,confidence:0.95,plate_bbox:VALID_PLATE_BBOX,features:[],missing_fields:[]};
+    const first=await promoteDraft(env,101,draft,'vehicles/publish-inbox-101-test.jpg');
     assert.equal(first.published,true);
     const callsAfterFirst=calls.length;
-    const second=await promoteDraft(env,101,draft,'vehicles/inbox-101-test.jpg');
+    const second=await promoteDraft(env,101,draft,'vehicles/publish-inbox-101-test.jpg');
     assert.equal(second.published,true);
     assert.equal(second.telegram.duplicate,true);
     assert.equal(calls.length,callsAfterFirst);
