@@ -1,8 +1,10 @@
 import { analyzeVehicleImage } from "./vehicle-ai.js";
+import { publishCar } from "./telegram.js";
 
 const json=(data,status=200,extra={})=>new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store",...extra}});
 const clean=v=>String(v??"").trim();
 const sha256=async value=>{const bytes=new TextEncoder().encode(value),hash=await crypto.subtle.digest("SHA-256",bytes);return[...new Uint8Array(hash)].map(x=>x.toString(16).padStart(2,"0")).join("")};
+const AUTO_PUBLISH_MIN_CONFIDENCE=0.85;
 
 async function tg(env,method,payload={}){
   if(!env.TELEGRAM_BOT_TOKEN)throw new Error("TELEGRAM_BOT_TOKEN is not configured");
@@ -14,12 +16,14 @@ async function tg(env,method,payload={}){
 
 function pickPhoto(message){const photos=Array.isArray(message?.photo)?message.photo:[];return photos.length?photos[photos.length-1]:null;}
 function authorized(request,env){const h=request.headers.get("Authorization")||"";return Boolean(env.ADMIN_TOKEN&&h===`Bearer ${env.ADMIN_TOKEN}`)}
+function canAutoPublish(ai){return Boolean(ai?.brand&&ai?.model&&Number(ai?.confidence||0)>=AUTO_PUBLISH_MIN_CONFIDENCE)}
+function carIdForInbox(inboxId){return `tg-${Number(inboxId)}`}
 
-function reportText(ai,inboxId,mediaKey){
+function reportText(ai,inboxId,mediaKey,published=false){
   const a=ai||{};
   const label=[a.brand,a.model].filter(Boolean).join(" ")||"Chưa xác định tên xe";
   const lines=[
-    "✅ ĐÃ NHẬN ẢNH + THÔNG TIN XE",
+    published?"🚀 ĐÃ PHÂN TÍCH + TỰ ĐĂNG XE":"✅ ĐÃ NHẬN ẢNH + THÔNG TIN XE",
     `📦 Inbox ID: ${inboxId}`,
     `🚗 Xe: ${label}`,
     a.year?`📅 Năm: ${a.year}`:null,
@@ -30,11 +34,29 @@ function reportText(ai,inboxId,mediaKey){
     `🎯 Độ tin cậy AI: ${Math.round(Number(a.confidence||0)*100)}%`,
     Array.isArray(a.missing_fields)&&a.missing_fields.length?`⚠️ Cần bổ sung: ${a.missing_fields.join(", ")}`:"✅ Không phát hiện trường bắt buộc còn thiếu",
     "",
-    "📌 Trạng thái: Đã lưu ảnh vào kho MEDIA + tạo bản nháp AI trong D1.",
-    "⏳ Chưa tự đăng bán cho đến khi bước kiểm duyệt/publish hoàn tất.",
+    published?"📌 Trạng thái: Đã tạo bản ghi xe và gọi bộ phận publish với cơ chế chống trùng.":"📌 Trạng thái: Đã lưu ảnh vào kho MEDIA + tạo bản nháp AI trong D1.",
+    published?"🛡 Duplicate protection: telegram_posts.car_id":"⏳ Chưa tự đăng vì chưa đạt ngưỡng an toàn hoặc còn thiếu định danh xe.",
     mediaKey?`🖼 Ảnh: /media/${mediaKey}`:null
   ].filter(Boolean);
   return lines.join("\n");
+}
+
+async function promoteDraft(env,inboxId,ai,mediaKey){
+  if(!canAutoPublish(ai))return {published:false,reason:"confidence_or_identity_below_threshold"};
+  const carId=carIdForInbox(inboxId);
+  const description=clean(ai.description,10000)||`Xe ${clean(ai.brand)} ${clean(ai.model)} được nhập từ Telegram và phân tích bởi AI.`;
+  const features=Array.isArray(ai.features)?ai.features.map(clean).filter(Boolean).slice(0,80):[];
+  const imageUrl=`https://phanthuanxtra.com/media/${encodeURIComponent(mediaKey)}`;
+  const existing=await env.DB.prepare("SELECT id,status FROM cars WHERE id=? LIMIT 1").bind(carId).first();
+  if(!existing){
+    await env.DB.prepare("INSERT INTO cars (id,brand,model,year,mileage,price,fuel,category,color,status,description,features_json,featured,cover_image) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+      .bind(carId,clean(ai.brand,100),clean(ai.model,160),ai.year??null,ai.mileage??0,ai.price??0,clean(ai.fuel,100),clean(ai.category,40)||"other",clean(ai.color,80),"available",description,JSON.stringify(features),0,imageUrl).run();
+  }
+  const imageExists=await env.DB.prepare("SELECT id FROM car_images WHERE car_id=? AND url=? LIMIT 1").bind(carId,imageUrl).first();
+  if(!imageExists)await env.DB.prepare("INSERT INTO car_images (car_id,url,sort_order,is_cover) VALUES (?,?,0,1)").bind(carId,imageUrl).run();
+  const published=await publishCar(env,carId);
+  await env.DB.prepare("UPDATE vehicle_ai_drafts SET status='published',updated_at=CURRENT_TIMESTAMP WHERE inbox_id=?").bind(inboxId).run();
+  return {published:true,car_id:carId,telegram:published};
 }
 
 async function processInbox(env,inboxId,filePath,caption,sourceHash,chatId,messageId){
@@ -50,7 +72,10 @@ async function processInbox(env,inboxId,filePath,caption,sourceHash,chatId,messa
     const ai=await analyzeVehicleImage(env,bytes,contentType,caption);
     await env.DB.prepare(`INSERT INTO vehicle_ai_drafts (inbox_id,status,ai_json,confidence,missing_fields_json,source_caption,source_file_path,created_at,updated_at) VALUES (?, 'draft', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(inbox_id) DO UPDATE SET ai_json=excluded.ai_json,confidence=excluded.confidence,missing_fields_json=excluded.missing_fields_json,source_caption=excluded.source_caption,source_file_path=excluded.source_file_path,error=NULL,status='draft',updated_at=CURRENT_TIMESTAMP`).bind(inboxId,JSON.stringify({...ai,media_key:mediaKey}),Number(ai.confidence||0),JSON.stringify(ai.missing_fields||[]),caption,filePath).run();
     await env.DB.prepare(`UPDATE telegram_inbox SET status='analyzed',processed_image_url=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(`/media/${mediaKey}`,inboxId).run();
-    if(chatId)await tg(env,"sendMessage",{chat_id:chatId,reply_to_message_id:messageId,text:reportText(ai,inboxId,mediaKey),disable_web_page_preview:true});
+    let promotion={published:false,reason:"not_attempted"};
+    try{promotion=await promoteDraft(env,inboxId,ai,mediaKey);if(promotion.published)await env.DB.prepare("UPDATE telegram_inbox SET status='published',updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(inboxId).run();}
+    catch(error){promotion={published:false,reason:clean(error?.message||error)||"publish_failed"};await env.DB.prepare("UPDATE vehicle_ai_drafts SET status='publish_failed',error=?,updated_at=CURRENT_TIMESTAMP WHERE inbox_id=?").bind(promotion.reason,inboxId).run().catch(()=>{});}
+    if(chatId)await tg(env,"sendMessage",{chat_id:chatId,reply_to_message_id:messageId,text:reportText(ai,inboxId,mediaKey,promotion.published),disable_web_page_preview:true});
   }catch(error){
     const message=clean(error?.message||error);
     await env.DB.prepare(`UPDATE telegram_inbox SET status='failed',error=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(message,inboxId).run().catch(()=>{});
@@ -101,3 +126,5 @@ export async function setTelegramWebhook(env,webhookUrl){
   if(env.TELEGRAM_WEBHOOK_SECRET)payload.secret_token=env.TELEGRAM_WEBHOOK_SECRET;
   return tg(env,"setWebhook",payload);
 }
+
+export { canAutoPublish, promoteDraft };
