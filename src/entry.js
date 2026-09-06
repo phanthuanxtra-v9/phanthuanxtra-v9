@@ -5,6 +5,7 @@ import { handleTelegramIngest, setTelegramWebhook } from "./telegram-ingest.js";
 import { handleMediaApi } from "./media.js";
 import { handleAiChat } from "./ai-chat.js";
 import { handleTelegramRouter } from "./telegram-router.js";
+import { reconcileTelegramNotifications } from "./telegram-notifications.js";
 
 const TELEGRAM_WEBHOOK_URL="https://phanthuanxtra.com/api/telegram/webhook";
 
@@ -36,6 +37,12 @@ export default {
       console.log("telegram_webhook_self_heal_ok",JSON.stringify({url:TELEGRAM_WEBHOOK_URL,result}));
     } catch (error) {
       console.error("telegram_webhook_self_heal_failed",String(error?.message||error));
+    }
+    try {
+      const result=await reconcileTelegramNotifications(env);
+      console.log("telegram_notifications_reconcile",JSON.stringify(result));
+    } catch (error) {
+      console.error("telegram_notifications_reconcile_failed",String(error?.message||error));
     }
   }
 };
