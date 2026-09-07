@@ -27,7 +27,7 @@ permissions:
 jobs:
   zero-cost:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Validate dispatch inputs
         shell: bash
@@ -58,14 +58,53 @@ jobs:
           fi
           echo 'dispatch_inputs=valid'
 
-      - name: Checkout main
+      - name: Checkout dispatched ref
         uses: actions/checkout@v5
         with:
-          ref: main
+          ref: ${{ github.ref_name }}
           fetch-depth: 0
 
+      - name: Multi-AI specialist review
+        if: ${{ startsWith(inputs.instruction, 'MULTI_AI:') }}
+        shell: bash
+        env:
+          TASK_ID: ${{ inputs.task_id }}
+          MULTI_AI_INSTRUCTION: ${{ inputs.instruction }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          MISTRAL_MODEL: ${{ vars.MISTRAL_MODEL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMMA_MODEL: ${{ vars.GEMMA_MODEL }}
+          LLAMA_API_KEY: ${{ secrets.LLAMA_API_KEY }}
+          LLAMA_BASE_URL: ${{ vars.LLAMA_BASE_URL }}
+          LLAMA_MODEL: ${{ vars.LLAMA_MODEL }}
+        run: |
+          set -euo pipefail
+          instruction="${MULTI_AI_INSTRUCTION#MULTI_AI:}"
+          export MULTI_AI_INSTRUCTION="$instruction"
+          node developer-gateway/multi-ai-review.mjs | tee multi-ai-review.json
+          {
+            echo '# Multi-AI Specialist Review'
+            echo
+            echo '- Mistral: code-engineering specialist'
+            echo '- Gemma: test-engineering specialist'
+            echo '- Llama: security/reliability specialist'
+            echo '- Production mutations: **not attempted**'
+            echo '- OpenAI calls: **0**'
+            echo
+            cat multi-ai-review.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Multi-AI review artifact
+        if: ${{ startsWith(inputs.instruction, 'MULTI_AI:') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: phanthuanxtra-multi-ai-review-${{ inputs.task_id }}
+          path: multi-ai-review.json
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Zero-cost repository audit
-        if: ${{ inputs.mode == 'audit' }}
+        if: ${{ inputs.mode == 'audit' && !startsWith(inputs.instruction, 'MULTI_AI:') }}
         shell: bash
         env:
           INSTRUCTION: ${{ inputs.instruction }}
@@ -113,7 +152,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Zero-cost repository test
-        if: ${{ inputs.mode == 'test' }}
+        if: ${{ inputs.mode == 'test' && !startsWith(inputs.instruction, 'MULTI_AI:') }}
         shell: bash
         run: |
           set -euo pipefail

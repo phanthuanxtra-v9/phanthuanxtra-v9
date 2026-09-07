@@ -1,0 +1,149 @@
+name: AI Peer Executor
+
+on:
+  workflow_dispatch:
+    inputs:
+      instruction:
+        description: 'Task to execute from the persistent checkpoint'
+        required: true
+        type: string
+      task_id:
+        description: 'Stable task/checkpoint ID'
+        required: true
+        type: string
+      agent:
+        description: 'Executor peer'
+        required: true
+        type: choice
+        options:
+          - mistral
+          - gemma
+          - llama
+        default: mistral
+      base_branch:
+        description: 'Branch containing the checkpoint to continue'
+        required: true
+        type: string
+        default: feature/multi-ai-developer-gateway
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ai-peer-executor-${{ inputs.task_id }}
+  cancel-in-progress: false
+
+jobs:
+  execute-peer-task:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout checkpoint
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.base_branch }}
+          fetch-depth: 0
+
+      - name: Prepare executor environment
+        env:
+          TASK_ID: ${{ inputs.task_id }}
+          AGENT: ${{ inputs.agent }}
+          BASE_BRANCH: ${{ inputs.base_branch }}
+        run: |
+          set -euo pipefail
+          test "$BASE_BRANCH" != "main"
+          test "$AGENT" != "all"
+          printf '%s\n' "$TASK_ID" > .ai-peer-task-id
+          printf '%s\n' "$AGENT" > .ai-peer-agent
+          node --version
+          git status --short
+
+      - name: Read persistent checkpoint
+        run: |
+          set -euo pipefail
+          test -f developer-gateway/TASK-LEDGER.md
+          test -f developer-gateway/AI-PEER-CONTINUITY.md
+          cp developer-gateway/TASK-LEDGER.md ai-task-checkpoint.md
+          cat developer-gateway/TASK-LEDGER.md
+
+      - name: Run constrained peer executor
+        shell: bash
+        env:
+          TASK_ID: ${{ inputs.task_id }}
+          MULTI_AI_INSTRUCTION: ${{ inputs.instruction }}
+          AI_PEER_AGENT: ${{ inputs.agent }}
+          TASK_CHECKPOINT: ${{ env.TASK_CHECKPOINT }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          MISTRAL_MODEL: ${{ vars.MISTRAL_MODEL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMMA_MODEL: ${{ vars.GEMMA_MODEL }}
+          LLAMA_API_KEY: ${{ secrets.LLAMA_API_KEY }}
+          LLAMA_BASE_URL: ${{ vars.LLAMA_BASE_URL }}
+          LLAMA_MODEL: ${{ vars.LLAMA_MODEL }}
+        run: |
+          set -euo pipefail
+          export TASK_CHECKPOINT="$(cat developer-gateway/TASK-LEDGER.md)"
+          node developer-gateway/ai-peer-executor.mjs > ai-peer-executor.json
+          node -e "const x=require('./ai-peer-executor.json'); if(x.production_mutation!==false) throw new Error('production mutation must remain false'); if(!x.summary) throw new Error('missing executor summary'); require('fs').writeFileSync('ai-peer-summary.md', x.summary+'\n'); require('fs').writeFileSync('ai-peer.patch', x.patch+'\n');"
+          test -s ai-peer-summary.md
+
+      - name: Validate patch without changing the worktree
+        run: |
+          set -euo pipefail
+          if [ ! -s ai-peer.patch ]; then
+            echo 'Peer produced no patch; stopping without PR.'
+            exit 0
+          fi
+          git apply --check --whitespace=error ai-peer.patch
+          grep -nE '(^|/)\.env($|\.)|(^|/)(credentials|secrets?)(/|\.)|wrangler\.jsonc$' ai-peer.patch && { echo 'Potential secret/config mutation detected; refusing patch.'; exit 1; } || true
+
+      - name: Apply patch and run repository checks
+        if: ${{ success() }}
+        run: |
+          set -euo pipefail
+          if [ ! -s ai-peer.patch ]; then exit 0; fi
+          git apply --whitespace=error ai-peer.patch
+          git diff --check
+          git status --short
+          if [ -f package.json ]; then npm ci --ignore-scripts; npm test --if-present; fi
+
+      - name: Create isolated executor branch and PR
+        if: ${{ success() && hashFiles('ai-peer.patch') != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TASK_ID: ${{ inputs.task_id }}
+          AGENT: ${{ inputs.agent }}
+          BASE_BRANCH: ${{ inputs.base_branch }}
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet; then
+            BRANCH="ai-peer/${TASK_ID}-${AGENT}"
+            git config user.name 'PHAN THUẦN XTRA AI Peer Executor'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git switch -c "$BRANCH"
+            git add -A
+            git commit -m "feat(ai-peer): execute ${TASK_ID} via ${AGENT}"
+            git push --set-upstream origin "$BRANCH"
+            gh pr create --base "$BASE_BRANCH" --head "$BRANCH" --title "feat(ai-peer): ${TASK_ID} via ${AGENT}" --body "## AI Peer Executor\n\nTask ID: ${TASK_ID}\nPeer: ${AGENT}\nBase checkpoint: ${BASE_BRANCH}\n\n### Safety\n- Generated through constrained executor.\n- Production mutation: **false**.\n- Production deployment is not performed by this workflow.\n- CI and the existing Production Gate remain authoritative.\n\n### Peer summary\n$(cat ai-peer-summary.md)"
+          else
+            echo 'No changes after patch application; no PR created.'
+          fi
+
+      - name: Executor summary
+        if: always()
+        run: |
+          {
+            echo '# AI Peer Executor'
+            echo
+            echo "task_id=${{ inputs.task_id }}"
+            echo "agent=${{ inputs.agent }}"
+            echo "base_branch=${{ inputs.base_branch }}"
+            echo '- Production mutations: **not attempted**'
+            echo '- Direct Cloudflare production credentials exposed: **no**'
+            if [ -f ai-peer-summary.md ]; then
+              echo
+              echo '## Peer summary'
+              cat ai-peer-summary.md
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
