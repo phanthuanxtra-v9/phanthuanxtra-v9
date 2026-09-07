@@ -2,6 +2,7 @@ import process from 'node:process';
 
 const instruction = process.env.MULTI_AI_INSTRUCTION?.trim();
 const taskId = process.env.TASK_ID?.trim() || 'unknown';
+const requestedAgent = process.env.AI_PEER_AGENT?.trim() || 'all';
 
 if (!instruction) {
   throw new Error('MULTI_AI_INSTRUCTION is required');
@@ -61,39 +62,48 @@ async function openAiCompatible({ name, baseUrl, apiKey, model, system }) {
   }
 }
 
-const common = `You are a specialist reviewer for the PHAN THUAN XTRA production repository.\nDo not modify files, deploy production, expose secrets, or invent test results.\nReturn concise findings with severity (critical/high/medium/low), evidence, and a concrete recommendation.\nRepository: phanthuanxtra-v9/phanthuanxtra-v9.`;
+const common = `You are a peer AI worker for the PHAN THUAN XTRA production repository.
+Continue the supplied task from the existing GitHub Markdown checkpoint.
+Do not modify files, deploy production, expose secrets, or invent test results.
+Return concise findings with severity (critical/high/medium/low), evidence, concrete recommendations, and an explicit next checkpoint.
+Repository: phanthuanxtra-v9/phanthuanxtra-v9.`;
 
-const workers = [
-  openAiCompatible({
+const allWorkers = {
+  mistral: openAiCompatible({
     name: 'mistral-code-engineer',
     baseUrl: 'https://api.mistral.ai/v1',
     apiKey: process.env.MISTRAL_API_KEY,
     model: process.env.MISTRAL_MODEL || 'mistral-large-latest',
-    system: `${common}\nRole: code engineer. Focus on JavaScript, Cloudflare Workers, APIs, tests, race conditions, and minimal safe patches.`
+    system: `${common}\nRole: implementation/code engineer. Focus on JavaScript, Cloudflare Workers, APIs, tests, race conditions, and minimal safe patches.`
   }),
-  openAiCompatible({
+  gemma: openAiCompatible({
     name: 'gemma-test-engineer',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
     apiKey: process.env.GEMINI_API_KEY,
     model: process.env.GEMMA_MODEL || 'gemma-4-31b-it',
     system: `${common}\nRole: test engineer. Focus on regression coverage, edge cases, API contracts, Android integration, and reproducible acceptance tests.`
   }),
-  openAiCompatible({
+  llama: openAiCompatible({
     name: 'llama-security-reviewer',
     baseUrl: process.env.LLAMA_BASE_URL,
     apiKey: process.env.LLAMA_API_KEY,
     model: process.env.LLAMA_MODEL || 'llama',
-    system: `${common}\nRole: independent security and reliability reviewer. Focus on authentication, authorization, secret handling, prompt injection, idempotency, concurrency, and production blast radius.`
+    system: `${common}\nRole: independent security and reliability engineer. Focus on authentication, authorization, secret handling, prompt injection, idempotency, concurrency, and production blast radius.`
   })
-];
+};
 
-const results = await Promise.all(workers);
+const selected = requestedAgent === 'all'
+  ? Object.values(allWorkers)
+  : [allWorkers[requestedAgent] || { name: requestedAgent, status: 'invalid_agent' }];
+
+const results = await Promise.all(selected);
 const configured = results.filter(item => item.status !== 'not_configured').length;
 const successful = results.filter(item => item.status === 'ok').length;
 
 const report = {
-  schema: 'phanthuanxtra.multi-ai-review.v1',
+  schema: 'phanthuanxtra.multi-ai-review.v2',
   task_id: taskId,
+  requested_agent: requestedAgent,
   generated_at: new Date().toISOString(),
   configured_workers: configured,
   successful_workers: successful,
