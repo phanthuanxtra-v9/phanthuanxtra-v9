@@ -3,7 +3,7 @@
 > **Purpose:** Single handoff/checkpoint document so any AI/session can resume PHAN THUẦN XTRA without reconstructing prior conversations.
 >
 > **Last updated:** 2026-09-07 (Vietnam, UTC+7)
-> **Current milestone:** S21 Ultra production-admin APK integrated with phanthuanxtra.com backend; production deployment GREEN.
+> **Current milestone:** S21 Ultra physical production test PASSED; next implementation is mobile management hardening + Auto Bot + VIP Bot E2E.
 > **Rule:** Do not regress working production code or remove/skip D1 migrations merely to make CI green.
 
 ---
@@ -41,7 +41,7 @@
 9. Preserve existing production functionality while making fixes.
 10. When a milestone materially changes, update this file and commit it.
 11. Prefer direct GitHub/repo/workflow inspection over assumptions.
-12. Real-device testing cannot be truthfully marked complete until the S21 Ultra has installed and exercised the APK.
+12. Real-device testing is complete only when the user confirms the S21 Ultra has installed and exercised the APK.
 
 ---
 
@@ -49,64 +49,38 @@
 
 ### STATUS: GREEN / DEPLOYED
 
-The previous Cloudflare production credential problem is resolved.
-
-Historical failure:
-- Workflow `34085914775`
-- `Apply D1 migrations` failed with Cloudflare `10000` / `9109`.
-
-Resolution:
-- New Cloudflare token verified active.
-- Correct account ID: `5f35d608938abe622b694bab3af1319c`.
-- GitHub production environment secrets were corrected.
-
-### CURRENT VERIFIED DEPLOYMENT
-
-Production workflow after Android API integration:
+Production deployment after Android API integration:
 - Run: `34090076816`
 - Head SHA: `de33cfe2ce6b2e99bfa6f7b19f8aad91fabc2cd1`
-- `CI / Validate` → **SUCCESS**
-- Wrangler dry-run → **SUCCESS**
-- `Apply D1 migrations` → **SUCCESS**
-- `Deploy to Cloudflare` → **SUCCESS**
+- CI / Validate → SUCCESS
+- Wrangler dry-run → SUCCESS
+- D1 migrations → SUCCESS
+- Deploy to Cloudflare → SUCCESS
 
-Therefore the production Worker is deployed with the Android App API integration.
+Production Worker is deployed with the Android App API integration.
 
 ---
 
-## 4. CRITICAL ANDROID/PRODUCTION DISCOVERY + FIX
+## 4. ANDROID/PRODUCTION DISCOVERY + FIX
 
-### Discovery
-The repository already contained `src/app-api.js` implementing:
-- `/api/app/v1/health`
-- authenticated `/api/app/v1/dashboard`
-- authenticated `/api/app/v1/cars`
-- authenticated `/api/app/v1/cars/:id`
-- authenticated `/api/app/v1/media`
-- authenticated `/api/app/v1/vehicle/analyze`
-- authenticated `/api/app/v1/leads`
+The repository contains `src/app-api.js` implementing the Android App API, including health, dashboard, cars, media, vehicle AI and leads endpoints.
 
-The Android APK already targeted:
+The APK targets:
 `https://phanthuanxtra.com/api/app/v1`
 
-However, the production Worker entrypoint `src/index.js` did **not** import/call `handleAppApi` before the fix. This meant the APK's intended API surface was not actually wired into the Worker request dispatcher.
+The production Worker previously failed to dispatch this API because `src/index.js` did not call `handleAppApi()`.
 
-### Fix
-Commit:
+Fix commit:
 `de33cfe2ce6b2e99bfa6f7b19f8aad91fabc2cd1`
 
 Message:
 `fix: wire Android app API into production Worker`
 
-Changes:
-- imported `handleAppApi` from `./app-api.js`
-- routed `handleAppApi(r,e)` from the Worker fetch handler before the legacy admin/static routes.
-
-This commit passed CI, D1 migration, and production Worker deployment.
+The fix passed CI, D1 migration and production Worker deployment.
 
 ---
 
-## 5. S21 ULTRA ADMIN APK — CURRENT BUILD
+## 5. S21 ULTRA ADMIN APK — VERIFIED
 
 ### App identity
 - Application ID: `com.phanthuanxtra.app`
@@ -116,15 +90,12 @@ This commit passed CI, D1 migration, and production Worker deployment.
 - targetSdk: `35`
 - INTERNET permission enabled.
 
-### Current APK feature set
+### Latest APK source
 Commit:
 `d3859fc06b5a5c69218883699b4c994558567e02`
 
-Message:
-`feat: expand S21 admin app for website management`
-
-The APK now provides:
-- Save APP API token locally in app preferences.
+The APK provides:
+- Save APP API token locally.
 - Connection/health check.
 - Dashboard.
 - Vehicle inventory (`KHO XE`).
@@ -132,7 +103,7 @@ The APK now provides:
 - Add vehicle using photo picker + Vehicle AI.
 - Upload vehicle image to production media storage.
 - Create vehicle record in production D1 through App API.
-- Open `phanthuanxtra.com` directly from the app.
+- Open `phanthuanxtra.com` directly.
 
 Android API base:
 `https://phanthuanxtra.com/api/app/v1`
@@ -141,34 +112,20 @@ Android API base:
 - Run: `34090103902`
 - Run number: `14`
 - Head SHA: `d3859fc06b5a5c69218883699b4c994558567e02`
-- Build: **SUCCESS**
+- Build: SUCCESS
 - Artifact: `phanthuanxtra-apk-debug`
 - Artifact ID: `10006523773`
 - Artifact digest: `sha256:60193bf938a38800e0d5d16be5e51e9be72291cd602cafcd88986220535ca76a`
-- Artifact is not expired.
 
-### Important distinction
-**APK build is GREEN, but real S21 Ultra installation/execution is still the remaining physical-device gate.** Do not mark that step DONE without an actual device test.
+### PHYSICAL S21 ULTRA GATE — PASSED
 
----
+User confirmed that the APK was installed on the real S21 Ultra, the production test was completed successfully, and additional fixes/upgrades are now requested.
 
-## 6. ANDROID SOURCE CHECKPOINT
-
-`android/app/build.gradle` currently defines:
-- namespace `com.phanthuanxtra.app`
-- compileSdk 35
-- minSdk 26
-- targetSdk 35
-- versionCode 2
-- versionName `1.1.0`
-
-`AndroidManifest.xml` includes INTERNET permission and launcher activity.
-
-`MainActivity.java` currently targets the production App API and provides the S21 management actions described above.
+Therefore the previous physical-device gate is no longer blocking the roadmap.
 
 ---
 
-## 7. PRODUCTION APP API
+## 6. PRODUCTION APP API
 
 Source:
 `src/app-api.js`
@@ -178,7 +135,7 @@ Authentication:
 - Worker environment must provide `APP_API_TOKEN`.
 - Never store or expose the actual token in this checkpoint.
 
-Endpoints implemented:
+Endpoints currently implemented:
 
 ```text
 GET  /api/app/v1/health
@@ -192,11 +149,109 @@ POST /api/app/v1/vehicle/analyze
 GET  /api/app/v1/leads
 ```
 
-The App API uses D1 for vehicle/lead data and MEDIA storage for uploaded images.
+The App API uses D1 for vehicle/lead data and media storage for uploaded images.
 
 ---
 
-## 8. IMPORTANT GIT CHECKPOINTS
+## 7. MOBILE MANAGEMENT HARDENING — NEXT
+
+The current APK is functional and physically tested. Next implementation should strengthen it into the operational management app:
+
+- Vehicle detail/edit form.
+- Create/update/delete vehicle workflow.
+- Status changes: available / reserved / sold.
+- Delete with explicit confirmation.
+- Featured toggle.
+- Image gallery management.
+- Lead status and note editing.
+- Search/filter.
+- Retry/offline/error UX.
+- Token validation and clearer authentication failure messages.
+- Production-safe validation before destructive operations.
+
+Do not remove working MVP functions while adding these capabilities.
+
+---
+
+## 8. BOT ARCHITECTURE — OPERATIONAL OWNERSHIP
+
+### `@phanthuanxtra_auto_bot`
+
+**Primary mission:** NHẬP XE LÊN WEBSITE / VEHICLE INGESTION.
+
+Responsibilities:
+- Receive vehicle information/media from the configured intake source.
+- Normalize and validate vehicle fields.
+- Use Vehicle AI where appropriate for image/data analysis.
+- Create/update vehicle inventory records.
+- Persist vehicle images/media.
+- Publish/update vehicle listings on `phanthuanxtra.com` according to business rules.
+- Prevent duplicate/concurrent processing.
+- Report failures without creating partial/duplicate vehicle records.
+
+Existing related checkpoint:
+`d7c5dd004ed39035932be76d5b87b8feefe1d823`
+
+Message:
+`fix: make Auto Bot bundle processing single-flight`
+
+Required acceptance:
+- Same bundle/event repeated → one effective vehicle-processing result.
+- Concurrent duplicate events → one effective result.
+- Vehicle data and media remain consistent.
+- Production listing is verifiable after ingestion.
+
+### `@phanthuanxtra_bot`
+
+**Primary mission:** TRA CỨU THÔNG TIN XE.
+
+Responsibilities:
+- Search/query vehicle inventory.
+- Return vehicle information accurately.
+- Return vehicle registration/inspection information when that data is available in the system.
+- Return vehicle images/media associated with the vehicle.
+- Answer vehicle lookup requests without modifying inventory unless an explicitly authorized workflow requires it.
+- Keep responses grounded in production data and clearly distinguish unavailable information.
+
+### `VIP Bot`
+
+Existing checkpoint:
+`cb042effbdc06d0bb49d35a314a6dcf58e790e86`
+
+Message:
+`fix: make VIP Bot Telegram inputs idempotent`
+
+Required acceptance:
+- Repeated Telegram events do not create duplicate downstream side effects.
+- VIP intake/session/media persistence remains idempotent.
+
+---
+
+## 9. BOT E2E ROADMAP
+
+```text
+S21 physical test                         → DONE
+        ↓
+Mobile management hardening              → NEXT
+        ↓
+@phanthuanxtra_auto_bot                  → vehicle ingestion
+        ↓
+Auto Bot duplicate/concurrency E2E       → VERIFY
+        ↓
+@phanthuanxtra_bot                       → vehicle lookup
+        ↓
+Lookup data/image/registration E2E        → VERIFY
+        ↓
+VIP Bot idempotency E2E                  → VERIFY
+        ↓
+Full production acceptance               → FINAL
+```
+
+Important: do not mark Auto Bot or lookup bot complete from source inspection alone. Execute and verify their real workflows and downstream production effects.
+
+---
+
+## 10. IMPORTANT GIT CHECKPOINTS
 
 ### APK MVP
 `cde5084e0838f0869529884f29e3ea14c307004e`
@@ -207,15 +262,11 @@ The App API uses D1 for vehicle/lead data and MEDIA storage for uploaded images.
 ### APK 1.1.0 / versionCode 2
 `19325b9c41168f05de98dee38734abfa39a65d88`
 
-### Auto Bot
+### Auto Bot single-flight
 `d7c5dd004ed39035932be76d5b87b8feefe1d823`
 
-Message: `fix: make Auto Bot bundle processing single-flight`
-
-### VIP Bot
-`cb042effbdc06d0bb49d35a314a6dcf58e790e86`
-
-Message: `fix: make VIP Bot Telegram inputs idempotent`
+### VIP Bot idempotency
+`cb042effbd06c0bb49d35a314a6dcf58e790e86`
 
 ### Production App API integration
 `de33cfe2ce6b2e99bfa6f7b19f8aad91fabc2cd1`
@@ -223,9 +274,12 @@ Message: `fix: make VIP Bot Telegram inputs idempotent`
 ### S21 admin app expansion
 `d3859fc06b5a5c69218883699b4c994558567e02`
 
+### Current checkpoint
+This document is being updated to record the physical S21 test as PASSED and define the two bot roles clearly for AI handoff.
+
 ---
 
-## 9. D1 MIGRATIONS — DO NOT DELETE/BYPASS
+## 11. D1 MIGRATIONS — DO NOT DELETE/BYPASS
 
 - `0001_init.sql`
 - `0002_posts.sql`
@@ -243,7 +297,7 @@ Production migration is currently passing.
 
 ---
 
-## 10. TEST / CI STATE
+## 12. TEST / CI STATE
 
 Latest production deployment run `34090076816`:
 - CI syntax/tests → PASS
@@ -254,130 +308,79 @@ Latest production deployment run `34090076816`:
 Latest APK run `34090103902`:
 - Gradle assembleDebug → PASS
 - APK artifact upload → PASS
+- Real S21 Ultra installation and production test → **USER-CONFIRMED PASS**
 
-Existing tests/validation cover:
-- Telegram caption Unicode and real vehicle fields
-- AI draft identity/confidence gating
-- Immediate webhook receipt
-- Branding not being an identity gate
-- Telegram duplicate protection
-- JavaScript syntax/tests
-- Wrangler dry-run
-
-Remaining testing gap:
-- Dedicated regression tests should be strengthened for Auto Bot single-flight and VIP Bot idempotency.
-- Real S21 Ultra end-to-end test is still required.
+Remaining verification:
+- Mobile CRUD hardening.
+- Auto Bot single-flight E2E.
+- Vehicle lookup bot E2E.
+- VIP Bot idempotency E2E.
+- Final production acceptance.
 
 ---
 
-## 11. CURRENT EXECUTION ROADMAP
+## 13. WINDOWS 10 POWERSHELL WORKSPACE
 
-```text
-1. App API tối thiểu                 → DONE
-2. Android APK MVP                   → DONE
-3. Production API integration        → DONE
-4. Production Worker deployment     → DONE / GREEN
-5. S21 Ultra APK build               → DONE / GREEN
-6. S21 Ultra installation            → NEXT PHYSICAL GATE
-7. S21 production API smoke test     → NEXT
-8. Add/edit/delete vehicle workflow  → NEXT HARDENING
-9. Leads workflow                    → NEXT HARDENING
-10. Auto Bot single-flight E2E       → NEXT
-11. VIP Bot idempotency E2E          → NEXT
-12. Final production acceptance      → FINAL
-```
+The user's current PowerShell prompt is:
+`PS C:\Windows\system32>`
 
----
+The command `cd phanthuanxtra-v9` failed because the repository is not located at:
+`C:\Windows\system32\phanthuanxtra-v9`
 
-## 12. IMMEDIATE NEXT ACTIONS
+Do not assume the local clone path. Locate the actual clone first, then run Git commands from that directory.
 
-### A. S21 Ultra
-1. Obtain artifact `phanthuanxtra-apk-debug` from workflow `34090103902`.
-2. Install on S21 Ultra.
-3. Enter the APP API token locally; never send it to chat.
-4. Press `KIỂM TRA KẾT NỐI`.
-5. Press `DASHBOARD`.
-6. Press `KHO XE`.
-7. Press `KHÁCH HÀNG / LEADS`.
-8. Test `THÊM XE + AI` with a real vehicle photo.
-9. Verify the newly created vehicle appears on the website.
-10. Open `PHANTHUANXTRA.COM` from the app and confirm the listing is visible.
-
-### B. Website management hardening
-The current APK is an admin MVP. Next implementation should add:
-- vehicle detail/edit form
-- status changes: available/reserved/sold
-- delete with confirmation
-- featured toggle
-- image gallery management
-- lead status/note editing
-- search/filter
-- retry/offline/error UX
-- token validation and clearer auth failure messages
-
-### C. Auto Bot
-- Add/verify explicit concurrent duplicate regression tests.
-- Verify one bundle produces one effective processing result.
-
-### D. VIP Bot
-- Add/verify explicit repeated Telegram event regression tests.
-- Verify downstream side effects remain idempotent.
-
-### E. Final production acceptance
-- CI green.
-- D1 migrations green.
-- Worker deploy green.
-- S21 real-device tests green.
-- Website listing CRUD verified.
-- Auto Bot E2E verified.
-- VIP Bot E2E verified.
-
----
-
-## 13. CLOUDFLARE CREDENTIAL FACTS
-
-Correct account ID:
-`5f35d608938abe622b694bab3af1319c`
-
-Token was verified active and successfully used by production GitHub Actions.
-
-Expected production permissions:
-- Account → D1 → Edit
-- Account → Workers Scripts → Edit
-
-Never store actual token values in this file.
-
----
-
-## 14. GITHUB CLI STATE
-
-Windows 10:
-`gh version 2.100.0 (2026-09-03)`
-
-GitHub CLI browser authentication completed successfully.
-
-Useful commands:
+Recommended safe discovery command:
 
 ```powershell
-gh auth status
-gh repo view phanthuanxtra-v9/phanthuanxtra-v9
-gh secret list --repo phanthuanxtra-v9/phanthuanxtra-v9 --env production
+Get-ChildItem -Path $HOME -Directory -Recurse -ErrorAction SilentlyContinue |
+  Where-Object { $_.Name -eq 'phanthuanxtra-v9' } |
+  Select-Object -ExpandProperty FullName
 ```
 
-Never output secret values.
+If the clone is found, enter that exact directory and verify:
+
+```powershell
+cd "<FOUND_PATH>"
+git status
+git remote -v
+git branch --show-current
+git log -5 --oneline
+```
+
+If no local clone exists, clone the repository using the authenticated GitHub CLI/account already configured on Windows, rather than inventing a path.
+
+Never paste secrets/tokens into PowerShell output or chat.
+
+---
+
+## 14. CURRENT EXECUTION PLAN
+
+1. Locate/verify Windows 10 local repository.
+2. Inspect current `main` HEAD and working tree.
+3. Inspect Auto Bot implementation, tests and workflow.
+4. Inspect `@phanthuanxtra_bot` lookup implementation, tests and workflow.
+5. Strengthen missing regression/E2E coverage.
+6. Implement/fix production-safe vehicle ingestion and lookup behavior where evidence shows gaps.
+7. Run CI/tests.
+8. Deploy only verified changes.
+9. Verify production effects.
+10. Update this checkpoint and commit it.
+
+The user expects the AI team to continue directly, with PowerShell commands on Windows 10 when local execution is required.
 
 ---
 
 ## 15. KNOWN RISKS / DO NOT ASSUME
 
-1. Green CI/deploy does not equal real S21 device success.
-2. APK build success does not prove authentication or API behavior on-device.
-3. The App API token must exist in the Worker environment; never hard-code it in the APK.
+1. Green CI/deploy does not by itself prove bot E2E behavior.
+2. APK build success is now supplemented by a user-confirmed real S21 production test.
+3. App API token must remain server-side/locally configured; never expose actual values.
 4. Do not confuse `ADMIN_TOKEN` legacy admin routes with `APP_API_TOKEN` App API routes.
 5. Do not delete or bypass D1 migrations.
-6. Do not weaken production authentication merely to simplify mobile testing.
-7. Do not mark Auto Bot/VIP Bot complete without duplicate/concurrency evidence.
-8. Do not claim website CRUD is complete until edit/delete/status/featured behavior is actually tested.
+6. Do not weaken production authentication.
+7. Do not mark Auto Bot complete without duplicate/concurrency evidence.
+8. Do not mark vehicle lookup bot complete without verified production vehicle data/image responses.
+9. Do not claim website CRUD is complete until edit/delete/status/featured behavior is actually tested.
 
 ---
 
@@ -386,8 +389,8 @@ Never output secret values.
 1. Read this entire file.
 2. Inspect current `main` HEAD.
 3. Inspect latest GitHub Actions runs.
-4. If production is green, do not re-solve the old Cloudflare credential issue.
-5. Start at the first unfinished item in Section 11.
+4. If production is green, do not re-solve old Cloudflare credential issues.
+5. Start at the first unfinished item in Section 14.
 6. Execute and verify it.
 7. Update this checkpoint with date/time, commit SHA, workflow run, tests, production state, and next action.
 8. Commit the checkpoint to `main`.
@@ -414,11 +417,15 @@ Never output secret values.
 - Added AI vehicle intake/upload/create flow.
 - Added direct website opening.
 - APK workflow `34090103902` passed.
-- APK artifact digest:
-  `sha256:60193bf938a38800e0d5d16be5e51e9be72291cd602cafcd88986220535ca76a`
+
+### 2026-09-07 — S21 physical test + bot role update
+- User confirmed APK installation and production test on physical S21 Ultra completed successfully.
+- `@phanthuanxtra_auto_bot` role confirmed: vehicle ingestion/publishing to website.
+- `@phanthuanxtra_bot` role confirmed: vehicle information lookup, registration/inspection data when available, and vehicle images.
+- This checkpoint was updated so subsequent AIs can take over without reconstructing the conversation.
 
 ---
 
 ## 18. ONE-LINE CURRENT STATE
 
-**PHAN THUẦN XTRA production is GREEN; the S21 Ultra admin APK is built and connected to the production App API; next gate is physical S21 installation + real production smoke test, then complete mobile CRUD and Auto Bot/VIP Bot end-to-end acceptance.**
+**PHAN THUẦN XTRA production is GREEN; S21 Ultra APK v1.1.0 has been physically installed and production-tested successfully; next work is mobile management hardening, then @phanthuanxtra_auto_bot vehicle ingestion E2E, @phanthuanxtra_bot vehicle lookup E2E, VIP Bot idempotency verification, and final production acceptance.**
