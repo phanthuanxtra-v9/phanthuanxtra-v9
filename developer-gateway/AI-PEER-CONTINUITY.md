@@ -81,9 +81,9 @@ The authoritative state must remain in GitHub Markdown, not inside a single chat
 
 ## Security boundary
 
-AI peers must not receive raw production secrets in prompts or Markdown. Cloudflare API tokens, GitHub tokens, `APP_API_TOKEN`, provider keys and gateway authentication secrets remain in GitHub/Cloudflare secret stores. Cloudflare documents Worker secrets as encrypted bindings and recommends secrets rather than plaintext variables for API keys/auth tokens. citeturn3search0turn3search1
+AI peers must not receive raw production secrets in prompts or Markdown. Cloudflare API tokens, GitHub tokens, `APP_API_TOKEN`, provider keys and gateway authentication secrets remain in GitHub/Cloudflare secret stores.
 
-GitHub Actions should grant only the permissions required by each job. Job-level permissions are supported, allowing a write-capable executor job to be isolated from read-only review jobs. citeturn2search0turn2search3
+GitHub Actions should grant only the permissions required by each job. Review jobs remain read-only; any write-capable executor must be isolated in its own job with explicit permissions.
 
 ## Current implementation status
 
