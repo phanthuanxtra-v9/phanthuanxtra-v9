@@ -1,74 +1,47 @@
-# PHAN THUAN XTRA — V8 PRO
+# PHAN THUAN XTRA — V8 PRO — LEGACY / ARCHIVE
 
-Cloudflare Workers + Static Assets + optional D1 data layer. The public website works immediately from `public/`. D1 is an upgrade path for persistent inventory and leads.
+> **LƯU Ý 2026-09-07:** Đây là tài liệu lịch sử của V8 PRO. **Không dùng file này làm nguồn hướng dẫn triển khai hiện tại.** Không chạy các lệnh Wrangler cũ trong file này trên S21 Ultra.
 
-## Current handoff status — 2026-09-07
+## Nguồn bàn giao hiện tại
+Nguồn ưu tiên cho công việc hiện tại là:
 
-This section is the shared handoff note for anyone taking over work on the project.
+1. `MASTER_CONTEXT_PHAN_THUAN.md` — trạng thái dự án tổng thể.
+2. `developer-gateway/AI-PEER-CONTINUITY.md` — giao thức bàn giao giữa các AI peer.
+3. `developer-gateway/TASK-20260907-S21-OLLAMA-OPENCODE.md` — checkpoint S21 + OpenCode + Ollama + Cloudflare AI hiện tại.
+4. Branch làm việc: `feat/v10-s21-termux-opencode-android`.
+5. Production branch: `main` — không sửa trực tiếp.
 
-### Local project
-- Project root: `/mnt/sdcard/phanthuanxtra-v9`
-- Git repository: **YES** (`.git/` exists)
-- GitHub repository: `phanthuanxtra-v9/phanthuanxtra-v9`
-- Default branch: `main`
-- Current project structure includes `src/`, `public/`, `scripts/`, `migrations/`, `package.json`, `package-lock.json`, and `wrangler.json`.
+## Phạm vi của tài liệu này
+V8 PRO ghi lại kiến trúc nền tảng ban đầu: Cloudflare Workers + Static Assets + D1 tùy chọn. Website có thể hoạt động từ `public/`, còn D1 là lớp dữ liệu lâu dài.
 
-### Git ownership issue on Android/SD card
-The repository is currently blocked by Git's `safe.directory` ownership check when accessed from the local environment. The observed error is:
+Các hướng dẫn cũ về `npx wrangler login`, `npm run deploy`, tạo D1 thủ công hoặc đường dẫn cũ trong file này chỉ có giá trị tham khảo lịch sử. Quy trình hiện tại dùng **GitHub Actions / Cloudflare Workers Builds** cho CI/CD từ xa; S21 Ultra không phải máy deploy production.
 
-`fatal: detected dubious ownership in repository at '/mnt/sdcard/phanthuanxtra-v9'`
+## Hiện trạng V10 liên quan
+- Repository: `phanthuanxtra-v9/phanthuanxtra-v9`.
+- Website: `https://phanthuanxtra.com`.
+- S21 Ultra đã vượt qua gate kiểm thử APK vật lý theo `MASTER_CONTEXT_PHAN_THUAN.md`.
+- OpenCode 1.18.29 chạy trong Debian/proot trên S21.
+- Ollama 0.30.10 chạy trên Termux host.
+- `phi3:mini` đã kết nối được với OpenCode nhưng không hỗ trợ tools; không dùng làm coding-agent chính.
+- Không tải thêm Llama/Mistral/Gemma 7–8B local khi RAM S21 đang thiếu.
+- Workers AI + AI Gateway là tầng AI cloud ưu tiên cho các tác vụ nặng.
 
-Before running normal Git commands locally, add the repository as a trusted safe directory:
+## Dữ liệu lịch sử cần bảo vệ
+`public/data/cars.json` là fallback inventory lịch sử. Không xóa nếu chưa có kế hoạch migration được phê duyệt.
 
-```bash
-git config --global --add safe.directory /mnt/sdcard/phanthuanxtra-v9
-```
+## Quy tắc an toàn
+- Không commit Cloudflare API token, mật khẩu, database credential hoặc provider key.
+- Không sửa/deploy trực tiếp `main` trong công việc V10.
+- Không xóa các D1 migration hiện có.
+- Không coi tài liệu V8 này là trạng thái production hiện tại.
+- Trước mọi thay đổi, đọc `MASTER_CONTEXT_PHAN_THUAN.md` và checkpoint V10.
 
-Then verify:
+## Handoff checklist lịch sử
+Nếu cần phục hồi hoặc nghiên cứu V8:
+1. Đọc file này để hiểu bối cảnh lịch sử.
+2. Kiểm tra branch và `git status`.
+3. Đối chiếu cấu hình hiện tại thay vì sao chép nguyên lệnh V8.
+4. Bảo toàn `public/data/cars.json`.
+5. Ghi mọi thay đổi quan trọng vào checkpoint V10.
 
-```bash
-cd /mnt/sdcard/phanthuanxtra-v9
-git status
-git branch --show-current
-git log -5 --oneline
-```
-
-This is a Git ownership/trust check, not evidence that the repository itself is corrupted.
-
-### Important handoff rule
-Use this file as the first handoff checkpoint. Before making changes, check `git status`, current branch, and recent commits. Do not assume the local SD-card checkout is synchronized with GitHub.
-
-## Deploy
-1. Install Node.js 20+.
-2. `npm install`
-3. `npx wrangler login`
-4. `npm run dev`
-5. Create D1: `npx wrangler d1 create phanthuanxtra`
-6. Put the returned database_id into `wrangler.json`.
-7. `npx wrangler d1 migrations apply phanthuanxtra --remote`
-8. `npm run deploy`
-
-The website is designed so D1 can be absent: `/api/cars` falls back to `public/data/cars.json`, and lead submission returns demo-mode status until D1 is connected.
-
-## Existing inventory
-The current V6 inventory is preserved in `public/data/cars.json`. Do not delete it. It is the fallback data source and can be migrated into D1 later.
-
-## Production notes
-- Never put Cloudflare API tokens, passwords, or database credentials in `public/`.
-- Add admin authentication before exposing CRUD endpoints.
-- Add Turnstile and rate limiting before production lead forms.
-- Keep database backups/export before schema changes.
-- Do not commit secrets, tokens, `.env` files, or credentials to GitHub.
-
-## Handoff checklist
-
-For the next person/agent:
-
-1. Read this file first.
-2. Check the GitHub `main` branch before changing files.
-3. On the SD-card checkout, resolve the `safe.directory` warning if it appears.
-4. Run `git status` and confirm the working tree state.
-5. Inspect `package.json` and `wrangler.json` before deployment-related work.
-6. Preserve `public/data/cars.json` unless there is an explicit migration plan.
-7. Keep Cloudflare secrets out of the repository.
-8. Record important deployment, migration, testing, or blocking-status changes back in this document so the next worker can continue without repeating discovery.
+**Kết luận:** `README_V8_PRO.md` vẫn được giữ để truy vết lịch sử, nhưng **không phải tài liệu điều hành chính của V10**.
