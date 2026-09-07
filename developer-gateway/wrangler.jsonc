@@ -7,8 +7,11 @@
   "observability": { "enabled": true },
   "vars": {
     "GATEWAY_MODE": "readonly",
-    "PRODUCTION_MUTATIONS_ENABLED": "false"
+    "PRODUCTION_MUTATIONS_ENABLED": "false",
+    "AI_PEER_FAILOVER_ENABLED": "true",
+    "AI_PEER_POLICY_VERSION": "1"
   }
   // Set GATEWAY_READ_TOKEN as a Cloudflare secret; never commit it.
   // Set GATEWAY_ALLOWED_ORIGINS as a secret/variable with exact APK/web origins.
+  // Provider API keys and any future per-agent credentials must be Cloudflare/GitHub secrets.
 }
