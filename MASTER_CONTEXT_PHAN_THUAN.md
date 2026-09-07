@@ -3,7 +3,7 @@
 > **Purpose:** Single handoff/checkpoint document so any AI/session can resume PHAN THUẦN XTRA without reconstructing prior conversations.
 >
 > **Last updated:** 2026-09-07 (Vietnam, UTC+7)
-> **Current milestone:** S21 Ultra physical production test PASSED; next implementation is mobile management hardening + Auto Bot + VIP Bot E2E.
+> **Current milestone:** S21 Ultra physical production test PASSED; mobile management hardening is next, with Auto Bot + vehicle lookup + VIP E2E following. OpenCode Mobile/AI6 has been evaluated and approved as a parallel development/operations capability, not a blocker for the core product roadmap.
 > **Rule:** Do not regress working production code or remove/skip D1 migrations merely to make CI green.
 
 ---
@@ -42,6 +42,7 @@
 10. When a milestone materially changes, update this file and commit it.
 11. Prefer direct GitHub/repo/workflow inspection over assumptions.
 12. Real-device testing is complete only when the user confirms the S21 Ultra has installed and exercised the APK.
+13. Tooling such as OpenCode Mobile must support the project; it must not silently become a prerequisite for the production APK.
 
 ---
 
@@ -153,7 +154,7 @@ The App API uses D1 for vehicle/lead data and media storage for uploaded images.
 
 ---
 
-## 7. MOBILE MANAGEMENT HARDENING — NEXT
+## 7. MOBILE MANAGEMENT HARDENING — NEXT CORE PRODUCT STAGE
 
 The current APK is functional and physically tested. Next implementation should strengthen it into the operational management app:
 
@@ -171,9 +172,87 @@ The current APK is functional and physically tested. Next implementation should 
 
 Do not remove working MVP functions while adding these capabilities.
 
+**Product direction:** PHAN THUẦN XTRA is the project and the APK/application name. Do not invent a separate product name for the APK.
+
 ---
 
-## 8. BOT ARCHITECTURE — OPERATIONAL OWNERSHIP
+## 8. OPEN CODE MOBILE / AI6 — EVALUATION CHECKPOINT
+
+### Objective
+
+Evaluate whether OpenCode Mobile should be added as a parallel capability while the PHAN THUẦN XTRA APK remains the primary operational application.
+
+### Evidence
+
+The user wants the S21 Ultra to eventually manage the PHAN THUẦN XTRA system from the finished APK, while also being able to work remotely with AI6 through OpenCode Mobile.
+
+The current S21 Termux evidence shows:
+- Node.js: `v24.17.0`
+- architecture: `aarch64`
+- Android kernel: `5.4.242-30958140-abG998NKSSCHZA9`
+- `opencode` CLI is not installed on the S21.
+- `127.0.0.1:4096` is not listening on the S21.
+
+This does **not** prove that AI6/A16 lacks an OpenCode Server. It only proves the S21 itself is not currently running one.
+
+### Architectural assessment
+
+OpenCode Mobile should be treated as a **development/agent control client**, not as a replacement for the PHAN THUẦN XTRA APK.
+
+Preferred conceptual topology:
+
+```text
+PHAN THUẦN XTRA APK
+    → production/system operations on S21
+
+OpenCode Mobile
+    → remote development/AI6 control
+
+AI6 / OpenCode Server
+    → project execution environment
+
+ChatGPT
+    → architecture, audit, GitHub/Cloudflare verification and review
+
+GitHub
+    → source/change history and collaboration boundary
+```
+
+### Recommendation
+
+**APPROVE as a parallel capability, NOT as a core-product blocker.**
+
+Reasons:
+1. It can improve remote development and AI-agent collaboration.
+2. It does not need to replace the APK's operational functions.
+3. It can coexist on S21 without changing the production API architecture.
+4. It can be introduced without weakening production security.
+5. It should connect to an OpenCode Server running on the actual AI6/A16 execution environment, not by assuming `127.0.0.1:4096` on the S21.
+6. The exact AI6/A16 host, network path, authentication and server status remain to be verified.
+
+### Security / isolation requirements
+
+- Prefer private HTTPS connectivity (for example Tailscale or an equivalent private access layer) rather than exposing port 4096 directly to the public Internet.
+- OpenCode server authentication must be enabled.
+- Never place `APP_API_TOKEN`, Cloudflare tokens, GitHub tokens or other production secrets in source, commits, logs or chat.
+- OpenCode access must not automatically gain production deployment/migration privileges.
+- Keep production mutations behind the existing review/deploy controls.
+- Do not make OpenCode Mobile a dependency of the PHAN THUẦN XTRA APK runtime.
+
+### Decision boundary
+
+OpenCode Mobile integration can proceed in parallel **after the actual AI6/A16 OpenCode Server endpoint is identified and verified**.
+
+It must not delay:
+- Mobile management hardening.
+- Auto Bot E2E.
+- Vehicle lookup bot E2E.
+- VIP Bot idempotency E2E.
+- Final production acceptance.
+
+---
+
+## 9. BOT ARCHITECTURE — OPERATIONAL OWNERSHIP
 
 ### `@phanthuanxtra_auto_bot`
 
@@ -216,7 +295,7 @@ Responsibilities:
 ### `VIP Bot`
 
 Existing checkpoint:
-`cb042effbdc06d0bb49d35a314a6dcf58e790e86`
+`cb042effbd06c0bb49d35a314a6dcf58e790e86`
 
 Message:
 `fix: make VIP Bot Telegram inputs idempotent`
@@ -227,12 +306,12 @@ Required acceptance:
 
 ---
 
-## 9. BOT E2E ROADMAP
+## 10. BOT E2E ROADMAP
 
 ```text
 S21 physical test                         → DONE
         ↓
-Mobile management hardening              → NEXT
+Mobile management hardening              → NEXT CORE PRODUCT
         ↓
 @phanthuanxtra_auto_bot                  → vehicle ingestion
         ↓
@@ -245,13 +324,16 @@ Lookup data/image/registration E2E        → VERIFY
 VIP Bot idempotency E2E                  → VERIFY
         ↓
 Full production acceptance               → FINAL
+
+OpenCode Mobile + AI6                    → PARALLEL TOOLING
+                                           (does not block the above)
 ```
 
 Important: do not mark Auto Bot or lookup bot complete from source inspection alone. Execute and verify their real workflows and downstream production effects.
 
 ---
 
-## 10. IMPORTANT GIT CHECKPOINTS
+## 11. IMPORTANT GIT CHECKPOINTS
 
 ### APK MVP
 `cde5084e0838f0869529884f29e3ea14c307004e`
@@ -274,12 +356,16 @@ Important: do not mark Auto Bot or lookup bot complete from source inspection al
 ### S21 admin app expansion
 `d3859fc06b5a5c69218883699b4c994558567e02`
 
-### Current checkpoint
-This document is being updated to record the physical S21 test as PASSED and define the two bot roles clearly for AI handoff.
+### Current documentation checkpoint
+This revision records:
+- S21 physical test as PASSED.
+- Current core product roadmap.
+- OpenCode Mobile/AI6 as approved parallel tooling.
+- The requirement to verify the actual AI6/A16 server before configuring the mobile connection.
 
 ---
 
-## 11. D1 MIGRATIONS — DO NOT DELETE/BYPASS
+## 12. D1 MIGRATIONS — DO NOT DELETE/BYPASS
 
 - `0001_init.sql`
 - `0002_posts.sql`
@@ -297,7 +383,7 @@ Production migration is currently passing.
 
 ---
 
-## 12. TEST / CI STATE
+## 13. TEST / CI STATE
 
 Latest production deployment run `34090076816`:
 - CI syntax/tests → PASS
@@ -316,16 +402,14 @@ Remaining verification:
 - Vehicle lookup bot E2E.
 - VIP Bot idempotency E2E.
 - Final production acceptance.
+- AI6/OpenCode Server endpoint and secure connectivity verification.
 
 ---
 
-## 13. WINDOWS 10 POWERSHELL WORKSPACE
+## 14. WINDOWS 10 POWERSHELL WORKSPACE
 
 The user's current PowerShell prompt is:
 `PS C:\Windows\system32>`
-
-The command `cd phanthuanxtra-v9` failed because the repository is not located at:
-`C:\Windows\system32\phanthuanxtra-v9`
 
 Do not assume the local clone path. Locate the actual clone first, then run Git commands from that directory.
 
@@ -353,24 +437,38 @@ Never paste secrets/tokens into PowerShell output or chat.
 
 ---
 
-## 14. CURRENT EXECUTION PLAN
+## 15. CURRENT EXECUTION PLAN
 
+### Core product critical path
 1. Locate/verify Windows 10 local repository.
 2. Inspect current `main` HEAD and working tree.
-3. Inspect Auto Bot implementation, tests and workflow.
-4. Inspect `@phanthuanxtra_bot` lookup implementation, tests and workflow.
-5. Strengthen missing regression/E2E coverage.
-6. Implement/fix production-safe vehicle ingestion and lookup behavior where evidence shows gaps.
-7. Run CI/tests.
-8. Deploy only verified changes.
-9. Verify production effects.
-10. Update this checkpoint and commit it.
+3. Implement mobile management hardening only where source/production evidence requires it.
+4. Inspect Auto Bot implementation, tests and workflow.
+5. Strengthen missing Auto Bot regression/E2E coverage.
+6. Inspect `@phanthuanxtra_bot` lookup implementation, tests and workflow.
+7. Strengthen lookup E2E coverage.
+8. Verify VIP Bot idempotency E2E.
+9. Run CI/tests.
+10. Deploy only verified changes.
+11. Verify production effects.
+12. Perform final production acceptance.
+13. Update this checkpoint and commit it.
 
-The user expects the AI team to continue directly, with PowerShell commands on Windows 10 when local execution is required.
+### Parallel OpenCode/AI6 track
+A. Identify the actual AI6/A16 execution host.
+B. Verify whether OpenCode Server exists there.
+C. If absent, install/configure the official OpenCode server on that host.
+D. Verify `/global/health` and server authentication.
+E. Establish private HTTPS connectivity for S21.
+F. Add the connection to OpenCode Mobile.
+G. Test remote session/project access.
+H. Keep OpenCode permissions isolated from production deployment/migration controls.
+
+The OpenCode track is **parallel tooling** and must not displace the core product acceptance sequence unless a verified dependency is discovered.
 
 ---
 
-## 15. KNOWN RISKS / DO NOT ASSUME
+## 16. KNOWN RISKS / DO NOT ASSUME
 
 1. Green CI/deploy does not by itself prove bot E2E behavior.
 2. APK build success is now supplemented by a user-confirmed real S21 production test.
@@ -381,24 +479,29 @@ The user expects the AI team to continue directly, with PowerShell commands on W
 7. Do not mark Auto Bot complete without duplicate/concurrency evidence.
 8. Do not mark vehicle lookup bot complete without verified production vehicle data/image responses.
 9. Do not claim website CRUD is complete until edit/delete/status/featured behavior is actually tested.
+10. Do not assume `127.0.0.1:4096` on S21 represents the AI6/A16 OpenCode Server.
+11. Do not install OpenCode CLI on S21 merely because the Mobile Client displays a localhost connection profile.
+12. Do not expose OpenCode port 4096 directly to the public Internet without a deliberate security review.
+13. Do not grant OpenCode automatic production deploy, migration or secret-management authority.
 
 ---
 
-## 16. HANDOFF PROTOCOL FOR A NEW AI
+## 17. HANDOFF PROTOCOL FOR A NEW AI
 
 1. Read this entire file.
 2. Inspect current `main` HEAD.
 3. Inspect latest GitHub Actions runs.
 4. If production is green, do not re-solve old Cloudflare credential issues.
-5. Start at the first unfinished item in Section 14.
+5. Start at the first unfinished item in Section 15.
 6. Execute and verify it.
 7. Update this checkpoint with date/time, commit SHA, workflow run, tests, production state, and next action.
 8. Commit the checkpoint to `main`.
 9. Report only verified facts and remaining blockers.
+10. Treat OpenCode Mobile/AI6 as a parallel capability unless evidence proves a dependency.
 
 ---
 
-## 17. CHECKPOINT HISTORY
+## 18. CHECKPOINT HISTORY
 
 ### 2026-09-07 — Production credential recovery
 - Cloudflare credentials corrected.
@@ -424,8 +527,32 @@ The user expects the AI team to continue directly, with PowerShell commands on W
 - `@phanthuanxtra_bot` role confirmed: vehicle information lookup, registration/inspection data when available, and vehicle images.
 - This checkpoint was updated so subsequent AIs can take over without reconstructing the conversation.
 
+### 2026-09-07 — OpenCode Mobile / AI6 evaluation
+- User proposed adding OpenCode Mobile so S21 can work remotely with AI6.
+- S21 Termux verification showed Node.js `v24.17.0`, aarch64 Android, and no local `opencode` executable.
+- Local S21 `127.0.0.1:4096` health/doc checks failed because no local server is listening.
+- Assessment: OpenCode Mobile is useful as parallel development/agent tooling, but the actual AI6/A16 server endpoint must be identified before connection.
+- Decision status: **APPROVED AS PARALLEL TOOLING; NOT CORE PRODUCT DEPENDENCY.**
+
 ---
 
-## 18. ONE-LINE CURRENT STATE
+## 19. CHECKPOINT
 
-**PHAN THUẦN XTRA production is GREEN; S21 Ultra APK v1.1.0 has been physically installed and production-tested successfully; next work is mobile management hardening, then @phanthuanxtra_auto_bot vehicle ingestion E2E, @phanthuanxtra_bot vehicle lookup E2E, VIP Bot idempotency verification, and final production acceptance.**
+- Date: 2026-09-07
+- Repository: `phanthuanxtra-v9/phanthuanxtra-v9`
+- Branch: `main`
+- Current known HEAD: `ff1541de88ff7497b44ebd9b7b7d86b6431ab7b6`
+- Production Worker: `phanthuanxtra-v2`
+- Production deployment recorded: `34090076816`
+- APK workflow recorded: `34090103902`
+- S21 physical test: USER-CONFIRMED PASS
+- Core next action: mobile management hardening
+- Parallel action: identify and securely connect OpenCode Mobile to the actual AI6/A16 OpenCode Server
+- Blocked: live Cloudflare connector is not currently available to this AI session
+- No production code/deployment was changed by this documentation update
+
+---
+
+## 20. ONE-LINE CURRENT STATE
+
+**PHAN THUẦN XTRA production is recorded GREEN; S21 Ultra APK v1.1.0 has been physically installed and production-tested successfully; core work continues with mobile management hardening → Auto Bot E2E → vehicle lookup E2E → VIP Bot E2E → final acceptance, while OpenCode Mobile + AI6 is approved as a parallel development/operations capability pending verification of the actual AI6/A16 OpenCode Server endpoint.**
