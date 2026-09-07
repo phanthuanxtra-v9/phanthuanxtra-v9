@@ -9,15 +9,15 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const sha256 = async value => { const bytes = new TextEncoder().encode(value); const hash = await crypto.subtle.digest("SHA-256", bytes); return [...new Uint8Array(hash)].map(x => x.toString(16).padStart(2, "0")).join(""); };
 async function tg(token, method, payload = {}) { if (!token) throw new Error("Telegram bot token is not configured"); const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) }); const data = await response.json().catch(() => ({})); if (!response.ok || !data.ok) throw new Error(clean(data.description || `Telegram ${method} failed`)); return data.result; }
 const pickPhoto = message => Array.isArray(message?.photo) && message.photo.length ? message.photo[message.photo.length - 1] : null;
-
 export const telegramWebhookReceipt = hasPhoto => hasPhoto ? "📥 ĐÃ NHẬN ẢNH XE\n⏳ Đang kiểm tra và xử lý..." : "📥 ĐÃ NHẬN THÔNG TIN XE\n⏳ Đang chờ ảnh xe để xử lý...";
 
 async function processBundle(env, bundleKey, chatId) {
+  const claim = await env.DB.prepare("UPDATE telegram_inbox SET bundle_status='processing',updated_at=CURRENT_TIMESTAMP WHERE bundle_key=? AND bundle_status='pending'").bind(bundleKey).run();
+  if (Number(claim?.meta?.changes || 0) !== 1) return;
   const rows = (await env.DB.prepare("SELECT * FROM telegram_inbox WHERE bundle_key=? ORDER BY id ASC").bind(bundleKey).all()).results || [];
   const photoRow = rows.find(row => row.file_id);
   if (!photoRow) return;
   const text = rows.map(row => clean(row.caption)).filter(Boolean).join("\n\n");
-  await env.DB.prepare("UPDATE telegram_inbox SET bundle_status='processing',updated_at=CURRENT_TIMESTAMP WHERE bundle_key=?").bind(bundleKey).run();
   try {
     const file = await tg(env.TELEGRAM_BOT_TOKEN, "getFile", { file_id: photoRow.file_id });
     const filePath = clean(file?.file_path, 1000);
@@ -34,21 +34,16 @@ async function processBundle(env, bundleKey, chatId) {
     const inboxId = Number(photoRow.id);
     await env.DB.prepare(`INSERT INTO vehicle_ai_drafts (inbox_id,status,ai_json,confidence,missing_fields_json,source_caption,source_file_path,created_at,updated_at) VALUES (?, 'draft', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(inbox_id) DO UPDATE SET ai_json=excluded.ai_json,confidence=excluded.confidence,missing_fields_json=excluded.missing_fields_json,source_caption=excluded.source_caption,source_file_path=excluded.source_file_path,error=NULL,status='draft',updated_at=CURRENT_TIMESTAMP`).bind(inboxId, JSON.stringify({ ...ai, media_key: mediaKey, bundle_key: bundleKey }), Number(ai.confidence || 0), JSON.stringify(ai.missing_fields || []), text, filePath).run();
     await env.DB.prepare("UPDATE telegram_inbox SET status='analyzed',processed_image_url=?,bundle_status='done',caption=?,file_path=?,updated_at=CURRENT_TIMESTAMP WHERE bundle_key=?").bind(`/media/${mediaKey}`, text, filePath, bundleKey).run();
-
     const label = [ai.brand, ai.model].filter(Boolean).join(" ") || "Chưa xác định tên xe";
     if (!canAutoPublish(ai)) {
       await env.DB.prepare("UPDATE vehicle_ai_drafts SET status='awaiting_review',updated_at=CURRENT_TIMESTAMP WHERE inbox_id=?").bind(inboxId).run();
       await tg(env.TELEGRAM_BOT_TOKEN, "sendMessage", { chat_id: chatId, reply_to_message_id: Number(photoRow.message_id || 0), text: ["⚠️ ĐÃ PHÂN TÍCH XE — CHƯA TỰ ĐĂNG", `📦 Inbox: ${inboxId}`, `🚗 Xe: ${label}`, ai.year ? `📅 Năm: ${ai.year}` : null, ai.price != null ? `💰 Giá: ${ai.price}` : null, ai.mileage != null ? `🛣 ODO: ${ai.mileage}` : null, `🎯 AI: ${Math.round(Number(ai.confidence || 0) * 100)}%`, "🪪 Chưa đạt điều kiện xác định vùng biển số / độ tin cậy.", "⏳ Xe thật đã được lưu làm bản nháp, không tạo dữ liệu giả.", `🖼 /media/${mediaKey}`].filter(Boolean).join("\n") });
       return;
     }
-
-    // PT Xtra is deterministic branding only. The incoming plate text/image is
-    // never used as vehicle identity or publication evidence.
     const publishMediaKey = `vehicles/publish-inbox-${inboxId}-${sourceHash.slice(0, 16)}.jpg`;
     await createPtXtraPlateImage(env, bytes, contentType, ai.plate_bbox, publishMediaKey);
     await env.DB.prepare(`UPDATE vehicle_ai_drafts SET ai_json=?,status='branded',updated_at=CURRENT_TIMESTAMP WHERE inbox_id=?`).bind(JSON.stringify({ ...ai, media_key: mediaKey, publish_media_key: publishMediaKey, bundle_key: bundleKey, branding: "PT Xtra", branding_target: "license_plate" }), inboxId).run();
     await env.DB.prepare("UPDATE telegram_inbox SET processed_image_url=?,updated_at=CURRENT_TIMESTAMP WHERE bundle_key=?").bind(`/media/${publishMediaKey}`, bundleKey).run();
-
     const promotion = await promoteDraft(env, inboxId, ai, publishMediaKey);
     if (!promotion?.published) throw new Error(promotion?.reason || "Vehicle publication gate rejected the listing");
     await env.DB.prepare("UPDATE telegram_inbox SET status='published',bundle_status='published',updated_at=CURRENT_TIMESTAMP WHERE bundle_key=?").bind(bundleKey).run();
@@ -100,20 +95,7 @@ async function autoWebhook(request, env, ctx) {
   const caption = clean(message.caption || message.text);
   if (!photo && !caption) return json({ ok: true, ignored: true });
   const chatId = String(message.chat.id);
-
-  // The only synchronous work is the Telegram receipt. D1/R2/AI/publish is
-  // deliberately detached so Telegram gets HTTP 200 quickly and never sees a
-  // slow AI/Cloudflare operation as a webhook timeout.
-  try {
-    await tg(env.TELEGRAM_BOT_TOKEN, "sendMessage", {
-      chat_id: chatId,
-      reply_to_message_id: Number(message.message_id || 0),
-      text: telegramWebhookReceipt(Boolean(photo))
-    });
-  } catch (error) {
-    console.error("telegram_receipt_failed", clean(error?.message || error));
-  }
-
+  try { await tg(env.TELEGRAM_BOT_TOKEN, "sendMessage", { chat_id: chatId, reply_to_message_id: Number(message.message_id || 0), text: telegramWebhookReceipt(Boolean(photo)) }); } catch (error) { console.error("telegram_receipt_failed", clean(error?.message || error)); }
   if (ctx) ctx.waitUntil(processTelegramUpdate(env, update, chatId).catch(error => console.error("telegram_update_failed", clean(error?.message || error))));
   else processTelegramUpdate(env, update, chatId).catch(error => console.error("telegram_update_failed", clean(error?.message || error)));
   return json({ ok: true, received: true, queued: Boolean(ctx) });
@@ -135,7 +117,6 @@ async function aiWebhook(request, env) {
   if (result.reply) await tg(env.TELEGRAM_CHAT_BOT_TOKEN, "sendMessage", { chat_id: chatId, reply_to_message_id: Number(message.message_id || 0), text: clean(result.reply, 4000) });
   return json({ ok: true, conversation_id: result.conversation_id, replied: Boolean(result.reply) });
 }
-
 export async function handleTelegramRouter(request, env, ctx) {
   const url = new URL(request.url);
   if (url.pathname === "/api/telegram/webhook" && request.method === "POST") return autoWebhook(request, env, ctx);
