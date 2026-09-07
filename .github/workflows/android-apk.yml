@@ -4,6 +4,10 @@ on:
     branches: [main, feature/apk-mvp]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build-apk:
