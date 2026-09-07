@@ -12,7 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      TELEGRAM_AUTO_BOT_TOKEN: ${{ secrets.TELEGRAM_AUTO_BOT_TOKEN }}
+      # Auto Bot production code uses TELEGRAM_BOT_TOKEN. Keep the old AUTO secret as an override when present.
+      TELEGRAM_AUTO_BOT_TOKEN: ${{ secrets.TELEGRAM_AUTO_BOT_TOKEN || secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_VIP_BOT_TOKEN: ${{ secrets.TELEGRAM_VIP_BOT_TOKEN }}
 
     steps:
@@ -20,9 +21,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          [[ -n "${TELEGRAM_AUTO_BOT_TOKEN:-}" ]] || { echo "❌ TELEGRAM_AUTO_BOT_TOKEN is missing"; exit 1; }
+          [[ -n "${TELEGRAM_AUTO_BOT_TOKEN:-}" ]] || { echo "❌ Auto Bot token is missing (checked TELEGRAM_AUTO_BOT_TOKEN, then TELEGRAM_BOT_TOKEN)"; exit 1; }
           [[ -n "${TELEGRAM_VIP_BOT_TOKEN:-}" ]] || { echo "❌ TELEGRAM_VIP_BOT_TOKEN is missing"; exit 1; }
-          echo "✅ Both Telegram secrets are present."
+          echo "✅ Both Telegram bot tokens are available to diagnostics."
 
       - name: Check Telegram getMe and getWebhookInfo
         shell: bash
@@ -90,8 +91,10 @@ jobs:
             fi
           }
 
-          check_bot "AUTO BOT (@phanthuanxtra_auto_bot)" "$TELEGRAM_AUTO_BOT_TOKEN" "/api/telegram/auto-webhook"
-          check_bot "VIP BOT (@phanthuanxtra_vip_bot)" "$TELEGRAM_VIP_BOT_TOKEN" "/api/telegram/vip-webhook"
+          # Auto Bot is handled by the existing /api/telegram/webhook route in src/telegram-router.js.
+          # Do not invent /api/telegram/auto-webhook or mutate Telegram webhook state here.
+          check_bot "AUTO BOT" "$TELEGRAM_AUTO_BOT_TOKEN" "/api/telegram/webhook"
+          check_bot "VIP BOT" "$TELEGRAM_VIP_BOT_TOKEN" "/api/telegram/vip-webhook"
 
       - name: Safety confirmation
         run: |
