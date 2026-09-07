@@ -1,0 +1,98 @@
+name: Telegram Bots Diagnostic
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  telegram-diagnostics:
+    name: Check Auto + VIP Telegram bots
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      TELEGRAM_AUTO_BOT_TOKEN: ${{ secrets.TELEGRAM_AUTO_BOT_TOKEN }}
+      TELEGRAM_VIP_BOT_TOKEN: ${{ secrets.TELEGRAM_VIP_BOT_TOKEN }}
+
+    steps:
+      - name: Check secret presence without revealing values
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "${TELEGRAM_AUTO_BOT_TOKEN:-}" ]] || { echo "❌ TELEGRAM_AUTO_BOT_TOKEN is missing"; exit 1; }
+          [[ -n "${TELEGRAM_VIP_BOT_TOKEN:-}" ]] || { echo "❌ TELEGRAM_VIP_BOT_TOKEN is missing"; exit 1; }
+          echo "✅ Both Telegram secrets are present."
+
+      - name: Check Telegram getMe and getWebhookInfo
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          check_bot() {
+            local label="$1"
+            local token="$2"
+            local expected_path="$3"
+
+            echo ""
+            echo "===== $label ====="
+
+            me="$(curl --fail-with-body --silent --show-error \
+              --retry 2 --retry-delay 1 \
+              --request POST \
+              --url "https://api.telegram.org/bot${token}/getMe")"
+
+            if ! printf '%s' "$me" | jq -e '.ok == true' >/dev/null; then
+              echo "❌ getMe failed"
+              printf '%s\n' "$me" | jq -r '.description // "Unknown Telegram API error"'
+              return 1
+            fi
+
+            printf '%s\n' "$me" | jq '{ok, result: {id, is_bot, first_name, username}}'
+
+            info="$(curl --fail-with-body --silent --show-error \
+              --retry 2 --retry-delay 1 \
+              --request POST \
+              --url "https://api.telegram.org/bot${token}/getWebhookInfo")"
+
+            if ! printf '%s' "$info" | jq -e '.ok == true' >/dev/null; then
+              echo "❌ getWebhookInfo failed"
+              printf '%s\n' "$info" | jq -r '.description // "Unknown Telegram API error"'
+              return 1
+            fi
+
+            printf '%s\n' "$info" | jq '{ok, result: {url, has_custom_certificate, pending_update_count, last_error_date, last_error_message, max_connections, ip_address}}'
+
+            actual_url="$(printf '%s' "$info" | jq -r '.result.url // empty')"
+            pending="$(printf '%s' "$info" | jq -r '.result.pending_update_count // 0')"
+            last_error="$(printf '%s' "$info" | jq -r '.result.last_error_message // empty')"
+
+            if [[ -z "$actual_url" ]]; then
+              echo "⚠️ Webhook is not configured. Expected path: $expected_path"
+            elif [[ "$actual_url" == *"$expected_path" ]]; then
+              echo "✅ Webhook path matches: $expected_path"
+            else
+              echo "⚠️ Webhook URL does not match expected path."
+              echo "   Expected path: $expected_path"
+              echo "   Current host/path is shown above; token is never printed."
+            fi
+
+            if [[ "$pending" != "0" ]]; then
+              echo "⚠️ Telegram has $pending pending update(s)."
+            else
+              echo "✅ No pending Telegram updates."
+            fi
+
+            if [[ -n "$last_error" ]]; then
+              echo "⚠️ Telegram reports a webhook error: $last_error"
+            else
+              echo "✅ No recent Telegram webhook error reported."
+            fi
+          }
+
+          check_bot "AUTO BOT (@phanthuanxtra_auto_bot)" "$TELEGRAM_AUTO_BOT_TOKEN" "/api/telegram/auto-webhook"
+          check_bot "VIP BOT (@phanthuanxtra_vip_bot)" "$TELEGRAM_VIP_BOT_TOKEN" "/api/telegram/vip-webhook"
+
+      - name: Safety confirmation
+        run: |
+          echo "✅ Diagnostic only: no Cloudflare deploy, no D1 migration, no setWebhook, no secret mutation."
