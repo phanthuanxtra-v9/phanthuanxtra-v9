@@ -48,7 +48,15 @@ async function promoteDraft(env,inboxId,ai,publishMediaKey){
   const published=await publishCar(env,carId); await env.DB.prepare("UPDATE vehicle_ai_drafts SET status='published',updated_at=CURRENT_TIMESTAMP WHERE inbox_id=?").bind(inboxId).run(); return {published:true,car_id:carId,telegram:published};
 }
 
+/** Atomically claims a received inbox row so Telegram retries/concurrent webhook deliveries cannot process it twice. */
+export async function claimInbox(env,inboxId){
+  const result=await env.DB.prepare("UPDATE telegram_inbox SET status='processing',updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='received'").bind(inboxId).run();
+  const changes=Number(result?.meta?.changes??result?.changes??0);
+  return changes===1;
+}
+
 async function processInbox(env,inboxId,filePath,caption,sourceHash,chatId,messageId){
+  if(!(await claimInbox(env,inboxId)))return;
   try{if(!env.MEDIA)throw new Error("MEDIA binding is not configured"); const imageResponse=await fetch(`https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${filePath}`); if(!imageResponse.ok)throw new Error(`Telegram file download failed: ${imageResponse.status}`); const bytes=await imageResponse.arrayBuffer(); const contentType=imageResponse.headers.get("content-type")||"image/jpeg"; const extension=contentType.includes("png")?"png":contentType.includes("webp")?"webp":"jpg"; const mediaKey=`vehicles/inbox-${inboxId}-${sourceHash.slice(0,16)}.${extension}`; await env.MEDIA.put(mediaKey,bytes,{httpMetadata:{contentType,cacheControl:"public, max-age=31536000, immutable"}}); const ai=await analyzeVehicleImage(env,bytes,contentType,caption); await env.DB.prepare(`INSERT INTO vehicle_ai_drafts (inbox_id,status,ai_json,confidence,missing_fields_json,source_caption,source_file_path,created_at,updated_at) VALUES (?, 'draft', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT(inbox_id) DO UPDATE SET ai_json=excluded.ai_json,confidence=excluded.confidence,missing_fields_json=excluded.missing_fields_json,source_caption=excluded.source_caption,source_file_path=excluded.source_file_path,error=NULL,status='draft',updated_at=CURRENT_TIMESTAMP`).bind(inboxId,JSON.stringify({...ai,media_key:mediaKey}),Number(ai.confidence||0),JSON.stringify(ai.missing_fields||[]),caption,filePath).run(); await env.DB.prepare(`UPDATE telegram_inbox SET status='analyzed',processed_image_url=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(`/media/${mediaKey}`,inboxId).run();
     if(!canAutoPublish(ai)){await env.DB.prepare("UPDATE vehicle_ai_drafts SET status='awaiting_review',updated_at=CURRENT_TIMESTAMP WHERE inbox_id=?").bind(inboxId).run(); if(chatId)await tg(env,"sendMessage",{chat_id:chatId,reply_to_message_id:messageId,text:reportText(ai,inboxId,mediaKey,false),disable_web_page_preview:true}); return;}
     const plateDetected=hasValidPlateBox(ai?.plate_bbox); let publishMediaKey=mediaKey;
