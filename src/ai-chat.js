@@ -1,6 +1,6 @@
 import { notifyTelegramCrm } from "./telegram-crm-notify.js";
 
-const MODEL = "@cf/meta/llama-3.1-8b-instruct";
+const MODEL = "@cf/meta/llama-3.2-3b-instruct";
 const AI_SEARCH_IDS = ["ai-search-mcp", "ai-search-auto"];
 const MAX_MESSAGE = 4000;
 const MAX_HISTORY = 12;

@@ -23,10 +23,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with: { fetch-depth: 0 }
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with: { node-version: 24, cache: npm }
       - name: Validate JavaScript syntax
         run: |
@@ -34,8 +34,19 @@ jobs:
           node --check src/cms.js
           node --check src/index.js
           node --check src/app-api.js
+          node --check src/ai-chat.js
           node --check src/vip-telegram.js
           node --check src/vip-vehicle-intelligence.js
+      - name: Guard Workers AI model IDs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -R -n --exclude-dir=node_modules --exclude-dir=.git \
+            -E '@cf/meta/llama-3\.1-8b-instruct(["@]|[^a-zA-Z0-9_-])' src tests; then
+            echo "ERROR: deprecated Workers AI model ID detected"; exit 1
+          fi
+          grep -n '@cf/meta/llama-3.2-3b-instruct' src/ai-chat.js
+          echo "Workers AI model guard passed"
       - name: Unit tests
         run: |
           node --test tests/*.test.mjs

@@ -38,7 +38,7 @@ test('website AI chat creates a conversation, calls AI and persists reply', asyn
     DB,
     AI_SEARCH: { async search() { return { chunks: [] }; } },
     AI: { async run(model, payload) {
-      assert.equal(model, '@cf/meta/llama-3.1-8b-instruct');
+      assert.equal(model, '@cf/meta/llama-3.2-3b-instruct');
       assert.equal(payload.messages.at(-1).content, 'Tôi muốn tìm Lexus');
       return { response: 'Tôi có thể hỗ trợ anh tìm Lexus phù hợp.' };
     } }
