@@ -69,17 +69,6 @@ Each entry records:
 
 **Production mutation:** **NOT ATTEMPTED.**
 
-**Next exact actions:**
-
-1. Verify `main` points to the PR #45 merge result and inspect the merged hardening files on `main`.
-2. Verify post-merge GitHub Actions using any available workflow/run/status evidence; do not infer success from the absence of results.
-3. Inspect the AI Peer Executor workflow and provider configuration contract on `main`.
-4. Run a controlled non-production executor task using one peer and a documentation-only change when a workflow-dispatch execution path is available.
-5. Verify the generated `ai-peer/<task>-<agent>` branch, PR, CI, and ledger handoff.
-6. Keep `PRODUCTION_MUTATIONS_ENABLED=false`; production deployment remains a separate gated operation.
-
-**Known connector limitation:** The current GitHub connector can read workflows and write repository files/PRs but does not expose a workflow-dispatch mutation. Therefore an actual `workflow_dispatch` run cannot be claimed from this connector unless another execution path is available.
-
 ## HANDOFF-20260908-BACKUP-INTEGRITY-AUDIT
 
 **Date/time (UTC):** 2026-09-08
@@ -88,38 +77,38 @@ Each entry records:
 
 **Objective:** Continue the core roadmap by auditing the daily full-system backup path and applying only evidence-backed hardening.
 
-**Audit evidence:**
+**Finding and implemented hardening:** The backup workflow now verifies its checksum manifest before archiving, asserts D1/R2 content and secret redaction, extracts and re-verifies the archive before upload, and keeps Telegram notification separate from correctness. PR #46 was merged as `900b13e451a9899bd438c7bbf312435aefac09c8`. Post-merge workflow evidence was unavailable, so no post-merge CI pass was claimed. Production mutation was not attempted.
 
-- `MASTER_CONTEXT_PHAN_THUAN.md` still described `@phanthuanxtra2026_bot` backup as planned, but direct inspection of `main` proved that `.github/workflows/full-system-backup.yml` and `scripts/full-system-backup.mjs` already exist. The master context is stale on this point and must not be treated as proof that backup is operational. fileciteturn54file0 fileciteturn55file0
-- The backup workflow is scheduled for `0 0 * * *` (07:00 Vietnam time), uses `contents: read`, serializes runs with concurrency, and does not deploy Cloudflare or run D1 migrations. fileciteturn54file0
-- The collector performs a Git source archive, Cloudflare Worker/deployment/settings metadata, redacted bindings, D1 SQL export, paginated R2 object manifest/content export, zone/route metadata and SHA-256 manifest generation. fileciteturn55file0
-- The collector requires `CLOUDFLARE_BACKUP_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`; secret values are explicitly redacted from stored metadata. fileciteturn55file0
+## HANDOFF-20260908-WORKERS-AI-GLM-APK-ACCELERATION
 
-**Finding:** Before this checkpoint, the workflow generated SHA-256 data but did not verify the collected checksum manifest or verify the compressed archive after packaging. Backup correctness therefore could not be established from source inspection alone.
+**Date/time (UTC):** 2026-09-08
 
-**Implemented hardening:**
+**Current AI peer:** ChatGPT
 
-1. Added deterministic `BACKUP_ROOT=backup-artifact/run-${{ github.run_id }}`.
-2. Added pre-archive verification of every collected file against `SHA256SUMS`.
-3. Added manifest assertions that secret values are excluded and D1/R2 content is present.
-4. Added post-compression extraction and checksum verification before artifact upload.
-5. Preserved the separation between backup correctness and Telegram notification; Telegram remains a reporting/delivery channel, not the correctness gate.
-6. No production deployment, D1 migration, or secret value was added.
+**Objective:** Use available Cloudflare Workers AI capacity to accelerate the project toward Android APK completion while keeping production mutations gated.
 
-**GitHub change:** PR **#46** — `fix(backup): harden full-system backup integrity verification`, initially created at head `5b804020408dd2416bc9d3e6273b7b24aa5717eb` against main `f04d1d17fd697791b846b34dfa07e5abefdbfea7`. The ledger update is now also committed on the PR branch, so the final PR head must be re-verified before any merge decision. fileciteturn60file0
+**Audit evidence:** `src/ai-chat.js` on `main` already uses `env.AI` with `@cf/meta/llama-3.2-3b-instruct`. The user supplied Cloudflare dashboard evidence showing active usage of `@cf/zai-org/glm-4.7-flash` and the displayed daily allowance at `0/10k` neurons used for the shown reset period. Prior verified Cloudflare settings also showed the production Worker has Workers AI binding.
 
-**CI evidence:** The first PR #46 `Deploy Cloudflare Worker` run `34200875722` was observed queued and its `CI / Validate` job was observed `in_progress`; it must not be called passed until completion is directly verified. fileciteturn62file0
+**Implemented on isolated branch:** `feature/workers-ai-glm-apk-acceleration`.
 
-**Production mutation:** **NOT ATTEMPTED.**
+- Primary chatbot model changed to `@cf/zai-org/glm-4.7-flash`.
+- Automatic fallback retained with `@cf/meta/llama-3.2-3b-instruct` if the primary model call fails.
+- Added non-sensitive model telemetry (`workers_ai_model`) to Worker logs.
+- Added `ai_model` to successful `/api/ai-chat` responses.
+- Corrected the D1 conversation update to execute with `.run()`.
+- No production deployment, secret change, D1 migration, workflow change, or production mutation was performed.
+
+**Git evidence:** Branch starts from current `main`; implementation commit is `c52abce743780eba2672fed0553269b123b3cc9c`.
 
 **Next exact actions:**
 
-1. Verify the latest PR #46 head after the ledger commit.
-2. Verify all PR #46 CI checks to completion; skipped production deployment is acceptable if the workflow gate intentionally skips it on pull requests.
-3. If checks pass, PR #46 requires the user's explicit merge confirmation before merge.
-4. After merge, verify `main` and post-merge CI.
-5. Then continue mobile management, Auto Bot E2E, vehicle lookup E2E, VIP idempotency E2E, and actual backup/restore execution.
-6. Do not declare backup operational until a real scheduled-equivalent backup and a restore/readability test have been verified.
+1. Verify CI for the Workers AI branch when workflow evidence is available and create a PR if checks pass.
+2. Keep that PR unmerged until explicit merge authorization.
+3. Reconcile stale PR #40 mobile management safely against current `main`; never blindly overwrite newer main files.
+4. Continue Android/API/Telegram integration work and use Workers AI where it materially reduces external inference dependency.
+5. Do not claim APK completion until build, install, API integration and critical user flows are directly verified.
+
+**Production mutation:** **NOT ATTEMPTED.**
 
 ## Handoff protocol
 
