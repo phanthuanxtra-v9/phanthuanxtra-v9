@@ -35,11 +35,15 @@ This is strong evidence that the current `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_AC
 
 ## LATEST AUDIT CONTINUATION CHECKPOINT
 
-Latest observed repository commit: `f0b5ad900d910409d6d7087b25c6d2e58cbd2af0` (`docs: reconcile Cloudflare credential and Telegram diagnostic state`).
+Latest code commit: `b5bace11f7246a9debe9acde18846059b22c2059` (`test(app-api): cover malformed car ID production gate`).
 
-Latest Android workflow run observed: `34206165145`, based on the checkpoint commit. Its `build-apk` job completed successfully. Verified steps include the Production App API smoke test, Gradle assembleDebug, APK output verification, and artifact upload.
+Audit found a reproducible production-facing routing defect in `src/app-api.js`: a malformed percent-encoded `/api/app/v1/cars/:id` path could make `decodeURIComponent()` throw, escaping the handler and becoming the Worker-level 500 response. The fix wraps car-ID decoding and returns HTTP 400 with `ID xe không hợp lệ` instead of allowing an uncaught exception.
 
-The previously verified production deployment remains the authoritative production deployment evidence until a newer production deploy run is observed. No infrastructure resource was recreated or duplicated during this audit continuation.
+A production-gate regression test was added in `tests/production-gates.test.mjs` for `/api/app/v1/cars/%E0%A4%A` with a valid API token.
+
+Latest Android workflow run for the fix: `34207229206`. The `build-apk` job completed SUCCESS. Verified steps include the Production App API smoke test, Gradle assembleDebug, APK output verification, artifact upload, and all post-job cleanup steps.
+
+The latest code push also triggers the existing production deployment workflow. The last independently verified production deployment remains run `34090076816` until a newer deploy run is directly observed as successful. No Cloudflare resource was recreated or duplicated.
 
 ## RUNTIME/ROUTING SOURCE AUDIT
 
@@ -52,6 +56,7 @@ The scheduled handler checks Telegram webhook status and self-heals the webhook 
 `tests/production-gates.test.mjs` currently verifies:
 - Telegram auto-publish requires brand + model identity and confidence >= 0.85.
 - Unknown AI production questions are handed to a human instead of being answered by the AI model.
+- Malformed app car IDs are rejected with HTTP 400 rather than becoming Worker-level 500 errors.
 
 ## CLOUDFLARE WORKER CONFIGURATION — DO NOT DUPLICATE
 
@@ -114,8 +119,10 @@ Never put production secrets in source, documentation, issues, logs, or chat.
 | Workers AI / Images / AI Search | VERIFIED | `wrangler.json` |
 | Production GitHub deploy workflow | VERIFIED | `deploy-cloudflare.yml` |
 | Cloudflare credential workflow path | OPERATIONAL | production run `34090076816` passed all deploy stages |
-| Latest APK validation | PASS | workflow run `34206165145` |
-| Production App API smoke test | PASS | APK workflow run `34206165145` |
+| Latest App API fix | COMMITTED | `b5bace11f7246a9debe9acde18846059b22c2059` |
+| Latest APK validation | PASS | workflow run `34207229206` |
+| Production App API smoke test | PASS | workflow run `34207229206` |
+| Malformed car ID 500 defect | FIXED + REGRESSION TESTED | source + `production-gates.test.mjs` |
 | Telegram Auto diagnostic route | FIXED | current diagnostic expects `/api/telegram/webhook` |
 | Telegram VIP route | VERIFIED | current diagnostic + source |
 | Existing Worker cron | VERIFIED | `*/5 * * * *` |
@@ -124,8 +131,8 @@ Never put production secrets in source, documentation, issues, logs, or chat.
 
 ## NEXT AI HANDOFF
 
-Continue from this exact repository state. Do not rotate, recreate, rename, or duplicate Cloudflare resources merely because an older audit mentioned a credential failure. First inspect the latest production workflow run before changing credentials.
+Continue from commit `b5bace11f7246a9debe9acde18846059b22c2059` and this checkpoint. Do not rotate, recreate, rename, or duplicate Cloudflare resources merely because an older audit mentioned a credential failure.
+
+Next priority: inspect the newest production deploy workflow result for this commit. If it passed, continue the production-facing API/workflow audit from this exact state. If it failed, inspect the failing job/log first and fix only the evidenced failure.
 
 If a new credential must actually be rotated, perform that only through GitHub/Cloudflare settings; never paste the value into chat. The source workflow already uses the correct secret names.
-
-Next audit priority: inspect current production-facing source/API routes and all non-doc GitHub workflow health; fix only reproducible defects, then validate and checkpoint the resulting commit here.
