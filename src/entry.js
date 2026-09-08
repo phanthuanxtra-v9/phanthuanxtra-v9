@@ -6,6 +6,7 @@ import { handleMediaApi } from "./media.js";
 import { handleAiChat } from "./ai-chat.js";
 import { handleTelegramRouter } from "./telegram-router.js";
 import { handleVipTelegram } from "./vip-telegram.js";
+import { handleTelegramLookup } from "./telegram-lookup.js";
 import { handleAppApi } from "./app-api.js";
 import { reconcileTelegramNotifications } from "./telegram-notifications.js";
 
@@ -20,6 +21,8 @@ export default {
       if (appApiResponse) return appApiResponse;
       const vipTelegramResponse = await handleVipTelegram(request, env);
       if (vipTelegramResponse) return vipTelegramResponse;
+      const lookupTelegramResponse = await handleTelegramLookup(request, env);
+      if (lookupTelegramResponse) return lookupTelegramResponse;
       const telegramRouterResponse = await handleTelegramRouter(request, env, ctx);
       if (telegramRouterResponse) return telegramRouterResponse;
       const ingestResponse = await handleTelegramIngest(request, env, ctx);

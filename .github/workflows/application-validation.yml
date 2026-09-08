@@ -35,6 +35,7 @@ jobs:
           node --check src/index.js
           node --check src/app-api.js
           node --check src/ai-chat.js
+          node --check src/telegram-lookup.js
           node --check src/vip-telegram.js
           node --check src/vip-vehicle-intelligence.js
       - name: Guard Workers AI model IDs
