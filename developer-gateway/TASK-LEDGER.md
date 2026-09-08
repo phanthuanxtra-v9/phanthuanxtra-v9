@@ -90,10 +90,10 @@ Each entry records:
 
 **Audit evidence:**
 
-- `MASTER_CONTEXT_PHAN_THUAN.md` still described `@phanthuanxtra2026_bot` backup as planned, but direct inspection of `main` proved that `.github/workflows/full-system-backup.yml` and `scripts/full-system-backup.mjs` already exist. The master context is stale on this point and must not be treated as proof that backup is operational. fileciteturn54file0 fileciteturn55file0
-- The backup workflow is scheduled for `0 0 * * *` (07:00 Vietnam time), uses `contents: read`, serializes runs with concurrency, and does not deploy Cloudflare or run D1 migrations. fileciteturn54file0
-- The collector performs a Git source archive, Cloudflare Worker/deployment/settings metadata, redacted bindings, D1 SQL export, paginated R2 object manifest/content export, zone/route metadata and SHA-256 manifest generation. fileciteturn55file0
-- The collector requires `CLOUDFLARE_BACKUP_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`; secret values are explicitly redacted from stored metadata. fileciteturn55file0
+- `MASTER_CONTEXT_PHAN_THUAN.md` still described `@phanthuanxtra2026_bot` backup as planned, but direct inspection of `main` proved that `.github/workflows/full-system-backup.yml` and `scripts/full-system-backup.mjs` already exist. The master context is stale on this point and must not be treated as proof that backup is operational.
+- The backup workflow is scheduled for `0 0 * * *` (07:00 Vietnam time), uses `contents: read`, serializes runs with concurrency, and does not deploy Cloudflare or run D1 migrations.
+- The collector performs a Git source archive, Cloudflare Worker/deployment/settings metadata, redacted bindings, D1 SQL export, paginated R2 object manifest/content export, zone/route metadata and SHA-256 manifest generation.
+- The collector requires `CLOUDFLARE_BACKUP_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`; secret values are explicitly redacted from stored metadata.
 
 **Finding:** Before this checkpoint, the workflow generated SHA-256 data but did not verify the collected checksum manifest or verify the compressed archive after packaging. Backup correctness therefore could not be established from source inspection alone.
 
@@ -106,20 +106,52 @@ Each entry records:
 5. Preserved the separation between backup correctness and Telegram notification; Telegram remains a reporting/delivery channel, not the correctness gate.
 6. No production deployment, D1 migration, or secret value was added.
 
-**GitHub change:** PR **#46** — `fix(backup): harden full-system backup integrity verification`, initially created at head `5b804020408dd2416bc9d3e6273b7b24aa5717eb` against main `f04d1d17fd697791b846b34dfa07e5abefdbfea7`. The ledger update is now also committed on the PR branch, so the final PR head must be re-verified before any merge decision. fileciteturn60file0
+**GitHub change:** PR **#46** — `fix(backup): harden full-system backup integrity verification`.
 
-**CI evidence:** The first PR #46 `Deploy Cloudflare Worker` run `34200875722` was observed queued and its `CI / Validate` job was observed `in_progress`; it must not be called passed until completion is directly verified. fileciteturn62file0
+**CI evidence:** PR #46 current head `b4de4898483846b09e29fa1eaab18c0db960992c` had successful PR-triggered runs for Deploy Cloudflare Worker (`34200936718`), Developer Gateway (`34200936764`) and Android APK MVP (`34200936734`). Production deployment job was skipped by design in the PR validation workflow.
+
+**Merge evidence:** PR #46 was subsequently merged. Merge commit verified as `900b13e451a9899bd438c7bbf312435aefac09c8`.
+
+**Post-merge verification:** GitHub connector currently returns no PR-triggered workflow runs for merge commit `900b13e451a9899bd438c7bbf312435aefac09c8`; therefore post-merge CI is not claimed as passed. This is consistent with the connector limitation and is not treated as evidence of failure.
+
+**Production mutation:** **NOT ATTEMPTED.**
+
+## HANDOFF-20260908-ROADMAP-AUDIT-CONTINUATION
+
+**Date/time (UTC):** 2026-09-08
+
+**Current AI peer:** ChatGPT
+
+**Objective:** Continue remediation/upgrades immediately from the verified `main` checkpoint without guessing configuration or claiming unverified production state.
+
+**Verified repository state:**
+
+- `main` contains the PR #46 merge commit `900b13e451a9899bd438c7bbf312435aefac09c8`.
+- PR #46 pre-merge CI was green for Deploy Cloudflare Worker, Developer Gateway and Android APK MVP.
+- No post-merge workflow run is exposed by the current connector query for the merge commit; therefore no post-merge CI success is claimed.
+
+**Open implementation work discovered directly from GitHub:**
+
+- PR **#40** `feat: harden Android vehicle management` remains open against `main`, head `0f6cc8503aecc617330e3aba29d8d3162b914d16`, with the intended vehicle CRUD/search/status/featured/delete expansion. Its recorded PR-triggered validation runs were successful. The PR is currently reported non-mergeable and requires separate merge authorization before changing `main`.
+- PR **#37** `fix: complete VIP Telegram document ingestion` remains open against `main`, head `418748fedf105e140ec45959e9b43a6ee7dbf47a`, with successful recorded Application Validation and Deploy Cloudflare Worker runs. It is not merged and therefore remains outside production `main`.
+- The current `main` `src/app-api.js` still lacks the PR #40 vehicle-management additions such as DELETE and strict status validation. Direct source inspection confirms those changes are not yet in production `main`.
+
+**Immediate remediation decision:**
+
+1. Do not claim PR #40 or PR #37 is deployed merely because their historical CI is green.
+2. Do not merge either PR without the user's explicit merge authorization because merge changes `main`.
+3. Continue safe branch-based remediation and checkpointing where no merge authorization is required.
+4. Keep production mutation controls unchanged and do not run migrations/deployments merely to make a check green.
 
 **Production mutation:** **NOT ATTEMPTED.**
 
 **Next exact actions:**
 
-1. Verify the latest PR #46 head after the ledger commit.
-2. Verify all PR #46 CI checks to completion; skipped production deployment is acceptable if the workflow gate intentionally skips it on pull requests.
-3. If checks pass, PR #46 requires the user's explicit merge confirmation before merge.
-4. After merge, verify `main` and post-merge CI.
-5. Then continue mobile management, Auto Bot E2E, vehicle lookup E2E, VIP idempotency E2E, and actual backup/restore execution.
-6. Do not declare backup operational until a real scheduled-equivalent backup and a restore/readability test have been verified.
+1. Rebase/retarget the open mobile/VIP work onto the current `main` only when the connector supports a safe non-main update path; otherwise preserve the existing PRs and avoid speculative conflict resolution.
+2. Audit Auto Bot single-flight, vehicle lookup, VIP idempotency and backup restore evidence directly from current source/tests.
+3. Add only evidence-backed regression tests/fixes on non-main branches.
+4. Keep every meaningful handoff in this ledger.
+5. Merge only after explicit user confirmation for the specific PR.
 
 ## Handoff protocol
 
