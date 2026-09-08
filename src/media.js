@@ -17,13 +17,18 @@ async function brandedVehicleResponse(request,env,object){
   return result.response({headers:{"cache-control":"public, max-age=31536000, immutable","x-pt-xtra-branding":"display-overlay"}});
 }
 
+function decodeMediaKey(pathname){
+  const raw=pathname.slice("/media/".length);
+  try{return decodeURIComponent(raw)}catch{return null}
+}
+
 export async function handleMediaApi(request,env){
   const url=new URL(request.url);
   if(!url.pathname.startsWith("/media/"))return null;
   if(request.method!=="GET"&&request.method!=="HEAD")return json({error:"Method Not Allowed"},405,{Allow:"GET, HEAD"});
   if(!env.MEDIA)return json({ok:false,error:"MEDIA binding is not configured"},503);
-  const key=decodeURIComponent(url.pathname.slice("/media/".length));
-  if(!key||key.includes(".."))return json({ok:false,error:"Invalid media key"},400);
+  const key=decodeMediaKey(url.pathname);
+  if(key===null||!key||key.includes(".."))return json({ok:false,error:"Invalid media key"},400);
   const object=await env.MEDIA.get(key);
   if(!object)return json({ok:false,error:"Not Found"},404);
   if(url.searchParams.get("branding")==="pt-xtra"&&request.method==="GET")return brandedVehicleResponse(request,env,object);
