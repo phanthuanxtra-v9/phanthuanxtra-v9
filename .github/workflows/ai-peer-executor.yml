@@ -95,15 +95,10 @@ jobs:
             exit 0
           fi
           git apply --check --whitespace=error ai-peer.patch
-          changed_paths="$(git apply --numstat ai-peer.patch >/dev/null 2>&1 && git apply --numstat ai-peer.patch || true)"
-          if grep -nE '(^|/)(\.env($|\.)|credentials|secrets?)(/|$)|(^|/)\.github/|(^|/)wrangler\.jsonc$' <(git diff --no-index /dev/null /dev/null 2>/dev/null || true) >/dev/null; then
-            :
-          fi
           if grep -nE '(^|/)(\.env($|\.)|credentials|secrets?)(/|$)|(^|/)\.github/|(^|/)wrangler\.jsonc$' ai-peer.patch; then
             echo 'Potential secret, workflow, or deployment-config mutation detected; refusing patch.'
             exit 1
           fi
-          printf '%s\n' "$changed_paths" >/tmp/ai-peer-patch-stat
 
       - name: Apply patch and run repository checks
         if: ${{ success() }}
