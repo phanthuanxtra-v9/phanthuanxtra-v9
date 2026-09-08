@@ -97,13 +97,14 @@ jobs:
           node-version: 24
           cache: npm
 
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify Wrangler
+        run: npx wrangler@4.129.0 --version
+
       - name: Wrangler dry-run
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: "4.129.0"
-          command: deploy --dry-run
+        run: npx wrangler@4.129.0 deploy --dry-run
 
       - name: Detect D1 migration changes
         id: migrations
@@ -121,20 +122,10 @@ jobs:
 
       - name: Apply D1 migrations
         if: steps.migrations.outputs.changed == 'true'
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: "4.129.0"
-          command: d1 migrations apply phanthuanxtra-db --remote
+        run: npx wrangler@4.129.0 d1 migrations apply phanthuanxtra-db --remote
 
       - name: Deploy to Cloudflare
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: "4.129.0"
-          command: deploy
+        run: npx wrangler@4.129.0 deploy
 
       - name: Deployment completed
         run: |
