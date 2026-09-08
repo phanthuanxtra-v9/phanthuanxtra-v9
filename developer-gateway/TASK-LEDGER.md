@@ -32,7 +32,7 @@ Each entry records:
 - Default branch: `main`
 - PR #41 was verified directly from GitHub as **merged** on 2026-09-07, merge commit `a960460069782ce822702a8232f3230be61ca0b7`.
 - Post-merge hardening PR: **#45**, `fix(ai-peer): harden executor and isolate write permissions`.
-- PR #45 head: `feature/ai-peer-executor-hardening`, latest checkpoint commit `7e763c45e4297c317b3430781ca2beab6db2856a` before this ledger append.
+- PR #45 head: `feature/ai-peer-executor-hardening`, latest checkpoint commit `ecf41d6a2f1336811528397d4c6e6136d018a268`.
 
 **Evidence:**
 
@@ -50,7 +50,7 @@ Each entry records:
 
 **Current AI peer:** ChatGPT
 
-**Action:** User authorized immediate continuation. Audited the actual repository state and discovered that the previously described PR #41 is already merged; therefore no attempt was made to merge it again. The executor is already on `main`, so the next safe action is post-merge hardening.
+**Action:** User authorized immediate continuation. Audited the actual repository state, verified PR #45 and its post-hardening CI, and continued under the existing checkpoint without restarting completed work.
 
 **Implemented on `feature/ai-peer-executor-hardening`:**
 
@@ -62,22 +62,23 @@ Each entry records:
 6. Made dependency installation tolerant of repositories without a lockfile while still running `npm test --if-present`.
 7. Kept Cloudflare production mutation outside this workflow.
 
-**Commits:**
+**Verified CI evidence for head `ecf41d6a2f1336811528397d4c6e6136d018a268`:**
 
-- `9135171fb158c37a20fc4adcb45f8be934384bea` — executor response hardening.
-- `7e763c45e4297c317b3430781ca2beab6db2856a` — executor workflow permission isolation and validation hardening.
-- `316c96a30341ad159e49b9c72d05b09db14d9edd` — simplified patch validation; removed dead validation logic while preserving `git apply --check` and sensitive-path rejection.
-- This ledger append follows those commits.
+- `Deploy Cloudflare Worker` run `34200258301`: **success**; CI/Validate passed; production deployment job was **skipped by design**.
+- `Developer Gateway` run `34200258356`: **success**; validation, gateway tests, Wrangler dry-run, and production-mutation guard passed.
+- `Android APK MVP` run `34200258317`: **success**; APK build completed successfully.
 
-**PR:** #45 — currently **open / draft / not merged**. CI on the earlier head passed: `CI / Validate`, `validate`, and `build-apk` succeeded; Production Worker deployment was skipped by design. After the latest hardening commit, a new CI run must be verified before merge.
+**PR #45 current state:** GitHub reports **open / draft / mergeable=true / not merged**. Head remains `ecf41d6a2f1336811528397d4c6e6136d018a268`.
 
-**Next exact actions:**
+**Audit conclusion:** No evidence-backed blocker remains in the visible PR/CI state. Production mutation was not attempted. The next irreversible repository action is merging PR #45; this requires the user's explicit merge confirmation under the project operating rules.
 
-1. Verify the latest PR #45 head and its new CI run/checks.
-2. If all required checks pass, mark PR #45 ready for review.
-3. Merge PR #45 only after the ready-state checks remain successful.
-4. Perform a controlled non-production executor run using a harmless documentation task and one configured peer.
-5. Verify generated branch/PR, CI checks, and ledger handoff.
+**Next exact actions after merge confirmation:**
+
+1. Merge PR #45 using the verified head SHA.
+2. Re-fetch PR state and merge commit to verify the merge actually succeeded.
+3. Verify `main` contains the hardening checkpoint and its CI is healthy.
+4. Perform a controlled non-production executor run using a harmless documentation task and one configured peer, if a workflow-dispatch execution path is available.
+5. Verify generated branch/PR, CI checks, and append the next ledger handoff.
 6. Only after executor validation consider any production deployment path. `PRODUCTION_MUTATIONS_ENABLED` remains false.
 
 **Known connector limitation:** The current GitHub connector can read workflows and write repository files/PRs but does not expose a workflow-dispatch mutation. Therefore an actual `workflow_dispatch` run cannot be claimed from this connector unless another execution path is available.
