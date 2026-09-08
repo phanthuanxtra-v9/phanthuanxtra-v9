@@ -8,6 +8,7 @@ import { handleTelegramRouter } from "./telegram-router.js";
 import { handleVipTelegram } from "./vip-telegram.js";
 import { handleTelegramLookup } from "./telegram-lookup.js";
 import { handleAppApi } from "./app-api.js";
+import { handleAppAdmin } from "./app-admin.js";
 import { reconcileTelegramNotifications } from "./telegram-notifications.js";
 
 const TELEGRAM_WEBHOOK_URL="https://phanthuanxtra.com/api/telegram/webhook";
@@ -17,6 +18,8 @@ export default {
     try {
       const aiChatResponse = await handleAiChat(request, env);
       if (aiChatResponse) return aiChatResponse;
+      const appAdminResponse = await handleAppAdmin(request, env);
+      if (appAdminResponse) return appAdminResponse;
       const appApiResponse = await handleAppApi(request, env);
       if (appApiResponse) return appApiResponse;
       const vipTelegramResponse = await handleVipTelegram(request, env);
