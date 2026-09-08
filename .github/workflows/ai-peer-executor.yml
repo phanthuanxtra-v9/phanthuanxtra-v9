@@ -21,14 +21,10 @@ on:
           - llama
         default: mistral
       base_branch:
-        description: 'Branch containing the checkpoint to continue'
+        description: 'Non-main branch containing the checkpoint to continue'
         required: true
         type: string
         default: feature/multi-ai-developer-gateway
-
-permissions:
-  contents: write
-  pull-requests: write
 
 concurrency:
   group: ai-peer-executor-${{ inputs.task_id }}
@@ -38,6 +34,9 @@ jobs:
   execute-peer-task:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - name: Checkout checkpoint
         uses: actions/checkout@v5
@@ -54,6 +53,7 @@ jobs:
           set -euo pipefail
           test "$BASE_BRANCH" != "main"
           test "$AGENT" != "all"
+          test "$TASK_ID" != ""
           printf '%s\n' "$TASK_ID" > .ai-peer-task-id
           printf '%s\n' "$AGENT" > .ai-peer-agent
           node --version
@@ -73,7 +73,6 @@ jobs:
           TASK_ID: ${{ inputs.task_id }}
           MULTI_AI_INSTRUCTION: ${{ inputs.instruction }}
           AI_PEER_AGENT: ${{ inputs.agent }}
-          TASK_CHECKPOINT: ${{ env.TASK_CHECKPOINT }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           MISTRAL_MODEL: ${{ vars.MISTRAL_MODEL }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -85,7 +84,7 @@ jobs:
           set -euo pipefail
           export TASK_CHECKPOINT="$(cat developer-gateway/TASK-LEDGER.md)"
           node developer-gateway/ai-peer-executor.mjs > ai-peer-executor.json
-          node -e "const x=require('./ai-peer-executor.json'); if(x.production_mutation!==false) throw new Error('production mutation must remain false'); if(!x.summary) throw new Error('missing executor summary'); require('fs').writeFileSync('ai-peer-summary.md', x.summary+'\n'); require('fs').writeFileSync('ai-peer.patch', x.patch+'\n');"
+          node -e "const x=require('./ai-peer-executor.json'); if(x.production_mutation!==false) throw new Error('production mutation must remain false'); if(!x.summary) throw new Error('missing executor summary'); if(typeof x.patch!=='string') throw new Error('patch must be a string'); require('fs').writeFileSync('ai-peer-summary.md', x.summary+'\n'); require('fs').writeFileSync('ai-peer.patch', x.patch);"
           test -s ai-peer-summary.md
 
       - name: Validate patch without changing the worktree
@@ -96,7 +95,15 @@ jobs:
             exit 0
           fi
           git apply --check --whitespace=error ai-peer.patch
-          grep -nE '(^|/)\.env($|\.)|(^|/)(credentials|secrets?)(/|\.)|wrangler\.jsonc$' ai-peer.patch && { echo 'Potential secret/config mutation detected; refusing patch.'; exit 1; } || true
+          changed_paths="$(git apply --numstat ai-peer.patch >/dev/null 2>&1 && git apply --numstat ai-peer.patch || true)"
+          if grep -nE '(^|/)(\.env($|\.)|credentials|secrets?)(/|$)|(^|/)\.github/|(^|/)wrangler\.jsonc$' <(git diff --no-index /dev/null /dev/null 2>/dev/null || true) >/dev/null; then
+            :
+          fi
+          if grep -nE '(^|/)(\.env($|\.)|credentials|secrets?)(/|$)|(^|/)\.github/|(^|/)wrangler\.jsonc$' ai-peer.patch; then
+            echo 'Potential secret, workflow, or deployment-config mutation detected; refusing patch.'
+            exit 1
+          fi
+          printf '%s\n' "$changed_paths" >/tmp/ai-peer-patch-stat
 
       - name: Apply patch and run repository checks
         if: ${{ success() }}
@@ -106,7 +113,12 @@ jobs:
           git apply --whitespace=error ai-peer.patch
           git diff --check
           git status --short
-          if [ -f package.json ]; then npm ci --ignore-scripts; npm test --if-present; fi
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            npm ci --ignore-scripts
+          elif [ -f package.json ]; then
+            npm install --ignore-scripts
+          fi
+          if [ -f package.json ]; then npm test --if-present; fi
 
       - name: Create isolated executor branch and PR
         if: ${{ success() && hashFiles('ai-peer.patch') != '' }}
@@ -119,10 +131,14 @@ jobs:
           set -euo pipefail
           if ! git diff --quiet; then
             BRANCH="ai-peer/${TASK_ID}-${AGENT}"
+            case "$BRANCH" in
+              *..*|*' '*|*'~'*) echo 'Unsafe generated branch name'; exit 1 ;;
+            esac
             git config user.name 'PHAN THUẦN XTRA AI Peer Executor'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
             git switch -c "$BRANCH"
-            git add -A
+            git add -u
+            git add -- developer-gateway .ai-peer-task-id .ai-peer-agent
             git commit -m "feat(ai-peer): execute ${TASK_ID} via ${AGENT}"
             git push --set-upstream origin "$BRANCH"
             gh pr create --base "$BASE_BRANCH" --head "$BRANCH" --title "feat(ai-peer): ${TASK_ID} via ${AGENT}" --body "## AI Peer Executor\n\nTask ID: ${TASK_ID}\nPeer: ${AGENT}\nBase checkpoint: ${BASE_BRANCH}\n\n### Safety\n- Generated through constrained executor.\n- Production mutation: **false**.\n- Production deployment is not performed by this workflow.\n- CI and the existing Production Gate remain authoritative.\n\n### Peer summary\n$(cat ai-peer-summary.md)"
