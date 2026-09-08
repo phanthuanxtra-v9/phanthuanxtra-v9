@@ -33,14 +33,12 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Verify required secrets are present
+      - name: Verify Cloudflare backup credentials
         shell: bash
         run: |
           set -euo pipefail
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           test -n "$CLOUDFLARE_BACKUP_API_TOKEN"
-          test -n "$TELEGRAM_BACKUP_BOT_TOKEN"
-          test -n "$TELEGRAM_BACKUP_CHAT_ID"
 
       - name: Run full-system collector
         run: node scripts/full-system-backup.mjs
@@ -65,9 +63,15 @@ jobs:
 
       - name: Send backup result and compact manifest to Telegram
         if: always()
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
+          if [ -z "$TELEGRAM_BACKUP_BOT_TOKEN" ] || [ -z "$TELEGRAM_BACKUP_CHAT_ID" ]; then
+            echo "Telegram backup notification skipped: Telegram secrets are not configured."
+            exit 0
+          fi
+
           status="${{ job.status }}"
           size="unknown"
           if [ -f full-system-backup.tar.gz ]; then
@@ -80,16 +84,13 @@ jobs:
             --data-urlencode "parse_mode=HTML" \
             "https://api.telegram.org/bot${TELEGRAM_BACKUP_BOT_TOKEN}/sendMessage"
 
-          # Telegram Bot API accepts uploaded documents up to 50 MB.
-          # Always send the compact manifest/checksum; send the full archive when it fits.
+          # Keep Telegram delivery independent from backup correctness.
           if [ -f full-system-backup.tar.gz ] && [ "$(stat -c%s full-system-backup.tar.gz)" -le 49000000 ]; then
             curl --fail --silent --show-error \
               -F "chat_id=$TELEGRAM_BACKUP_CHAT_ID" \
               -F "document=@full-system-backup.tar.gz" \
               -F "caption=Full-system backup archive — ${{ github.sha }}" \
               "https://api.telegram.org/bot${TELEGRAM_BACKUP_BOT_TOKEN}/sendDocument"
-          else
-            echo "Archive exceeds Telegram upload safety threshold; GitHub Actions artifact remains the full archive." >&2
           fi
 
           if [ -f backup-artifact/manifest.json ]; then
