@@ -46,6 +46,8 @@ jobs:
           node --check src/entry.js
           node --check src/cms.js
           node --check src/index.js
+          node --check src/app-api.js
+          node --check src/app-admin.js
           node --check src/telegram.js
           node --check src/telegram-ingest.js
           node --check src/telegram-router.js
