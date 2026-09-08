@@ -191,6 +191,53 @@ Each entry records:
 
 **Production mutation:** **NOT ATTEMPTED.**
 
+## HANDOFF-20260908-APK-1.2-ACCELERATION
+
+**Date/time (UTC):** 2026-09-08
+
+**Current AI peer:** ChatGPT
+
+**Objective:** Audit the Markdown/project checkpoint state, accelerate APK completion, and keep every material change recoverable by another AI.
+
+**Direct audit evidence:**
+
+- Current `main` at the start of this stage was `d417ac4b641dac467d107a11d457b518b48f4237`.
+- Android APK workflow run #90 / ID `34203010385` completed **SUCCESS** on that commit.
+- Job `build-apk` ID `101985934014`: Gradle `:app:assembleDebug --no-daemon` **SUCCESS** and artifact upload **SUCCESS**.
+- Artifact `phanthuanxtra-apk-debug`, ID `10046589500`, is available and not expired.
+- Artifact digest reported by GitHub: `sha256:0d4a626c4845dd3ff904e49ba625cd253e6757caa5118add0481c81da05b4a07`.
+- Downloaded artifact contained `app-debug.apk`; local SHA-256 of the APK payload was independently computed as `df95e7fab0bc7d0ed94ae0327f22524d54da498cf06062e599e54e207d717d68`.
+- Current APK source is `com.phanthuanxtra.app`; existing manifest has INTERNET permission and exported launcher activity.
+- Current App API source exposes `/api/app/v1/health`, dashboard, cars CRUD, media upload and vehicle AI analysis, protected by `APP_API_TOKEN`.
+- Current Auto/VIP diagnostic workflow now maps Auto to `/api/telegram/webhook` and VIP to `/api/telegram/vip-webhook`; it performs `getMe`/`getWebhookInfo` without changing production configuration.
+
+**Changes applied to `main`:**
+
+1. Commit `c7e2f530ab097a0c2897258ef16099869ca8fee5`: APK version bumped from `1.1.0` / versionCode `2` to `1.2.0` / versionCode `3`.
+2. Commit `d7e5401b663626064cb160e03965ea86458c72b6`: Android APK workflow upgraded with a production App API `/api/app/v1/health` smoke test and APK output/integrity verification before artifact upload.
+
+**Important current-state reconciliation:**
+
+- `MASTER_CONTEXT_PHAN_THUAN.md` on current `main` states that the physical S21 Ultra production APK test has already **PASSED**. That supersedes the older ledger wording that still listed physical installation as outstanding. Future peers must not treat that older wording as the current blocker.
+- `AUDIT_SESSION_2026-09-08_1300.md` records that the backup workflow has been implemented/hardened and that the next required verification is a real backup workflow run plus restore/readability checks.
+- Older `AUDIT_HANDOFF_2026-09-08.md` and `AUDIT_SESSION_2026-09-08_0625.md` contain earlier “backup planned” and old Auto-diagnostic-route statements; they are historical audit records and must not override newer source/workflow evidence. A future AI should read them for history, then reconcile against current `main` before acting.
+- Open PR #47 is a documentation checkpoint branch based on an older main (`900b13e...`) and must not be merged blindly into current `main`.
+
+**Next action:**
+
+- Wait for the new APK workflow run triggered by commit `d7e5401...`; verify production App API smoke test, Gradle build, artifact and APK integrity.
+- Then perform the highest-value Telegram Auto/VIP E2E verification available through the exposed GitHub tooling; do not claim Telegram runtime health without real `getMe`/`getWebhookInfo` evidence.
+- Continue mobile-management hardening only where it materially improves production workflows; avoid cosmetic refactors before core E2E gates.
+- Keep DeepSeek Harness/local AI integration experimental and isolated until its actual repo/runtime fit is verified.
+
+**Blockers:**
+
+- The current connector cannot manually dispatch the Telegram diagnostic workflow.
+- Private Cloudflare Dashboard state remains unverified in this session.
+- No direct Android-device control tool is available in this AI environment, although the repository's current master checkpoint records that the user's S21 physical production test has already passed.
+
+**Production mutation:** No direct Cloudflare configuration or Telegram webhook mutation was performed in this stage. GitHub `main` was updated only for APK versioning and CI verification.
+
 ## Handoff protocol
 
 When switching AI peers, append a new entry instead of rewriting prior evidence. The next peer must read this file and `MASTER_CONTEXT_PHAN_THUAN.md` before acting. Every meaningful work session MUST append a new handoff entry before stopping so another AI can continue immediately.
