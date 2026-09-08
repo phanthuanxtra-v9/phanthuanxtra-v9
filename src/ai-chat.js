@@ -102,7 +102,7 @@ export async function handleAiChat(request,env){
   const identityQuery=IDENTITY_QUERY_RE.test(message); const vehicleQuery=VEHICLE_RE.test(message); const pending=await pendingUnknown(env,conversationId);
   if(pending && (contact.name||contact.phone)){
     await env.DB.prepare("UPDATE ai_unknown_questions SET name=COALESCE(?,name),phone=COALESCE(?,phone),updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(contact.name||null,contact.phone||null,pending.id).run();
-    await env.DB.prepare("UPDATE ai_conversations SET name=COALESCE(?,name),phone=COALESCE(?,phone),updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(contact.name||null,contact.phone||null,conversationId);
+    await env.DB.prepare("UPDATE ai_conversations SET name=COALESCE(?,name),phone=COALESCE(?,phone),updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(contact.name||null,contact.phone||null,conversationId).run();
   }
   const allowed = identityQuery || vehicleQuery;
   const needsHuman = !allowed || (!identityQuery && !vehicleQuery && !knowledge.evidence);
@@ -118,5 +118,5 @@ export async function handleAiChat(request,env){
   const phone=clean(body?.phone,30)||contact.phone; const name=clean(body?.name,120)||contact.name;
   if(phone)await saveLead(env,conversationId,phone,name,message); else await env.DB.prepare("UPDATE ai_conversations SET name=COALESCE(?,name),updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(name||null,conversationId).run();
   if(!needsHuman)await notifyTelegramCrm(env,{source:"ai-chat",conversationId,visitorId:body?.visitor_id,name,phone,message,reply});
-  return json({ok:true,conversation_id:conversationId,reply,needs_human:needsHuman});
+  return json({ok:true,conversation_id:conversationId,reply,needs_human:needsHuman,ai_model:MODEL_PRIMARY});
 }
