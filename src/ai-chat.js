@@ -1,6 +1,7 @@
 import { notifyTelegramCrm } from "./telegram-crm-notify.js";
 
-const MODEL = "@cf/meta/llama-3.2-3b-instruct";
+const MODEL_PRIMARY = "@cf/zai-org/glm-4.7-flash";
+const MODEL_FALLBACK = "@cf/meta/llama-3.2-3b-instruct";
 const AI_SEARCH_IDS = ["ai-search-mcp", "ai-search-auto"];
 const MAX_MESSAGE = 4000;
 const MAX_HISTORY = 12;
@@ -69,7 +70,22 @@ async function ensureConversation(env, conversationId, visitorId, channel="websi
   return cid;
 }
 async function loadHistory(env,cid){const q=await env.DB.prepare("SELECT role,content FROM ai_messages WHERE conversation_id=? ORDER BY id DESC LIMIT ?").bind(cid,MAX_HISTORY).all();return(q.results||[]).reverse().map(x=>({role:x.role,content:x.content}));}
-async function runAI(env,messages,cars,knowledge){if(!env.AI)throw new Error("Workers AI binding AI is not configured");const response=await env.AI.run(MODEL,{messages:[{role:"system",content:systemPrompt(cars,knowledge)},...messages],max_tokens:700,temperature:0.15});const text=typeof response==="string"?response:response?.response;if(!text)throw new Error("Workers AI returned no response");return clean(text,8000);}
+async function runAI(env,messages,cars,knowledge){
+  if(!env.AI)throw new Error("Workers AI binding AI is not configured");
+  const request={messages:[{role:"system",content:systemPrompt(cars,knowledge)},...messages],max_tokens:700,temperature:0.15};
+  let response;
+  try {
+    response=await env.AI.run(MODEL_PRIMARY,request);
+    console.log("workers_ai_model",MODEL_PRIMARY);
+  } catch(error) {
+    console.warn("workers_ai_primary_failed",String(error?.message||error));
+    response=await env.AI.run(MODEL_FALLBACK,request);
+    console.log("workers_ai_model",MODEL_FALLBACK);
+  }
+  const text=typeof response==="string"?response:response?.response;
+  if(!text)throw new Error("Workers AI returned no response");
+  return clean(text,8000);
+}
 function extractContact(text){const phone=(text.match(PHONE_RE)?.[0]||"").trim();let name="";const m=text.match(/(?:tôi|mình|em|anh|chị)\s+(?:tên\s+(?:là)?|là)\s+([A-Za-zÀ-ỹ][A-Za-zÀ-ỹ' -]{1,80})/i);if(m)name=clean(m[1],120).replace(/[,.!?]+$/g,"").trim();return {name,phone};}
 async function saveLead(env,conversationId,phone,name,message){if(!phone||!env.DB)return false;const normalized=phone.replace(/\D/g,"");if(normalized.length<9)return false;await env.DB.prepare("INSERT INTO leads (name,phone,car_id,message) VALUES (?,?,?,?)").bind(clean(name,120),clean(phone,30),"",`[AI CHAT ${conversationId}] ${clean(message,1800)}`).run();await env.DB.prepare("UPDATE ai_conversations SET name=?,phone=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(clean(name,120)||null,clean(phone,30),conversationId).run();return true;}
 async function pendingUnknown(env,cid){try{return await env.DB.prepare("SELECT id,question,name,phone,status FROM ai_unknown_questions WHERE conversation_id=? AND status='pending' ORDER BY id DESC LIMIT 1").bind(cid).first();}catch{return null;}}
@@ -102,5 +118,5 @@ export async function handleAiChat(request,env){
   const phone=clean(body?.phone,30)||contact.phone; const name=clean(body?.name,120)||contact.name;
   if(phone)await saveLead(env,conversationId,phone,name,message); else await env.DB.prepare("UPDATE ai_conversations SET name=COALESCE(?,name),updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(name||null,conversationId).run();
   if(!needsHuman)await notifyTelegramCrm(env,{source:"ai-chat",conversationId,visitorId:body?.visitor_id,name,phone,message,reply});
-  return json({ok:true,conversation_id:conversationId,reply,needs_human:needsHuman});
+  return json({ok:true,conversation_id:conversationId,reply,needs_human:needsHuman,ai_model:MODEL_PRIMARY});
 }
