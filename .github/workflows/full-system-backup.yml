@@ -21,6 +21,7 @@ env:
   D1_DATABASE_ID: 8b6c0fc8-c278-4797-9cfa-3ec93d0c1b7d
   R2_BUCKET: phanthuanxtra-media
   ZONE_NAME: phanthuanxtra.com
+  BACKUP_ROOT: backup-artifact/run-${{ github.run_id }}
 
 jobs:
   backup:
@@ -43,13 +44,34 @@ jobs:
       - name: Run full-system collector
         run: node scripts/full-system-backup.mjs
 
+      - name: Verify collected backup checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "$BACKUP_ROOT/SHA256SUMS"
+          (cd "$BACKUP_ROOT" && sha256sum -c SHA256SUMS)
+          test -s "$BACKUP_ROOT/manifest.json"
+          node -e "const m=require('./$BACKUP_ROOT/manifest.json'); if(m.secret_values_included!==false) throw new Error('backup manifest claims secret values are included'); if(m.components?.d1_sql_export!==true) throw new Error('D1 export missing'); if(m.components?.r2_object_content!==true) throw new Error('R2 content missing');"
+
       - name: Create compressed archive
         shell: bash
         run: |
           set -euo pipefail
-          tar -C backup-artifact -czf full-system-backup.tar.gz .
+          tar -C "$BACKUP_ROOT" -czf full-system-backup.tar.gz .
           sha256sum full-system-backup.tar.gz > full-system-backup.tar.gz.sha256
           ls -lh full-system-backup.tar.gz full-system-backup.tar.gz.sha256
+
+      - name: Verify compressed archive integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          verify_dir="$(mktemp -d)"
+          trap 'rm -rf "$verify_dir"' EXIT
+          tar -xzf full-system-backup.tar.gz -C "$verify_dir"
+          test -s "$verify_dir/SHA256SUMS"
+          (cd "$verify_dir" && sha256sum -c SHA256SUMS)
+          test -s "$verify_dir/manifest.json"
+          echo "Archive integrity: PASS"
 
       - name: Upload full backup artifact
         uses: actions/upload-artifact@v4
@@ -84,7 +106,6 @@ jobs:
             --data-urlencode "parse_mode=HTML" \
             "https://api.telegram.org/bot${TELEGRAM_BACKUP_BOT_TOKEN}/sendMessage"
 
-          # Keep Telegram delivery independent from backup correctness.
           if [ -f full-system-backup.tar.gz ] && [ "$(stat -c%s full-system-backup.tar.gz)" -le 49000000 ]; then
             curl --fail --silent --show-error \
               -F "chat_id=$TELEGRAM_BACKUP_CHAT_ID" \
@@ -93,10 +114,10 @@ jobs:
               "https://api.telegram.org/bot${TELEGRAM_BACKUP_BOT_TOKEN}/sendDocument"
           fi
 
-          if [ -f backup-artifact/manifest.json ]; then
+          if [ -f "$BACKUP_ROOT/manifest.json" ]; then
             curl --fail --silent --show-error \
               -F "chat_id=$TELEGRAM_BACKUP_CHAT_ID" \
-              -F "document=@backup-artifact/manifest.json" \
+              -F "document=@$BACKUP_ROOT/manifest.json" \
               -F "caption=Backup manifest — ${{ github.sha }}" \
               "https://api.telegram.org/bot${TELEGRAM_BACKUP_BOT_TOKEN}/sendDocument"
           fi
