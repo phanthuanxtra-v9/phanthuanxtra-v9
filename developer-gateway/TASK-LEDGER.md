@@ -142,6 +142,55 @@ Each entry records:
 
 **Production mutation:** The PR-triggered Deploy Cloudflare Worker check succeeded, but no separate claim of production deployment is made beyond that workflow result. Physical S21 installation/critical-flow verification remains an acceptance gate.
 
+## HANDOFF-20260908-MULTI-AI-CONTINUOUS-ROTATION
+
+**Date/time (UTC):** 2026-09-08
+
+**Current AI peer:** ChatGPT
+
+**Objective:** Make the repository's Markdown checkpoint the single durable handoff point so ChatGPT, Mistral, Gemma, Llama and future peer AIs can take turns at any time without requiring the user to repeat project context.
+
+**Current canonical checkpoint:** `main` after PR #40 merge. Latest verified merge commit in this ledger: `5f543a79c7b03b4d71def56eb869ae45709a0ec4`. The Workers AI GLM implementation was previously merged through PR #48; its merge commit was `536fb90d967a2562c52ef201f9f7f8ec51167c3b` before the later PR #40 merge.
+
+**Working rules for every peer:**
+
+1. Read `developer-gateway/TASK-LEDGER.md` before changing code.
+2. Read `MASTER_CONTEXT_PHAN_THUAN.md` before changing architecture or project-wide behavior.
+3. Inspect current `main` and relevant branches/PRs before acting; never assume an old checkpoint is still current.
+4. Continue the existing task instead of restarting it or asking the user to repeat completed work.
+5. Before stopping, append a new dated handoff entry to this ledger containing objective, actions, evidence, next action, blockers and production-mutation status.
+6. Never record API tokens, secret values, credentials, private keys, or other sensitive values in Markdown.
+7. Never claim deployed, merged, production-healthy, API-working or complete without direct evidence.
+8. Keep production mutations gated; do not enable `PRODUCTION_MUTATIONS_ENABLED` or deploy production merely because a peer is rotating.
+9. Treat AIs as peer executors taking turns, not merely reviewers. The next available AI should pick up from the latest entry and continue until the task is complete or a real blocker is reached.
+10. Merge remains a protected operation: do not merge a new PR unless explicit merge authorization is present. Existing user authorization for PR #40 was already consumed and must not be reused for unrelated PRs.
+
+**Current project status:**
+
+- AI peer continuity infrastructure: implemented and hardened through PR #45.
+- Full-system backup integrity hardening: merged through PR #46; post-merge scheduled E2E evidence still needs to be observed.
+- Workers AI GLM acceleration: merged through PR #48; GLM Flash is primary with Llama fallback for `/api/ai-chat`.
+- Android vehicle-management hardening: merged through PR #40 after reconciliation; pre-merge CI succeeded.
+- Android APK artifact: debug APK was successfully built and inspected at package level. Artifact was downloaded and verified as an Android package; physical Samsung S21 Ultra installation and critical user-flow verification remain outstanding acceptance gates.
+- VIP Telegram document ingestion PR #37 remains open and merge-conflicted; it must be audited/reconciled and must not be merged without explicit authorization.
+- Current GitHub connector does not expose workflow-dispatch mutation; do not claim manual workflow execution when it cannot be performed.
+
+**Next actions for the next available AI peer:**
+
+1. Re-audit current `main`, open PRs and latest workflow evidence before choosing the next task.
+2. Prioritize completion of the Android APK acceptance gates and/or the next highest-value Telegram/VIP integration blocker based on fresh evidence.
+3. For APK work, verify build artifact provenance, API contract compatibility, then request/perform physical-device verification only where an actual device is available; do not declare complete without it.
+4. For PR #37, inspect current `main` versus the PR head, reconcile only non-stale changes, run validation, and stop before merge until explicit authorization.
+5. After every meaningful change, update this ledger so another AI can immediately continue.
+
+**Blockers:**
+
+- No direct physical Samsung S21 Ultra installation/control tool is available in the current AI environment.
+- No GitHub workflow-dispatch mutation is exposed by the current connector.
+- PR #37 requires conflict reconciliation and separate merge authorization.
+
+**Production mutation:** **NOT ATTEMPTED.**
+
 ## Handoff protocol
 
 When switching AI peers, append a new entry instead of rewriting prior evidence. The next peer must read this file and `MASTER_CONTEXT_PHAN_THUAN.md` before acting. Every meaningful work session MUST append a new handoff entry before stopping so another AI can continue immediately.
