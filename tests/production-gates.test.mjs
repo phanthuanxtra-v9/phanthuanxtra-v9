@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { canAutoPublish } from '../src/telegram-ingest.js';
 import { handleAiChat } from '../src/ai-chat.js';
+import { handleAppApi } from '../src/app-api.js';
 
 function mockDb() {
   const rows = [];
@@ -61,4 +62,13 @@ test('production gate: unknown AI Chat is handed to a human and AI is not called
   assert.equal(aiCalled, false);
   assert.equal(DB._unknown.length, 1);
   assert.match(data.reply, /thông tin xác thực/);
+});
+
+test('production gate: malformed car ID is rejected with 400, not an uncaught Worker 500', async () => {
+  const response = await handleAppApi(new Request('https://phanthuanxtra.com/api/app/v1/cars/%E0%A4%A', {
+    headers:{authorization:'Bearer production-test-token'}
+  }), { APP_API_TOKEN:'production-test-token', DB:mockDb() });
+  const data = await response.json();
+  assert.equal(response.status, 400);
+  assert.equal(data.error, 'ID xe không hợp lệ');
 });
