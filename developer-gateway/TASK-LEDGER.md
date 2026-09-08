@@ -80,6 +80,47 @@ Each entry records:
 
 **Known connector limitation:** The current GitHub connector can read workflows and write repository files/PRs but does not expose a workflow-dispatch mutation. Therefore an actual `workflow_dispatch` run cannot be claimed from this connector unless another execution path is available.
 
+## HANDOFF-20260908-BACKUP-INTEGRITY-AUDIT
+
+**Date/time (UTC):** 2026-09-08
+
+**Current AI peer:** ChatGPT
+
+**Objective:** Continue the core roadmap by auditing the daily full-system backup path and applying only evidence-backed hardening.
+
+**Audit evidence:**
+
+- `MASTER_CONTEXT_PHAN_THUAN.md` still described `@phanthuanxtra2026_bot` backup as planned, but direct inspection of `main` proved that `.github/workflows/full-system-backup.yml` and `scripts/full-system-backup.mjs` already exist. The master context is stale on this point and must not be treated as proof that backup is operational. fileciteturn54file0 fileciteturn55file0
+- The backup workflow is scheduled for `0 0 * * *` (07:00 Vietnam time), uses `contents: read`, serializes runs with concurrency, and does not deploy Cloudflare or run D1 migrations. fileciteturn54file0
+- The collector performs a Git source archive, Cloudflare Worker/deployment/settings metadata, redacted bindings, D1 SQL export, paginated R2 object manifest/content export, zone/route metadata and SHA-256 manifest generation. fileciteturn55file0
+- The collector requires `CLOUDFLARE_BACKUP_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`; secret values are explicitly redacted from stored metadata. fileciteturn55file0
+
+**Finding:** Before this checkpoint, the workflow generated SHA-256 data but did not verify the collected checksum manifest or verify the compressed archive after packaging. Backup correctness therefore could not be established from source inspection alone.
+
+**Implemented hardening:**
+
+1. Added deterministic `BACKUP_ROOT=backup-artifact/run-${{ github.run_id }}`.
+2. Added pre-archive verification of every collected file against `SHA256SUMS`.
+3. Added manifest assertions that secret values are excluded and D1/R2 content is present.
+4. Added post-compression extraction and checksum verification before artifact upload.
+5. Preserved the separation between backup correctness and Telegram notification; Telegram remains a reporting/delivery channel, not the correctness gate.
+6. No production deployment, D1 migration, or secret value was added.
+
+**GitHub change:** PR **#46** — `fix(backup): harden full-system backup integrity verification`, initially created at head `5b804020408dd2416bc9d3e6273b7b24aa5717eb` against main `f04d1d17fd697791b846b34dfa07e5abefdbfea7`. The ledger update is now also committed on the PR branch, so the final PR head must be re-verified before any merge decision. fileciteturn60file0
+
+**CI evidence:** The first PR #46 `Deploy Cloudflare Worker` run `34200875722` was observed queued and its `CI / Validate` job was observed `in_progress`; it must not be called passed until completion is directly verified. fileciteturn62file0
+
+**Production mutation:** **NOT ATTEMPTED.**
+
+**Next exact actions:**
+
+1. Verify the latest PR #46 head after the ledger commit.
+2. Verify all PR #46 CI checks to completion; skipped production deployment is acceptable if the workflow gate intentionally skips it on pull requests.
+3. If checks pass, PR #46 requires the user's explicit merge confirmation before merge.
+4. After merge, verify `main` and post-merge CI.
+5. Then continue mobile management, Auto Bot E2E, vehicle lookup E2E, VIP idempotency E2E, and actual backup/restore execution.
+6. Do not declare backup operational until a real scheduled-equivalent backup and a restore/readability test have been verified.
+
 ## Handoff protocol
 
 When switching AI peers, append a new entry instead of rewriting prior evidence. The next peer must read this file and `MASTER_CONTEXT_PHAN_THUAN.md` before acting. Every meaningful work session MUST append a new handoff entry before stopping so another AI can continue immediately.
