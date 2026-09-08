@@ -13,21 +13,18 @@ if (!agent || !['mistral', 'gemma', 'llama'].includes(agent)) {
 
 const configs = {
   mistral: {
-    name: 'mistral-code-executor',
     baseUrl: 'https://api.mistral.ai/v1',
     key: process.env.MISTRAL_API_KEY,
     model: process.env.MISTRAL_MODEL || 'mistral-large-latest',
     role: 'implementation engineer'
   },
   gemma: {
-    name: 'gemma-test-executor',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
     key: process.env.GEMINI_API_KEY,
     model: process.env.GEMMA_MODEL || 'gemma-4-31b-it',
     role: 'test and regression engineer'
   },
   llama: {
-    name: 'llama-security-executor',
     baseUrl: process.env.LLAMA_BASE_URL,
     key: process.env.LLAMA_API_KEY,
     model: process.env.LLAMA_MODEL || 'llama',
@@ -39,27 +36,26 @@ const cfg = configs[agent];
 if (!cfg.key || !cfg.baseUrl) throw new Error(`${agent} provider is not configured`);
 
 const system = `You are the ${cfg.role} in the PHAN THUAN XTRA AI Peer Executor.
-You are operating on a disposable GitHub Actions branch, never production.
-Continue the existing task; do not restart completed work.
-Read the supplied checkpoint and task instruction as authoritative context.
-Produce ONLY a minimal safe unified diff that implements the requested task.
-Do not modify .github/workflows, secrets, credentials, production deployment gates, or main-branch policy unless the instruction explicitly requires an executor infrastructure change.
+You operate on an isolated non-main GitHub Actions branch, never production.
+Continue the existing task from the supplied checkpoint; do not restart completed work.
+Produce ONLY a minimal safe unified diff implementing the requested task.
+Never modify .github/workflows, GitHub policy, Wrangler/Cloudflare configuration, secrets, credentials, deployment gates, or production controls.
 Do not invent files, test results, API responses, or credentials.
-The workflow will run git apply --check before applying your patch.
-Return exactly this structure:
+Return exactly:
 BEGIN_SUMMARY
 <short summary>
 END_SUMMARY
 BEGIN_PATCH
 <unified diff suitable for git apply>
 END_PATCH
-If no safe patch can be produced, return an empty patch and explain why in the summary.
+If no safe patch is possible, return an empty patch and explain why.
 Repository: phanthuanxtra-v9/phanthuanxtra-v9
 Task ID: ${taskId}`;
 
 const user = `CHECKPOINT:\n${checkpoint}\n\nTASK INSTRUCTION:\n${instruction}`;
 const controller = new AbortController();
 const timeout = setTimeout(() => controller.abort(), Number(process.env.MULTI_AI_TIMEOUT_MS || 90000));
+
 try {
   const response = await fetch(`${cfg.baseUrl.replace(/\/$/, '')}/chat/completions`, {
     method: 'POST',
