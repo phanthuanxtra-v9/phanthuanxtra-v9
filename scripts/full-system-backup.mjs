@@ -52,6 +52,21 @@ async function sha256(path) {
   return hash.digest("hex");
 }
 
+// Remove secret material while preserving binding names, types, and non-secret resource metadata.
+function redactSecretValues(value) {
+  if (Array.isArray(value)) return value.map(redactSecretValues);
+  if (!value || typeof value !== "object") return value;
+  const output = {};
+  for (const [key, child] of Object.entries(value)) {
+    if (["text", "secret", "value", "private_key", "token", "api_key"].includes(key.toLowerCase())) {
+      output[key] = "[REDACTED]";
+    } else {
+      output[key] = redactSecretValues(child);
+    }
+  }
+  return output;
+}
+
 // 1) Immutable Git source snapshot.
 execFileSync("git", ["archive", "--format=tar.gz", "HEAD", "-o", join(root, "github-source.tar.gz")], { stdio: "inherit" });
 
@@ -59,6 +74,17 @@ execFileSync("git", ["archive", "--format=tar.gz", "HEAD", "-o", join(root, "git
 await saveJson("cloudflare/worker.json", await cf(`/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}`));
 await saveJson("cloudflare/deployments.json", await cf(`/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}/deployments`));
 await saveJson("cloudflare/script-settings.json", await cf(`/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}/script-settings`));
+
+// 2b) Worker version settings include the authoritative binding list.
+// Keep resource identifiers/structure, but never persist secret values.
+const workerSettings = await cf(`/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}/settings`);
+await saveJson("cloudflare/worker-settings.json", redactSecretValues(workerSettings));
+await saveJson("cloudflare/bindings.json", {
+  worker: workerName,
+  generated_at: new Date().toISOString(),
+  secret_values_included: false,
+  bindings: redactSecretValues(workerSettings.result?.bindings || []),
+});
 
 // 3) D1 full SQL export using the supported Cloudflare export API.
 const exportPath = `/accounts/${accountId}/d1/database/${d1Id}/export`;
@@ -146,6 +172,8 @@ await saveJson("manifest.json", {
     worker_metadata: true,
     deployments: true,
     script_settings: true,
+    worker_version_settings: true,
+    worker_bindings_manifest: true,
     d1_sql_export: true,
     r2_object_manifest: true,
     r2_object_content: true,
