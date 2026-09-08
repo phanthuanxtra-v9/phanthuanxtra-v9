@@ -32,7 +32,6 @@ Each entry records:
 - Default branch: `main`
 - PR #41 was verified directly from GitHub as **merged** on 2026-09-07, merge commit `a960460069782ce822702a8232f3230be61ca0b7`.
 - Post-merge hardening PR: **#45**, `fix(ai-peer): harden executor and isolate write permissions`.
-- PR #45 head: `feature/ai-peer-executor-hardening`, latest checkpoint commit `ecf41d6a2f1336811528397d4c6e6136d018a268`.
 
 **Evidence:**
 
@@ -50,40 +49,36 @@ Each entry records:
 
 **Current AI peer:** ChatGPT
 
-**Action:** User authorized immediate continuation. Audited the actual repository state, verified PR #45 and its post-hardening CI, and continued under the existing checkpoint without restarting completed work.
+**Action:** User explicitly authorized merge and immediate continuation. PR #45 was moved from Draft to Ready for review, merged, and re-verified.
 
-**Implemented on `feature/ai-peer-executor-hardening`:**
+**PR #45 merge evidence:**
 
-1. Moved `contents: write` and `pull-requests: write` from workflow-level scope into the executor job so write permission is isolated to the job that needs it.
-2. Preserved the hard guard against executing from `main` and against `all` peer routing.
-3. Strengthened executor output validation: required summary, string patch and `production_mutation=false`.
-4. Hardened patch rejection for `.env`, credentials, secrets, `.github/` workflow files and Wrangler/Cloudflare configuration.
-5. Kept provider credentials in GitHub secrets/variables only; no secret values are stored in the repository.
-6. Made dependency installation tolerant of repositories without a lockfile while still running `npm test --if-present`.
-7. Kept Cloudflare production mutation outside this workflow.
+- PR state after operation: **closed / merged=true / draft=false**.
+- Merge commit: `44e82f6294dae49840700df3b81e0d966a9308b7`.
+- PR head before merge: `9194dfd8d3bbff51d2fa8139800632c7cef9da50`.
+- PR contained the AI Peer Executor hardening: isolated write permissions, stronger provider response validation, sensitive-path rejection, lockfile-aware dependency installation, and no production deployment.
 
-**Verified CI evidence for head `ecf41d6a2f1336811528397d4c6e6136d018a268`:**
+**Post-merge verification:**
 
-- `Deploy Cloudflare Worker` run `34200258301`: **success**; CI/Validate passed; production deployment job was **skipped by design**.
-- `Developer Gateway` run `34200258356`: **success**; validation, gateway tests, Wrangler dry-run, and production-mutation guard passed.
-- `Android APK MVP` run `34200258317`: **success**; APK build completed successfully.
+- GitHub returned the merge result as `merged=true` with merge commit `44e82f6294dae49840700df3b81e0d966a9308b7`.
+- Re-fetch of PR #45 confirmed `closed`, `merged=true`, and `merged_at=2026-09-08T07:41:00Z`.
+- The merge commit was fetched successfully and contains the expected PR #45 hardening changes.
+- Combined-status query for the merge commit currently returns no status entries; the connector's PR-triggered workflow-run query also currently returns no runs for the merge commit. Therefore no post-merge CI pass is claimed from these queries.
 
-**PR #45 current state:** GitHub reports **open / draft / mergeable=true / not merged**. Head remains `ecf41d6a2f1336811528397d4c6e6136d018a268`.
-
-**Audit conclusion:** No evidence-backed blocker remains in the visible PR/CI state. Production mutation was not attempted. The next irreversible repository action is merging PR #45; this requires the user's explicit merge confirmation under the project operating rules.
-
-**Next exact actions after merge confirmation:**
-
-1. Merge PR #45 using the verified head SHA.
-2. Re-fetch PR state and merge commit to verify the merge actually succeeded.
-3. Verify `main` contains the hardening checkpoint and its CI is healthy.
-4. Perform a controlled non-production executor run using a harmless documentation task and one configured peer, if a workflow-dispatch execution path is available.
-5. Verify generated branch/PR, CI checks, and append the next ledger handoff.
-6. Only after executor validation consider any production deployment path. `PRODUCTION_MUTATIONS_ENABLED` remains false.
-
-**Known connector limitation:** The current GitHub connector can read workflows and write repository files/PRs but does not expose a workflow-dispatch mutation. Therefore an actual `workflow_dispatch` run cannot be claimed from this connector unless another execution path is available.
+**Repository cleanup:** The feature branch `feature/ai-peer-executor-hardening` is no longer needed after merge. The current GitHub connector does not expose a branch-delete mutation, so branch deletion was not falsely claimed.
 
 **Production mutation:** **NOT ATTEMPTED.**
+
+**Next exact actions:**
+
+1. Verify `main` points to the PR #45 merge result and inspect the merged hardening files on `main`.
+2. Verify post-merge GitHub Actions using any available workflow/run/status evidence; do not infer success from the absence of results.
+3. Inspect the AI Peer Executor workflow and provider configuration contract on `main`.
+4. Run a controlled non-production executor task using one peer and a documentation-only change when a workflow-dispatch execution path is available.
+5. Verify the generated `ai-peer/<task>-<agent>` branch, PR, CI, and ledger handoff.
+6. Keep `PRODUCTION_MUTATIONS_ENABLED=false`; production deployment remains a separate gated operation.
+
+**Known connector limitation:** The current GitHub connector can read workflows and write repository files/PRs but does not expose a workflow-dispatch mutation. Therefore an actual `workflow_dispatch` run cannot be claimed from this connector unless another execution path is available.
 
 ## Handoff protocol
 
