@@ -6,8 +6,6 @@ import { dirname, join } from "node:path";
 const required = [
   "CLOUDFLARE_BACKUP_API_TOKEN",
   "CLOUDFLARE_ACCOUNT_ID",
-  "TELEGRAM_BACKUP_BOT_TOKEN",
-  "TELEGRAM_BACKUP_CHAT_ID",
 ];
 for (const name of required) {
   if (!process.env[name]) throw new Error(`Missing required secret/env: ${name}`);
@@ -112,6 +110,7 @@ for (let attempt = 0; attempt < 60; attempt += 1) {
 if (!exportResult?.signed_url) throw new Error("D1 export did not complete within polling window");
 const d1Response = await fetch(exportResult.signed_url);
 if (!d1Response.ok) throw new Error(`D1 signed download failed: ${d1Response.status}`);
+await mkdir(dirname(join(root, "d1/production.sql")), { recursive: true });
 await writeFile(join(root, "d1/production.sql"), Buffer.from(await d1Response.arrayBuffer()));
 
 // 4) R2 metadata + complete object export, paginated. No object is deleted or modified.
