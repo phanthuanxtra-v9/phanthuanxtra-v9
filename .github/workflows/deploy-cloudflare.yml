@@ -1,6 +1,8 @@
 name: Deploy Cloudflare Worker
 
-# Production verification remains GitHub Actions based; do not run Wrangler on Android/Termux.
+# Production verification remains GitHub Actions based;
+# do not run Wrangler on Android/Termux.
+
 on:
   workflow_dispatch:
   pull_request:
@@ -8,10 +10,10 @@ on:
     branches:
       - main
     paths-ignore:
-      - 'docs/**'
-      - 'AUDIT_*.md'
-      - 'backup/README.md'
-      - '**/*.md'
+      - "docs/**"
+      - "AUDIT_*.md"
+      - "backup/README.md"
+      - "**/*.md"
 
 permissions:
   contents: read
@@ -29,18 +31,22 @@ jobs:
     name: CI / Validate
     runs-on: ubuntu-latest
     timeout-minutes: 10
+
     steps:
       - name: Checkout
         uses: actions/checkout@v5
         with:
           fetch-depth: 2
+
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
+
       - name: Install dependencies
         run: npm ci
+
       - name: Validate JavaScript syntax and tests
         run: |
           node --check src/entry.js
@@ -58,9 +64,18 @@ jobs:
           node --check src/ai-chat.js
           node --check src/plate-branding.js
           node --check public/script.js
-          node --test tests/telegram.test.mjs tests/ai-chat.test.mjs tests/pt-xtra-media.test.mjs tests/pt-xtra-plate.test.mjs tests/plate-branding.test.mjs tests/production-gates.test.mjs tests/vip-vehicle-intelligence.test.mjs
+
+          node --test \
+            tests/telegram.test.mjs \
+            tests/ai-chat.test.mjs \
+            tests/pt-xtra-media.test.mjs \
+            tests/pt-xtra-plate.test.mjs \
+            tests/plate-branding.test.mjs \
+            tests/production-gates.test.mjs \
+            tests/vip-vehicle-intelligence.test.mjs
+
       - name: Wrangler dry-run validation
-        run: npx wrangler deploy --dry-run
+        run: npx wrangler@4.129.0 deploy --dry-run
 
   deploy:
     name: Deploy production Worker (Production)
@@ -75,42 +90,54 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 2
+
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
+
       - name: Wrangler dry-run
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: '4.129.0'
+          wranglerVersion: "4.129.0"
           command: deploy --dry-run
+
       - name: Detect D1 migration changes
         id: migrations
         shell: bash
         run: |
           set -euo pipefail
+
           if git diff --name-only HEAD^ HEAD | grep -q '^migrations/'; then
-            echo 'changed=true' >> "$GITHUB_OUTPUT"
-            echo 'D1 migrations changed in this commit; remote migration step required.'
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "D1 migrations changed in this commit; remote migration step required."
           else
-            echo 'changed=false' >> "$GITHUB_OUTPUT"
-            echo 'No D1 migration changes in this commit; skipping remote migration step.'
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No D1 migration changes in this commit; skipping remote migration step."
           fi
+
       - name: Apply D1 migrations
         if: steps.migrations.outputs.changed == 'true'
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: '4.129.0'
+          wranglerVersion: "4.129.0"
           command: d1 migrations apply phanthuanxtra-db --remote
+
       - name: Deploy to Cloudflare
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: '4.129.0'
+          wranglerVersion: "4.129.0"
           command: deploy
+
+      - name: Deployment completed
+        run: |
+          echo "========================================"
+          echo "Cloudflare deployment completed"
+          echo "========================================"
