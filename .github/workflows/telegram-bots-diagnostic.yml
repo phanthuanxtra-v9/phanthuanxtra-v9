@@ -12,7 +12,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      # Auto Bot production code uses TELEGRAM_BOT_TOKEN. Keep the old AUTO secret as an override when present.
       TELEGRAM_AUTO_BOT_TOKEN: ${{ secrets.TELEGRAM_AUTO_BOT_TOKEN || secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_VIP_BOT_TOKEN: ${{ secrets.TELEGRAM_VIP_BOT_TOKEN }}
 
@@ -25,7 +24,7 @@ jobs:
           [[ -n "${TELEGRAM_VIP_BOT_TOKEN:-}" ]] || { echo "❌ TELEGRAM_VIP_BOT_TOKEN is missing"; exit 1; }
           echo "✅ Both Telegram bot tokens are available to diagnostics."
 
-      - name: Check Telegram getMe and getWebhookInfo
+      - name: Check Telegram identity and webhook state
         shell: bash
         run: |
           set -euo pipefail
@@ -34,35 +33,39 @@ jobs:
             local label="$1"
             local token="$2"
             local expected_path="$3"
+            local expected_username="$4"
 
             echo ""
             echo "===== $label ====="
 
-            me="$(curl --fail-with-body --silent --show-error \
-              --retry 2 --retry-delay 1 \
-              --request POST \
-              --url "https://api.telegram.org/bot${token}/getMe")"
-
+            me="$(curl --fail-with-body --silent --show-error --retry 2 --retry-delay 1 --request POST --url "https://api.telegram.org/bot${token}/getMe")"
             if ! printf '%s' "$me" | jq -e '.ok == true' >/dev/null; then
               echo "❌ getMe failed"
               printf '%s\n' "$me" | jq -r '.description // "Unknown Telegram API error"'
               return 1
             fi
 
-            printf '%s\n' "$me" | jq '{ok, result: {id, is_bot, first_name, username}}'
+            bot_id="$(printf '%s' "$me" | jq -r '.result.id // empty')"
+            username="$(printf '%s' "$me" | jq -r '.result.username // empty')"
+            first_name="$(printf '%s' "$me" | jq -r '.result.first_name // empty')"
+            echo "Telegram API: ✅ ok=true"
+            echo "Bot ID: ${bot_id:-unknown}"
+            echo "Username: ${username:-unknown}"
+            echo "First name: ${first_name:-unknown}"
 
-            info="$(curl --fail-with-body --silent --show-error \
-              --retry 2 --retry-delay 1 \
-              --request POST \
-              --url "https://api.telegram.org/bot${token}/getWebhookInfo")"
+            if [[ "$username" == "$expected_username" ]]; then
+              echo "✅ Identity matches expected bot: $expected_username"
+            else
+              echo "❌ Identity mismatch. Expected: $expected_username"
+              return 1
+            fi
 
+            info="$(curl --fail-with-body --silent --show-error --retry 2 --retry-delay 1 --request POST --url "https://api.telegram.org/bot${token}/getWebhookInfo")"
             if ! printf '%s' "$info" | jq -e '.ok == true' >/dev/null; then
               echo "❌ getWebhookInfo failed"
               printf '%s\n' "$info" | jq -r '.description // "Unknown Telegram API error"'
               return 1
             fi
-
-            printf '%s\n' "$info" | jq '{ok, result: {url, has_custom_certificate, pending_update_count, last_error_date, last_error_message, max_connections, ip_address}}'
 
             actual_url="$(printf '%s' "$info" | jq -r '.result.url // empty')"
             pending="$(printf '%s' "$info" | jq -r '.result.pending_update_count // 0')"
@@ -73,28 +76,16 @@ jobs:
             elif [[ "$actual_url" == *"$expected_path" ]]; then
               echo "✅ Webhook path matches: $expected_path"
             else
-              echo "⚠️ Webhook URL does not match expected path."
-              echo "   Expected path: $expected_path"
-              echo "   Current host/path is shown above; token is never printed."
+              echo "⚠️ Webhook URL does not match expected path: $expected_path"
             fi
 
-            if [[ "$pending" != "0" ]]; then
-              echo "⚠️ Telegram has $pending pending update(s)."
-            else
-              echo "✅ No pending Telegram updates."
-            fi
-
-            if [[ -n "$last_error" ]]; then
-              echo "⚠️ Telegram reports a webhook error: $last_error"
-            else
-              echo "✅ No recent Telegram webhook error reported."
-            fi
+            echo "Pending updates: $pending"
+            if [[ "$pending" == "0" ]]; then echo "✅ No pending Telegram updates."; else echo "⚠️ Telegram has pending update(s)."; fi
+            if [[ -n "$last_error" ]]; then echo "⚠️ Telegram webhook error: $last_error"; else echo "✅ No recent Telegram webhook error reported."; fi
           }
 
-          # Auto Bot is handled by the existing /api/telegram/webhook route in src/telegram-router.js.
-          # Do not invent /api/telegram/auto-webhook or mutate Telegram webhook state here.
-          check_bot "AUTO BOT" "$TELEGRAM_AUTO_BOT_TOKEN" "/api/telegram/webhook"
-          check_bot "VIP BOT" "$TELEGRAM_VIP_BOT_TOKEN" "/api/telegram/vip-webhook"
+          check_bot "AUTO BOT" "$TELEGRAM_AUTO_BOT_TOKEN" "/api/telegram/webhook" "phanthuanxtra_auto_bot"
+          check_bot "VIP BOT" "$TELEGRAM_VIP_BOT_TOKEN" "/api/telegram/vip-webhook" "phanthuanxtra_vip_bot"
 
       - name: Safety confirmation
         run: |
