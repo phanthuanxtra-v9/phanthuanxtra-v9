@@ -33,7 +33,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
         with:
-          fetch-depth: 1
+          fetch-depth: 2
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
@@ -74,7 +74,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
         with:
-          fetch-depth: 1
+          fetch-depth: 2
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
@@ -87,7 +87,20 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: '4.129.0'
           command: deploy --dry-run
+      - name: Detect D1 migration changes
+        id: migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --name-only HEAD^ HEAD | grep -q '^migrations/'; then
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+            echo 'D1 migrations changed in this commit; remote migration step required.'
+          else
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+            echo 'No D1 migration changes in this commit; skipping remote migration step.'
+          fi
       - name: Apply D1 migrations
+        if: steps.migrations.outputs.changed == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
