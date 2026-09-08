@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { canAutoPublish } from '../src/telegram-ingest.js';
 import { handleAiChat } from '../src/ai-chat.js';
 import { handleAppApi } from '../src/app-api.js';
+import { handleMediaApi } from '../src/media.js';
 
 function mockDb() {
   const rows = [];
@@ -71,4 +72,15 @@ test('production gate: malformed car ID is rejected with 400, not an uncaught Wo
   const data = await response.json();
   assert.equal(response.status, 400);
   assert.equal(data.error, 'ID xe không hợp lệ');
+});
+
+test('production gate: malformed media key is rejected with 400, not an uncaught Worker 500', async () => {
+  let getCalled = false;
+  const response = await handleMediaApi(new Request('https://phanthuanxtra.com/media/%E0%A4%A'), {
+    MEDIA: { async get() { getCalled = true; return null; } }
+  });
+  const data = await response.json();
+  assert.equal(response.status, 400);
+  assert.equal(data.error, 'Invalid media key');
+  assert.equal(getCalled, false);
 });
