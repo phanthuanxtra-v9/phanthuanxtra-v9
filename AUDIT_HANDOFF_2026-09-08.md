@@ -33,7 +33,25 @@ Known production deployment run `34090076816` was verified directly from GitHub 
 
 This is strong evidence that the current `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` workflow path is operational for that deployment.
 
-A later documentation-only commit `7f87adebadf404c161a31570cf2c6f6e974041a7` did not change production code and the production workflow intentionally ignores documentation-only changes.
+## LATEST AUDIT CONTINUATION CHECKPOINT
+
+Latest observed repository commit: `f0b5ad900d910409d6d7087b25c6d2e58cbd2af0` (`docs: reconcile Cloudflare credential and Telegram diagnostic state`).
+
+Latest Android workflow run observed: `34206165145`, based on the checkpoint commit. Its `build-apk` job completed successfully. Verified steps include the Production App API smoke test, Gradle assembleDebug, APK output verification, and artifact upload.
+
+The previously verified production deployment remains the authoritative production deployment evidence until a newer production deploy run is observed. No infrastructure resource was recreated or duplicated during this audit continuation.
+
+## RUNTIME/ROUTING SOURCE AUDIT
+
+`src/entry.js` currently routes requests through AI chat, admin, app API, VIP Telegram, Telegram lookup/router/ingest, media, Telegram API, CMS, then legacy fallback. The expected Auto Telegram webhook constant is `https://phanthuanxtra.com/api/telegram/webhook`.
+
+The scheduled handler checks Telegram webhook status and self-heals the webhook when status is unavailable or the URL does not match the expected route, then reconciles Telegram notifications. This behavior is protected by the existing Worker cron and must not be duplicated by another cron/resource.
+
+## PRODUCTION TEST GATES
+
+`tests/production-gates.test.mjs` currently verifies:
+- Telegram auto-publish requires brand + model identity and confidence >= 0.85.
+- Unknown AI production questions are handed to a human instead of being answered by the AI model.
 
 ## CLOUDFLARE WORKER CONFIGURATION — DO NOT DUPLICATE
 
@@ -54,7 +72,7 @@ Do not create another Worker, D1 database, R2 bucket, AI binding, or cron from g
 
 ## TELEGRAM DIAGNOSTIC — ROUTE MISMATCH ALREADY FIXED IN SOURCE
 
-Current `.github/workflows/telegram-bots-diagnostic.yml` now checks:
+Current `.github/workflows/telegram-bots-diagnostic.yml` checks:
 - Auto bot expected route: `/api/telegram/webhook`
 - Auto bot expected username: `phanthuanxtra_auto_bot`
 - VIP bot expected route: `/api/telegram/vip-webhook`
@@ -89,12 +107,15 @@ Never put production secrets in source, documentation, issues, logs, or chat.
 
 | Area | Status | Evidence |
 |---|---|---|
+| Active repository | VERIFIED | GitHub repo `phanthuanxtra-v9/phanthuanxtra-v9` |
 | Production Worker identity | VERIFIED | `wrangler.json` |
 | D1 identity | VERIFIED | `wrangler.json` |
 | R2 media identity | VERIFIED | `wrangler.json` |
 | Workers AI / Images / AI Search | VERIFIED | `wrangler.json` |
 | Production GitHub deploy workflow | VERIFIED | `deploy-cloudflare.yml` |
 | Cloudflare credential workflow path | OPERATIONAL | production run `34090076816` passed all deploy stages |
+| Latest APK validation | PASS | workflow run `34206165145` |
+| Production App API smoke test | PASS | APK workflow run `34206165145` |
 | Telegram Auto diagnostic route | FIXED | current diagnostic expects `/api/telegram/webhook` |
 | Telegram VIP route | VERIFIED | current diagnostic + source |
 | Existing Worker cron | VERIFIED | `*/5 * * * *` |
@@ -103,6 +124,8 @@ Never put production secrets in source, documentation, issues, logs, or chat.
 
 ## NEXT AI HANDOFF
 
-Continue from the current repository state. Do not rotate, recreate, rename, or duplicate Cloudflare resources merely because an older audit mentioned a credential failure. First inspect the latest production workflow run before changing credentials.
+Continue from this exact repository state. Do not rotate, recreate, rename, or duplicate Cloudflare resources merely because an older audit mentioned a credential failure. First inspect the latest production workflow run before changing credentials.
 
 If a new credential must actually be rotated, perform that only through GitHub/Cloudflare settings; never paste the value into chat. The source workflow already uses the correct secret names.
+
+Next audit priority: inspect current production-facing source/API routes and all non-doc GitHub workflow health; fix only reproducible defects, then validate and checkpoint the resulting commit here.
