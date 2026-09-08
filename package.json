@@ -8,6 +8,7 @@
     "dev": "wrangler dev",
     "build": "echo \"Build completed successfully\"",
     "deploy": "wrangler deploy",
+    "preview": "wrangler dev --remote",
     "check": "wrangler deploy --dry-run",
     "d1:create": "wrangler d1 create phanthuanxtra-db",
     "d1:migrate": "wrangler d1 migrations apply phanthuanxtra-db --remote",
