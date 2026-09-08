@@ -110,6 +110,38 @@ Each entry records:
 
 **Production mutation:** **NOT ATTEMPTED.**
 
+## HANDOFF-20260908-PR40-MOBILE-MANAGEMENT-MERGED
+
+**Date/time (UTC):** 2026-09-08
+
+**Current AI peer:** ChatGPT
+
+**Objective:** Reconcile and merge the authorized Android vehicle-management hardening PR #40 against the current `main` without overwriting newer changes.
+
+**Audit finding:** PR #40 was originally 67 commits behind current `main` and GitHub rejected a direct merge because of conflicts. The merge base was `ff1541de88ff7497b44ebd9b7b7d86b6431ab7b6`.
+
+**Implemented reconciliation:**
+
+- Created a reconciliation commit from current `main` (`536fb90d967a2562c52ef201f9f7f8ec51167c3b`).
+- Ported the PR #40 Android vehicle-management UI/API changes onto current `main` without reverting newer Workers AI, backup, gateway, or VIP changes.
+- Preserved current `main`'s newer `vip-telegram.js` implementation because its later origin/document intelligence changes superseded the stale VIP changes in PR #40.
+- Added Telegram lookup routing and lookup tests from PR #40.
+- Added the required `telegram-lookup.js` syntax check to Application Validation.
+- Repointed `feature/mobile-bots-hardening` to the reconciled commit `b620bb113965391c95f62a51123746ae9164c8ca`.
+
+**Verification before merge:**
+
+- GitHub showed PR #40 `mergeable=true`, `ahead_by=1`, `behind_by=0` after reconciliation.
+- Application Validation run `34202448360`: **success**.
+- Deploy Cloudflare Worker run `34202448430`: **success**.
+- Android APK MVP run `34202448361`: **success**.
+
+**Merge evidence:** User had already explicitly authorized `MERGE PR 40`. GitHub returned `merged=true` with merge commit `5f543a79c7b03b4d71def56eb869ae45709a0ec4`. PR #40 was re-fetched as `closed`, `merged=true`, `merged_at=2026-09-08T08:04:08Z`.
+
+**Post-merge verification:** The connector currently returns no PR-triggered workflow runs for merge commit `5f543a79c7b03b4d71def56eb869ae45709a0ec4`; therefore no post-merge CI pass is claimed.
+
+**Production mutation:** The PR-triggered Deploy Cloudflare Worker check succeeded, but no separate claim of production deployment is made beyond that workflow result. Physical S21 installation/critical-flow verification remains an acceptance gate.
+
 ## Handoff protocol
 
 When switching AI peers, append a new entry instead of rewriting prior evidence. The next peer must read this file and `MASTER_CONTEXT_PHAN_THUAN.md` before acting. Every meaningful work session MUST append a new handoff entry before stopping so another AI can continue immediately.
