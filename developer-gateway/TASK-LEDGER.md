@@ -66,19 +66,19 @@ Each entry records:
 
 - `9135171fb158c37a20fc4adcb45f8be934384bea` — executor response hardening.
 - `7e763c45e4297c317b3430781ca2beab6db2856a` — executor workflow permission isolation and validation hardening.
+- `316c96a30341ad159e49b9c72d05b09db14d9edd` — simplified patch validation; removed dead validation logic while preserving `git apply --check` and sensitive-path rejection.
 - This ledger append follows those commits.
 
-**PR:** #45 — currently **open / draft / not merged / mergeable=false** at creation. It is the active post-merge hardening checkpoint.
+**PR:** #45 — currently **open / draft / not merged**. CI on the earlier head passed: `CI / Validate`, `validate`, and `build-apk` succeeded; Production Worker deployment was skipped by design. After the latest hardening commit, a new CI run must be verified before merge.
 
 **Next exact actions:**
 
-1. Let GitHub CI validate PR #45.
-2. Inspect CI results and any failures; fix only evidence-backed issues.
-3. Convert PR #45 to ready-for-review only after validation passes.
-4. Merge PR #45 only after required checks pass.
-5. Perform a controlled non-production executor run using a harmless documentation task and one configured peer.
-6. Verify generated branch/PR, CI checks, and ledger handoff.
-7. Only after executor validation consider any production deployment path. `PRODUCTION_MUTATIONS_ENABLED` remains false.
+1. Verify the latest PR #45 head and its new CI run/checks.
+2. If all required checks pass, mark PR #45 ready for review.
+3. Merge PR #45 only after the ready-state checks remain successful.
+4. Perform a controlled non-production executor run using a harmless documentation task and one configured peer.
+5. Verify generated branch/PR, CI checks, and ledger handoff.
+6. Only after executor validation consider any production deployment path. `PRODUCTION_MUTATIONS_ENABLED` remains false.
 
 **Known connector limitation:** The current GitHub connector can read workflows and write repository files/PRs but does not expose a workflow-dispatch mutation. Therefore an actual `workflow_dispatch` run cannot be claimed from this connector unless another execution path is available.
 
