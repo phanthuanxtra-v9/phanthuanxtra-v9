@@ -6,6 +6,7 @@ const LEAD_STATUSES=new Set(["new","contacted","qualified","won","lost"]);
 const auth=(r,e)=>{const t=e.APP_API_TOKEN,a=r.headers.get("Authorization")||"";return !!t&&a.startsWith("Bearer ")&&a.slice(7)===t};
 const deny=()=>json({error:"Unauthorized"},401,{"WWW-Authenticate":"Bearer"});
 async function handleLeads(request,env,u){
+  if(request.method!=='GET'&&request.method!=='PUT'&&request.method!=='DELETE')return json({error:"Method Not Allowed"},405,{Allow:"GET,PUT,DELETE"});
   if(!env.DB)return json({error:"D1 chưa được kết nối"},503);
   if(request.method==='GET'){
     const q=text(u.searchParams.get("q"),120),status=text(u.searchParams.get("status"),30);
@@ -27,12 +28,9 @@ async function handleLeads(request,env,u){
     if(Number(result?.meta?.changes||0)!==1)return json({error:"Không tìm thấy lead"},404);
     return json({ok:true,id,status,note});
   }
-  if(request.method==='DELETE'){
-    const result=await env.DB.prepare("DELETE FROM leads WHERE id=?").bind(id).run();
-    if(Number(result?.meta?.changes||0)!==1)return json({error:"Không tìm thấy lead"},404);
-    return json({ok:true,id,deleted:true});
-  }
-  return json({error:"Method Not Allowed"},405,{Allow:"GET,PUT,DELETE"});
+  const result=await env.DB.prepare("DELETE FROM leads WHERE id=?").bind(id).run();
+  if(Number(result?.meta?.changes||0)!==1)return json({error:"Không tìm thấy lead"},404);
+  return json({ok:true,id,deleted:true});
 }
 export async function handleAppAdmin(request,env){
   const u=new URL(request.url);
