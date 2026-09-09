@@ -26,6 +26,13 @@ jobs:
           echo "$response"
           echo "$response" | jq -e '.ok == true and .service == "app-api"' >/dev/null
           echo "Production App API health: PASS"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: AI contract regression tests
+        working-directory: .
+        shell: bash
+        run: node --test tests/ai-chat-contract.test.mjs
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
