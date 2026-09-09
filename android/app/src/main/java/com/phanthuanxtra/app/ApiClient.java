@@ -24,30 +24,41 @@ public final class ApiClient {
         String token = authStore.get();
         if (!publicEndpoint && token.isEmpty()) throw new Exception("Chưa nhập APP API token");
 
-        HttpURLConnection connection = (HttpURLConnection) new URL(baseUrl + path).openConnection();
-        connection.setRequestMethod(method);
-        connection.setConnectTimeout(20000);
-        connection.setReadTimeout(60000);
-        connection.setRequestProperty("Accept", "application/json");
-        if (!token.isEmpty()) connection.setRequestProperty("Authorization", "Bearer " + token);
+        HttpURLConnection connection = open(method, path, contentType, token);
         if (raw != null || json != null) {
             connection.setDoOutput(true);
-            connection.setRequestProperty("Content-Type", contentType == null ? "application/json" : contentType);
             try (OutputStream out = connection.getOutputStream()) {
                 if (raw != null) out.write(raw);
                 else out.write(json.getBytes(StandardCharsets.UTF_8));
             }
         }
-        int code = connection.getResponseCode();
-        String body = read(code >= 400 ? connection.getErrorStream() : connection.getInputStream());
-        connection.disconnect();
-        return code + "\n" + body;
+        return finish(connection);
     }
 
     /**
-     * Checked request boundary. GET/health requests may retry transient failures with
-     * bounded exponential backoff. Non-idempotent writes are never retried automatically.
+     * Streaming request boundary for binary uploads. The payload is never materialized as a
+     * byte[] by this class. A fixed content length is preferred so HttpURLConnection can avoid
+     * buffering the request body; callers must enforce their own maximum payload size.
      */
+    public String requestStream(String method, String path, InputStream raw, long contentLength, String contentType) throws Exception {
+        if (raw == null) throw new IllegalArgumentException("raw input is null");
+        boolean publicEndpoint = path.equals("/health") || path.endsWith("/health");
+        String token = authStore.get();
+        if (!publicEndpoint && token.isEmpty()) throw new Exception("Chưa nhập APP API token");
+
+        HttpURLConnection connection = open(method, path, contentType, token);
+        connection.setDoOutput(true);
+        if (contentLength >= 0) connection.setFixedLengthStreamingMode(contentLength);
+        else connection.setChunkedStreamingMode(8192);
+        try (InputStream in = raw; OutputStream out = connection.getOutputStream()) {
+            byte[] buffer = new byte[8192];
+            int n;
+            while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
+        }
+        return finish(connection);
+    }
+
+    /** Checked request boundary. GET requests may retry transient failures; writes never retry. */
     public String requestChecked(String method, String path, String json, byte[] raw, String contentType) throws Exception {
         final boolean retryable = "GET".equalsIgnoreCase(method);
         int attempts = retryable ? 3 : 1;
@@ -74,6 +85,35 @@ public final class ApiClient {
             }
         }
         throw lastError == null ? new Exception("API request failed") : lastError;
+    }
+
+    /** Streaming binary requests are intentionally not retried because they are writes. */
+    public String requestCheckedStream(String method, String path, InputStream raw, long contentLength, String contentType) throws Exception {
+        String response = requestStream(method, path, raw, contentLength, contentType);
+        int code = statusCode(response);
+        if (code >= 200 && code < 300) return body(response);
+        throw new ApiException(code, body(response));
+    }
+
+    private HttpURLConnection open(String method, String path, String contentType, String token) throws Exception {
+        HttpURLConnection connection = (HttpURLConnection) new URL(baseUrl + path).openConnection();
+        connection.setRequestMethod(method);
+        connection.setConnectTimeout(20000);
+        connection.setReadTimeout(60000);
+        connection.setRequestProperty("Accept", "application/json");
+        if (!token.isEmpty()) connection.setRequestProperty("Authorization", "Bearer " + token);
+        if (contentType != null) connection.setRequestProperty("Content-Type", contentType);
+        return connection;
+    }
+
+    private String finish(HttpURLConnection connection) throws Exception {
+        try {
+            int code = connection.getResponseCode();
+            String body = read(code >= 400 ? connection.getErrorStream() : connection.getInputStream());
+            return code + "\n" + body;
+        } finally {
+            connection.disconnect();
+        }
     }
 
     private boolean isTransient(int code) {
