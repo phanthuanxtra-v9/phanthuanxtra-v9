@@ -85,7 +85,67 @@ public class MainActivity extends Activity {
   void addGalleryUrl(String id,String url){runAsync(()->{try{JSONObject c=fetchCar(id);JSONObject body=carPayload(c);JSONArray a=body.optJSONArray("images");if(a==null)a=new JSONArray();a.put(url);body.put("images",a);if(body.optString("cover_image","").isEmpty())body.put("cover_image",url);String r=api.requestChecked("PUT","/cars/"+Uri.encode(id),body.toString(),null,"application/json");ui(()->output.setText("Đã thêm ảnh gallery:\\n"+r));}catch(Exception e){ui(()->output.setText("Lỗi thêm gallery: "+e.getMessage()));}});}
   void processGalleryImage(Uri u){String galleryId=selectedId();if(galleryId==null)return;UploadPayload upload=null;try{upload=prepareUpload(u);String up;try(InputStream in=upload.open()){up=api.requestCheckedStream("POST","/media",in,upload.length,upload.contentType);}String image=new JSONObject(up).optString("url","");if(image.isEmpty())throw new Exception("Media API không trả URL");addGalleryUrl(galleryId,image);}catch(Exception e){ui(()->output.setText("Lỗi upload gallery: "+e.getMessage()));}finally{if(upload!=null)upload.delete();}}
 
-  void manageLeads(){runAsync(()->{try{String r=api.requestChecked("GET","/leads",null,null,"application/json");JSONObject root=new JSONObject(r);JSONArray list=root.optJSONArray("leads");ui(()->showLeadList(list));}catch(Exception e){ui(()->output.setText("Lỗi leads: "+e.getMessage()));}});}\\n  void showLeadList(JSONArray list){if(list==null||list.length()==0){output.setText("Chưa có lead.");return;}String[] labels=new String[list.length()];for(int i=0;i<list.length();i++){JSONObject l=list.optJSONObject(i);if(l==null)labels[i]="Lead #"+(i+1);else labels[i]="#"+l.optInt("id")+"  "+l.optString("name","Khách hàng")+"  •  "+l.optString("status","new")+"\\n"+l.optString("phone","");}new AlertDialog.Builder(this).setTitle("Lead CRM • "+list.length()).setItems(labels,(d,w)->showLeadActions(list.optJSONObject(w))).setNegativeButton("Đóng",null).show();}\\n  void showLeadActions(JSONObject lead){if(lead==null)return;int id=lead.optInt("id");if(id<1)return;String[] actions={"Đánh dấu đã liên hệ","Đánh dấu tiềm năng","Đã chốt","Không phù hợp","Xóa lead"};new AlertDialog.Builder(this).setTitle("Lead #"+id).setMessage(lead.optString("name","Khách hàng")+"\\\n"+lead.optString("phone","")+"\\\n"+lead.optString("message","")).setItems(actions,(d,w)->{if(w==4)deleteLead(id);else updateLead(id,new String[]{"contacted","qualified","won","lost"}[w]);}).setNegativeButton("Đóng",null).show();}\\n  void updateLead(int id,String status){runAsync(()->{try{JSONObject body=new JSONObject();body.put("id",id);body.put("status",status);body.put("note","Cập nhật từ Android Admin");String r=api.requestChecked("PUT","/leads",body.toString(),null,"application/json");ui(()->output.setText("Đã cập nhật lead #"+id+"\\\n"+r));}catch(Exception e){ui(()->output.setText("Lỗi cập nhật lead: "+e.getMessage()));}});}\\n  void deleteLead(int id){new AlertDialog.Builder(this).setTitle("Xóa lead?").setMessage("Lead #"+id+" sẽ bị xóa vĩnh viễn.").setNegativeButton("Hủy",null).setPositiveButton("Xóa",(d,w)->runAsync(()->{try{JSONObject body=new JSONObject();body.put("id",id);String r=api.requestChecked("DELETE","/leads",body.toString(),null,"application/json");ui(()->output.setText("Đã xóa lead #"+id+"\\\n"+r));}catch(Exception e){ui(()->output.setText("Lỗi xóa lead: "+e.getMessage()));}})).show();}\\n  void confirmDelete(){String id=selectedId();if(id==null)return;new AlertDialog.Builder(this).setTitle("Xóa xe?").setMessage("Xóa vĩnh viễn xe "+id+" khỏi kho. Không thể hoàn tác.").setNegativeButton("HỦY",null).setPositiveButton("XÓA",(d,w)->call("DELETE","/cars/"+Uri.encode(id),null,null,null)).show();}
+  void manageLeads(){
+    runAsync(()->{
+      try{
+        String r=api.requestChecked("GET","/leads",null,null,"application/json");
+        JSONObject root=new JSONObject(r);
+        JSONArray list=root.optJSONArray("leads");
+        ui(()->showLeadList(list));
+      }catch(Exception e){ui(()->output.setText("Lỗi leads: "+e.getMessage()));}
+    });
+  }
+
+  void showLeadList(JSONArray list){
+    if(list==null||list.length()==0){output.setText("Chưa có lead.");return;}
+    String[] labels=new String[list.length()];
+    for(int i=0;i<list.length();i++){
+      JSONObject l=list.optJSONObject(i);
+      if(l==null) labels[i]="Lead #"+(i+1);
+      else labels[i]="#"+l.optInt("id")+"  "+l.optString("name","Khách hàng")+"  •  "+l.optString("status","new")+"\n"+l.optString("phone","");
+    }
+    new AlertDialog.Builder(this).setTitle("Lead CRM • "+list.length()).setItems(labels,(d,w)->showLeadActions(list.optJSONObject(w))).setNegativeButton("Đóng",null).show();
+  }
+
+  void showLeadActions(JSONObject lead){
+    if(lead==null)return;
+    int id=lead.optInt("id");
+    if(id<1)return;
+    String[] actions={"Đánh dấu đã liên hệ","Đánh dấu tiềm năng","Đã chốt","Không phù hợp","Xóa lead"};
+    new AlertDialog.Builder(this).setTitle("Lead #"+id)
+      .setMessage(lead.optString("name","Khách hàng")+"\n"+lead.optString("phone","")+"\n"+lead.optString("message",""))
+      .setItems(actions,(d,w)->{if(w==4)deleteLead(id);else updateLead(id,new String[]{"contacted","qualified","won","lost"}[w]);})
+      .setNegativeButton("Đóng",null).show();
+  }
+
+  void updateLead(int id,String status){
+    runAsync(()->{
+      try{
+        JSONObject body=new JSONObject();
+        body.put("id",id);
+        body.put("status",status);
+        body.put("note","Cập nhật từ Android Admin");
+        String r=api.requestChecked("PUT","/leads",body.toString(),null,"application/json");
+        ui(()->output.setText("Đã cập nhật lead #"+id+"\n"+r));
+      }catch(Exception e){ui(()->output.setText("Lỗi cập nhật lead: "+e.getMessage()));}
+    });
+  }
+
+  void deleteLead(int id){
+    new AlertDialog.Builder(this).setTitle("Xóa lead?")
+      .setMessage("Lead #"+id+" sẽ bị xóa vĩnh viễn.")
+      .setNegativeButton("Hủy",null)
+      .setPositiveButton("Xóa",(d,w)->runAsync(()->{
+        try{
+          JSONObject body=new JSONObject();
+          body.put("id",id);
+          String r=api.requestChecked("DELETE","/leads",body.toString(),null,"application/json");
+          ui(()->output.setText("Đã xóa lead #"+id+"\n"+r));
+        }catch(Exception e){ui(()->output.setText("Lỗi xóa lead: "+e.getMessage()));}
+      })).show();
+  }
+
+  void confirmDelete(){String id=selectedId();if(id==null)return;new AlertDialog.Builder(this).setTitle("Xóa xe?").setMessage("Xóa vĩnh viễn xe "+id+" khỏi kho. Không thể hoàn tác.").setNegativeButton("HỦY",null).setPositiveButton("XÓA",(d,w)->call("DELETE","/cars/"+Uri.encode(id),null,null,null)).show();}
   @Override protected void onActivityResult(int req,int result,Intent data){super.onActivityResult(req,result,data);if(result!=RESULT_OK||data==null)return;Uri u=data.getData();if(u==null)return;if(req==PICK_NEW)runAsync(()->processImage(u));else if(req==PICK_GALLERY)runAsync(()->processGalleryImage(u));}
   void processImage(Uri u){UploadPayload upload=null;try{upload=prepareUpload(u);String type=upload.contentType;String analysis;try(InputStream in=upload.open()){analysis=api.requestCheckedStream("POST","/vehicle/analyze",in,upload.length,type);}JSONObject wrapper=new JSONObject(analysis),a=wrapper.optJSONObject("analysis");if(a==null)throw new Exception("AI không trả analysis");String brand=a.optString("brand","").trim(),model=a.optString("model","").trim();if(brand.isEmpty()||model.isEmpty())throw new Exception("AI chưa xác định được hãng/mẫu; không tự bịa dữ liệu.");String up;try(InputStream in=upload.open()){up=api.requestCheckedStream("POST","/media",in,upload.length,type);}String image=new JSONObject(up).optString("url","");if(image.isEmpty())throw new Exception("Media API không trả URL");JSONObject car=new JSONObject();String id=(brand+"-"+model+"-"+System.currentTimeMillis()).toLowerCase(Locale.US).replaceAll("[^a-z0-9-]","-");car.put("id",id);car.put("brand",brand);car.put("model",model);put(car,"year",a,"year");put(car,"mileage",a,"mileage");put(car,"price",a,"price");put(car,"fuel",a,"fuel");put(car,"category",a,"category");put(car,"color",a,"color");put(car,"description",a,"description");car.put("features",a.optJSONArray("features")==null?new JSONArray():a.optJSONArray("features"));car.put("status","available");JSONArray imgs=new JSONArray();imgs.put(image);car.put("images",imgs);car.put("cover_image",image);String saved=api.requestChecked("POST","/cars",car.toString(),null,"application/json");ui(()->output.setText("AI:\\n"+a.toString()+"\\n\\nUPLOAD:\\n"+up+"\\n\\nXE:\\n"+saved));}catch(Exception e){ui(()->output.setText("Lỗi AI/nhập xe: "+e.getMessage()));}finally{if(upload!=null)upload.delete();}}
   void put(JSONObject out,String key,JSONObject in,String src)throws Exception{Object v=in.opt(src);if(v!=null&&v!=JSONObject.NULL)out.put(key,v);}
