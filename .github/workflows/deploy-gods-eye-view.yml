@@ -31,13 +31,6 @@ jobs:
       - name: Checkout PHAN THUẦN XTRA
         uses: actions/checkout@v5
 
-      - name: Setup Node.js 24
-        uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: apps/gods-eye-view/upstream/package-lock.json
-
       - name: Fetch pinned upstream release
         working-directory: apps/gods-eye-view
         run: |
@@ -49,6 +42,13 @@ jobs:
           git checkout --detach "$GEV_UPSTREAM_COMMIT"
           test "$(git rev-parse HEAD)" = "$GEV_UPSTREAM_COMMIT"
           echo "Pinned upstream: $(git rev-parse HEAD)"
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/gods-eye-view/upstream/package-lock.json
 
       - name: Install upstream dependencies
         working-directory: apps/gods-eye-view/upstream
