@@ -54,3 +54,9 @@ Next agent must read this checkpoint and inspect the latest PR/CI before modifyi
 - Android `build-apk` passed API smoke test, AI contract regression tests, Gradle assembleDebug, APK output verification and artifact upload.
 - PR #58 remains open and mergeable; no merge was performed.
 - Next required production gate is review/merge decision, followed by runtime/physical-device verification where applicable.
+
+## Post-merge contract audit — 2026-09-09
+- Direct source audit found Android Lead CRM calls the shared App API boundary; `src/app-api.js` previously had no `/api/app/v1/leads` route even though Admin backend had `/api/admin/leads`.
+- Added authenticated `/api/app/v1/leads` GET/PUT/DELETE with bounded status allowlist and affected-row checks on branch `fix/admin-postmerge-contract-audit`.
+- This is a compatibility fix, not a guessed endpoint: it matches the existing Android `ApiClient` base-path model and existing lead schema/operations.
+- Do not merge this follow-up until its CI gates are green.
