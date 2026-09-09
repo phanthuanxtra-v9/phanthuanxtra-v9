@@ -65,3 +65,9 @@ Next agent must read this checkpoint and inspect the latest PR/CI before modifyi
 - Found admin lead mutation accepted arbitrary status values and returned success when the target lead did not exist. Fixed with allowlist + affected-row checks on branch `fix/postmerge-security-hardening`.
 - Found App API dashboard could throw against a missing D1 binding instead of returning a controlled 503. Added explicit D1 guard.
 - No schema/resource/config assumptions added. CI must pass before merge.
+
+## PR #60 merged — 2026-09-10
+- User authorized merge. PR #60 merged successfully into `main` using squash.
+- Merge commit: `4597d842a0771806c32a51bd070258a2df29b4a4`.
+- Pre-merge gates were green: Cloudflare Worker #279, Application Validation #126, Android APK MVP #242.
+- Post-merge workflows were not yet returned for the merge commit at checkpoint time; do not claim post-merge deployment until a new workflow/runtime result is observed.
