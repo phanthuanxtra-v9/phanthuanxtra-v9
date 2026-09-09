@@ -1,0 +1,1 @@
+A1-A5 consolidation branch is ready for PR validation. Production main remains untouched. Workers AI primary/fallback paths remain unchanged and verified.
