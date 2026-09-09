@@ -18,6 +18,7 @@ public final class ApiClient {
         this.authStore = authStore;
     }
 
+    /** Raw compatibility method: returns HTTP status followed by a newline and response body. */
     public String request(String method, String path, String json, byte[] raw, String contentType) throws Exception {
         boolean publicEndpoint = path.equals("/health") || path.endsWith("/health");
         String token = authStore.get();
@@ -43,6 +44,53 @@ public final class ApiClient {
         return code + "\n" + body;
     }
 
+    /**
+     * Checked request boundary. GET/health requests may retry transient failures with
+     * bounded exponential backoff. Non-idempotent writes are never retried automatically.
+     */
+    public String requestChecked(String method, String path, String json, byte[] raw, String contentType) throws Exception {
+        final boolean retryable = "GET".equalsIgnoreCase(method);
+        int attempts = retryable ? 3 : 1;
+        long delay = 500L;
+        Exception lastError = null;
+        for (int attempt = 1; attempt <= attempts; attempt++) {
+            try {
+                String response = request(method, path, json, raw, contentType);
+                int code = statusCode(response);
+                if (code >= 200 && code < 300) return body(response);
+                if (retryable && isTransient(code) && attempt < attempts) {
+                    Thread.sleep(delay);
+                    delay *= 2L;
+                    continue;
+                }
+                throw new ApiException(code, body(response));
+            } catch (ApiException e) {
+                throw e;
+            } catch (Exception e) {
+                lastError = e;
+                if (!retryable || attempt == attempts) throw e;
+                Thread.sleep(delay);
+                delay *= 2L;
+            }
+        }
+        throw lastError == null ? new Exception("API request failed") : lastError;
+    }
+
+    private boolean isTransient(int code) {
+        return code == 408 || code == 429 || code >= 500;
+    }
+
+    private int statusCode(String response) throws Exception {
+        int newline = response.indexOf('\n');
+        if (newline <= 0) throw new Exception("API response không hợp lệ");
+        return Integer.parseInt(response.substring(0, newline).trim());
+    }
+
+    private String body(String response) {
+        int newline = response.indexOf('\n');
+        return newline < 0 ? "" : response.substring(newline + 1);
+    }
+
     private String read(InputStream input) throws Exception {
         if (input == null) return "";
         StringBuilder result = new StringBuilder();
@@ -51,5 +99,16 @@ public final class ApiClient {
             while ((line = reader.readLine()) != null) result.append(line).append('\n');
         }
         return result.toString();
+    }
+
+    public static final class ApiException extends Exception {
+        public final int statusCode;
+        public final String responseBody;
+
+        public ApiException(int statusCode, String responseBody) {
+            super("API HTTP " + statusCode + (responseBody.isEmpty() ? "" : ": " + responseBody.trim()));
+            this.statusCode = statusCode;
+            this.responseBody = responseBody;
+        }
     }
 }
