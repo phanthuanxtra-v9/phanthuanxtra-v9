@@ -46,3 +46,5 @@ Next agent must read this checkpoint and inspect the latest PR/CI before modifyi
 ## Latest CI finding
 - Android APK run #233 failed at `MainActivity.java:74`: `s.append('\\\\n')` produced an invalid Java character literal. Fixed on commit `f5d0df6` to use a valid newline character literal. Awaiting fresh CI confirmation.
 - Application Validation and Cloudflare deployment workflow were successful on the preceding checkpoint commit.
+
+- Android APK run #235 repeated the same Java literal issue at `MainActivity.java:74`; direct source inspection showed `s.append('\\n')` persisted. Fixed with `s.append("\\n")` on commit `a2062ad`. This avoids char-literal escaping ambiguity and should compile as a String append.
