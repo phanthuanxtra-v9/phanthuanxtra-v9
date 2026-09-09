@@ -1,4 +1,4 @@
-# Audit Checkpoint — Post-Merge CI / Cloudflare / God's Eye View
+# Audit Checkpoint — Post-Merge CI / Cloudflare / Repository Cleanup
 
 **Date:** 2026-09-09
 **Repository:** `phanthuanxtra-v9/phanthuanxtra-v9`
@@ -45,20 +45,13 @@ Deployment log confirms:
 - Direct external HTTP probing from the current execution environment is unavailable because the environment cannot resolve the public hostnames; therefore no additional external HTTP result is claimed here.
 - Do not interpret tool-level DNS/network failure as a production outage.
 
-## 5. God's Eye View — route/configuration verified, public DNS still NOT independently verified
+## 5. God's Eye View — intentionally OUT OF SCOPE for this continuation
 
-Main repository configuration remains isolated:
+Per current operator instruction, `eye.phanthuanxtra.com` is **deferred** and is not a health blocker for this audit cycle.
 
-- Worker: `phanthuanxtra-gods-eye-view`.
-- Custom Domain: `eye.phanthuanxtra.com`.
-- Configuration does not bind the God's Eye View Worker to `phanthuanxtra.com`.
-- Previous GEV CI run `34322798768` passed all build, route-isolation, build-output and Wrangler dry-run checks.
-
-Current public DNS/HTTPS status:
-
-- Direct DNS/HTTPS verification from this execution environment could not be completed because external DNS resolution is unavailable here.
-- Historical direct 1.1.1.1 query returned NXDOMAIN, so public DNS remains **UNVERIFIED** until checked from a network with working DNS.
-- No Cloudflare DNS/custom-domain mutation has been performed.
+- No DNS/HTTPS health claim is made.
+- No Cloudflare DNS/custom-domain mutation is performed.
+- Main production `phanthuanxtra.com` Worker remains untouched by this deferred item.
 
 ## 6. Legacy duplicate repository dependency audit — PARTIAL / SAFE TO RETAIN FOR NOW
 
@@ -74,26 +67,32 @@ The duplicate `wrangler.jsonc` defines Worker name `phanthuanxtra`, AI binding `
 
 The duplicate `worker.js` is an old standalone chat Worker exposing `/api/health`, `/api/chat`, `/api/history`, and an inline chat UI. It is materially different from the current `phanthuanxtra-v9` production architecture.
 
-A GitHub code search for an explicit `phanthuanxtra-v9/phanthuanxtra` reference inside the main repository returned zero matches, but this alone is not sufficient to prove Cloudflare has no live dependency.
+A GitHub code search for explicit references to the duplicate repository inside the main repository returned zero matches, but GitHub-side inspection alone cannot prove that Cloudflare has no live dependency.
 
 **Safety decision:** do NOT delete the duplicate repository yet. Cloudflare Worker/custom-domain linkage cannot be independently inspected from the current environment. Deleting it before that verification would violate the production safety boundary.
 
-## 7. Branch cleanup
+## 7. Branch inventory / cleanup
 
-`refactor/apk-architecture-v1` is confirmed merged and can be deleted safely.
+Current remote branch inventory contains the merged `refactor/apk-architecture-v1` plus numerous historical `ai*`, `audit/*`, `checkpoint/*`, `chore/*`, `ci/*`, `codex/*`, `feat/*`, `feature/*`, `fix/*`, `refactor/*`, `tmp/*`, and `unified-v2` branches.
 
-The currently available GitHub connector does not expose a direct branch-delete mutation. Do not simulate deletion by force-moving the branch ref. If needed from Windows PowerShell, the owner can safely run the standard GitHub branch deletion command after confirming the merge:
+Confirmed cleanup candidate:
+
+- `refactor/apk-architecture-v1` — merged by PR #51; safe to delete.
+
+The currently available GitHub connector does not expose a direct branch-delete mutation. Do not simulate deletion by force-moving the branch ref. If needed from Windows PowerShell, the owner can safely run:
 
 `git push origin --delete refactor/apk-architecture-v1`
 
-## 8. Remaining blockers / next safe actions
+Other branches are **not** to be deleted solely from naming/age. Each requires merged/unused verification first.
 
-1. Verify `eye.phanthuanxtra.com` DNS A/CNAME and HTTPS from a network with functional public DNS.
-2. Obtain read-only Cloudflare access/connector if available and inspect Worker `phanthuanxtra-gods-eye-view`, Custom Domain and DNS linkage.
-3. Only after that inspection, decide whether legacy repository `phanthuanxtra-v9/phanthuanxtra` can be deleted.
-4. Keep production `phanthuanxtra.com` Worker untouched during the GEV cleanup.
-5. Address the observed npm audit findings and Wrangler version drift only as a separately proposed upgrade; do not silently introduce those changes.
+## 8. Remaining safe actions
+
+1. Keep `eye.phanthuanxtra.com` deferred and out of the current health gate.
+2. Verify Cloudflare Worker/custom-domain linkage before any destructive action on the duplicate repository.
+3. Review historical branches individually for merged/unused status before cleanup.
+4. Keep production `phanthuanxtra.com` Worker untouched during repository cleanup.
+5. Address npm audit findings and Wrangler version drift only as separately proposed upgrades; do not silently introduce them.
 
 ## Handoff rule
 
-Authoritative post-merge state: **PR merged → Android CI PASS → Cloudflare CI PASS → production Worker deploy PASS → Version ID recorded → GEV route isolated → public GEV DNS/HTTPS pending independent verification → duplicate repo deletion blocked until Cloudflare linkage is proven safe.**
+Authoritative state: **PR #51 merged → Android CI PASS → Cloudflare CI PASS → production Worker deploy PASS → Version ID recorded → GEV explicitly deferred → duplicate repo deletion blocked pending Cloudflare linkage inspection → merged branch identified as safe-to-delete → other branches require individual verification.**
