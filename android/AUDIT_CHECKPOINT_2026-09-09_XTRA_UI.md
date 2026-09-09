@@ -20,16 +20,34 @@ Upgrade the first APK interface into a premium automotive operations cockpit ins
 - Ask AI Agent remains at the bottom of the Operator Hub.
 - Quick controls retain access to APK management and phanthuanxtra.com.
 
-## Commits
-- `b90a11050a68f345ebb8c673879795b528011c8f` — XTRA dark theme.
-- `2fdcdef3b90f7eb49503c58f04e389c03361a2ba` — premium Operator Hub UI.
-- Earlier secure token foundation: `26f391f088a80ddc0b21d152ce0642e040fed5c6`.
+## MainActivity audit — current state
+The operational MainActivity still uses a functional programmatic LinearLayout with default Android Button/EditText controls. CRUD, search, gallery, AI upload, leads, and website actions are present, but the screen has not yet been fully converted to the XTRA visual hierarchy. This is an identified UI-only follow-up; API contracts must remain unchanged.
 
-## Current verification gate
-CI must be checked for the latest commit after this checkpoint. Do not claim build/production success until GitHub Actions confirms it.
+### Accessibility / interaction observations
+- Existing controls are native Android widgets, which provides baseline touch/accessibility behavior.
+- The screen is vertically scrollable for the output area, but the operational controls themselves are all placed in one long vertical stack.
+- Next UI pass should group actions into semantic sections (connection, inventory, vehicle detail, gallery, publishing/leads) and preserve clear touch targets.
+- Do not introduce destructive-action gestures or hidden controls; DELETE must remain explicit and confirmed.
+
+## Verification evidence
+Latest checkpoint commit under audit: `f8575bc77196e836b240128f7cf1c42edabdce50`.
+
+GitHub Actions verified after the checkpoint:
+- Android APK MVP run `34318548361` / run #151: **SUCCESS**.
+  - Production App API smoke test: SUCCESS.
+  - Gradle `:app:assembleDebug --no-daemon`: SUCCESS.
+  - APK output verification: SUCCESS.
+  - Artifact upload: SUCCESS.
+- Deploy Cloudflare Worker run `34318548282` / run #224: **VALIDATION SUCCESS**.
+  - JavaScript syntax/tests: SUCCESS.
+  - Cloudflare credential resolution: SUCCESS.
+  - Wrangler dry-run validation: SUCCESS.
+  - Production deploy job: **SKIPPED**, because this refactor branch is not a production-deploy branch.
+
+These results verify CI/build validation for the checkpoint. They do **not** constitute physical-device validation or production Worker deployment.
 
 ## Runtime gate still required
-Physical Android device regression: launch → credentials persistence → navigation → API health → Dashboard → Kho xe → Leads → Thêm xe + AI → gallery/edit → Ask AI Agent → return navigation.
+Physical Android device regression on Samsung S21 Ultra: launch → credentials persistence → navigation → API health → Dashboard → Kho xe → Leads → Thêm xe + AI → gallery/edit → Ask AI Agent → return navigation.
 
 ## Multi-AI handoff rules
 1. Read this checkpoint and `android/DESIGN_XTRA.md` before changing UI.
@@ -42,10 +60,13 @@ Physical Android device regression: launch → credentials persistence → navig
 8. Record every meaningful UI/security change in Markdown with commit SHA and verification state.
 9. Windows 10 PowerShell is the operator environment; no Wrangler installation in Termux is required.
 
+## PR state
+PR #51 remains **OPEN / DRAFT / NOT MERGED**. Head is `f8575bc77196e836b240128f7cf1c42edabdce50`; mergeability reported by GitHub is `true`. No merge action has been taken.
+
 ## Next ordered work
-1. Check CI for this commit.
-2. Fix compile/lint/runtime issues if CI reports any.
-3. Audit MainActivity visual hierarchy and convert operational screens to XTRA design without changing API contracts.
+1. ~~Check CI for this commit.~~ **VERIFIED PASS**.
+2. Fix compile/lint/runtime issues if CI reports any. **No CI failure currently reported.**
+3. Convert MainActivity operational screens to the XTRA visual hierarchy without changing API contracts.
 4. Add/verify accessible navigation and touch targets.
 5. Run physical-device regression on S21 Ultra when a device run is available.
 6. Update this checkpoint with evidence.
