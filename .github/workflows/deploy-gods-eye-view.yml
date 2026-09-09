@@ -50,10 +50,9 @@ jobs:
 
           account_id="${CF_CONFIGURED_ACCOUNT_ID:-}"
           if [ -z "$account_id" ]; then
-            echo "CLOUDFLARE_ACCOUNT_ID secret is unavailable; resolving account from authenticated token."
-            whoami_output="$(npx wrangler@4.129.0 whoami 2>&1)"
-            printf '%s\n' "$whoami_output" | sed -E 's/[A-Za-z0-9_-]{20,}/[REDACTED]/g' | head -80
-            account_id="$(printf '%s\n' "$whoami_output" | grep -Eo '[0-9a-fA-F]{32}' | head -1 || true)"
+            echo "CLOUDFLARE_ACCOUNT_ID secret is unavailable; resolving account from authenticated Wrangler identity."
+            whoami_output="$(npx wrangler@4.129.0 whoami --json 2>&1)"
+            account_id="$(printf '%s\n' "$whoami_output" | jq -r '.accounts[0].id // empty')"
           fi
           if ! printf '%s' "$account_id" | grep -Eq '^[0-9a-fA-F]{32}$'; then
             echo "A valid Cloudflare account ID could not be resolved."
