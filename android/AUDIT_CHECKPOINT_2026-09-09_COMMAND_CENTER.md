@@ -4,51 +4,56 @@ Date: 2026-09-09
 Branch: `refactor/apk-architecture-v1`
 Task: `TASK-S21-COMMAND-CENTER-001`
 
-## Objective
+## Current verified state
 
-Advance the Samsung S21 Ultra APK toward the XTRA Command Center while preserving API contracts, credential isolation, CI gates and multi-AI continuity.
+- PR #51 remains OPEN / DRAFT / NOT MERGED.
+- PR #51 head is `2ae278443cd8ad0930ea5a9ef594e009955f2c1f`.
+- Branch `refactor/apk-architecture-v1` is `29` commits ahead of `main` and `0` behind; no rebase/force-push is required.
+- GitHub reports the PR mergeable; merge is still intentionally blocked pending explicit human authorization.
+- Latest verified Android APK CI run: `34320732085` / #181 — SUCCESS.
+- Latest verified Application Validation, Cloudflare Worker validation, Developer Gateway, and God's Eye View validation runs for the same PR head are green in the current CI evidence set.
 
-## Verified state before this checkpoint
+## Temporary UI branches audit
 
-- PR #51 is OPEN / DRAFT / NOT MERGED.
-- PR #51 head before this checkpoint was `575fb9731967e73ddbb320e1810eab95ccd7f0ca`.
-- PR #51 is currently reported mergeable by GitHub.
-- Android APK CI run `34320110475` / #167: SUCCESS.
-- Application Validation run `34320110515` / #92: SUCCESS.
-- Deploy Cloudflare Worker validation run `34320110538` / #232: SUCCESS.
-- Developer Gateway run `34320110637` / #41: SUCCESS.
+- `tmp-xtra-ui4`, `tmp-xtra-ui5`, and `tmp-xtra-ui6` all point to the same commit `58e81b56c5b094b6d97e38ca1ee8804faa2fb6cc`.
+- Their history is diverged from current `main`; they are not independent feature branches.
+- No duplicate PR was created and no temporary branch was deleted.
 
-## Audit finding
+## Production safety audit
 
-The PR diff introduced `.github/workflows/deploy-gods-eye-view.yml` with an automatic `push` to `main` production deployment path. This conflicted with the project's existing production-mutation safety boundary.
+`.github/workflows/deploy-gods-eye-view.yml` was changed to validation-only. It no longer provides an autonomous production deployment path.
 
-## Corrective action
+Cloudflare production deployment remains restricted to a verified push to `main`; `workflow_dispatch` is validation-only. Credential resolution uses primary token with backup fallback inside the same shell environment and does not print token values.
 
-Replaced that workflow with validation-only behavior in commit `8daf50d20bb7c3f0f8182b525c2d8cbfb342e409`:
+## Android security audit
 
-- PR validation + manual workflow dispatch remain available.
-- Upstream God's Eye View commit remains pinned.
-- Isolated route configuration is validated.
-- Upstream dependencies are installed and built.
-- Wrangler dry-run is executed.
-- No Cloudflare API token is consumed by this validation workflow.
-- No production Worker deployment is performed by this workflow.
+- `SecureTokenStore` uses Android Keystore-backed AES/GCM storage for optional Cloudflare/GitHub operator credentials.
+- `OperatorHubActivity` does not populate secret values into visible fields when the screen opens.
+- `MainActivity` does not display the saved APP API token; saving a blank field preserves the stored token and explicit clear deletes it.
+- Credentials are not injected into the Ask AI Agent WebView/chat.
+- No real provider credentials may be committed to the repository.
 
-This keeps production mutation behind an explicit production gate rather than introducing a parallel autonomous deploy path.
+## API contract audit — verified against `src/app-api.js`
 
-## Credential boundary
+- `GET /api/app/v1/cars/{id}` returns `{car: ...}`.
+- `PUT /api/app/v1/cars/{id}` merges the request body over the existing row, validates the merged object, updates the supported vehicle fields, and only replaces `car_images` when `images` is an array.
+- `POST /api/app/v1/cars` requires a valid id, brand and model and accepts the vehicle fields used by the APK.
+- `POST /api/app/v1/media` accepts `image/*`, enforces a 12 MB limit, stores the object in R2 and returns a relative media URL.
+- `POST /api/app/v1/vehicle/analyze` accepts image data and returns `{ok:true,analysis:...}` on success.
+- The APK's `carPayload` preservation strategy is therefore aligned with the current PUT merge contract.
+- No media DELETE endpoint was found; the APK must not invent cleanup calls. A failed vehicle-create after successful media upload can therefore leave an orphaned R2 object and remains a known P2 reliability issue.
 
-The APK's Cloudflare/GitHub operator credentials remain encrypted locally with Android Keystore + AES/GCM and are not injected into the Ask AI Agent WebView/chat.
+## Runtime limitation
 
-The repository must never contain real provider or production credentials.
+Physical Samsung S21 Ultra regression remains pending because the current GitHub connector does not provide a physical-device execution channel. Do not claim device validation until actual device evidence exists.
 
-## Remaining P1 work
+## Next execution gate
 
-1. Re-run all relevant CI after commit `8daf50d20bb7c3f0f8182b525c2d8cbfb342e409`.
-2. Continue S21 Operator Hub lifecycle/security audit.
-3. Continue MainActivity CRUD/gallery/AI-flow regression analysis using only verified API contracts.
-4. Physical S21 Ultra regression remains pending because no physical-device execution channel is available through the current GitHub connector.
-5. Reconcile PR #51 against the current `main` state only after CI evidence is green; do not force-push.
+1. Keep PR #51 as the single integration path; do not create PRs from `tmp-xtra-ui4/5/6`.
+2. Continue backend/Telegram/API contract audit without inventing endpoints.
+3. Add only evidence-backed reliability/security improvements to the PR branch.
+4. Re-run CI after every code/workflow modification and verify the exact HEAD.
+5. Perform physical S21 regression when a real device execution channel is available.
 6. Do not merge PR #51 without explicit human authorization.
 
 ## Handoff contract
