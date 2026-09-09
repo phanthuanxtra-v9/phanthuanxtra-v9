@@ -1,0 +1,92 @@
+name: Deploy God's Eye View
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/gods-eye-view/**"
+      - ".github/workflows/deploy-gods-eye-view.yml"
+
+permissions:
+  contents: read
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  GEV_UPSTREAM_REPOSITORY: https://github.com/bilawalsidhu/gods-eye-view.git
+  GEV_UPSTREAM_COMMIT: 65bc522f49dc1166eca533996be8e789ad36cfe5
+
+concurrency:
+  group: gods-eye-view-production
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    name: Build and deploy God's Eye View
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout PHAN THUẦN XTRA
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/gods-eye-view/upstream/package-lock.json
+
+      - name: Fetch pinned upstream release
+        working-directory: apps/gods-eye-view
+        run: |
+          set -euo pipefail
+          rm -rf upstream
+          git clone --depth 1 https://github.com/bilawalsidhu/gods-eye-view.git upstream
+          cd upstream
+          git fetch --depth 1 origin "$GEV_UPSTREAM_COMMIT"
+          git checkout --detach "$GEV_UPSTREAM_COMMIT"
+          test "$(git rev-parse HEAD)" = "$GEV_UPSTREAM_COMMIT"
+          echo "Pinned upstream: $(git rev-parse HEAD)"
+
+      - name: Install upstream dependencies
+        working-directory: apps/gods-eye-view/upstream
+        run: npm ci
+
+      - name: Build upstream application
+        working-directory: apps/gods-eye-view/upstream
+        run: npm run build
+
+      - name: Verify build output
+        working-directory: apps/gods-eye-view/upstream
+        run: |
+          set -euo pipefail
+          test -f dist/index.html
+          test -s dist/index.html
+          echo "Build output verified: $(du -sh dist | cut -f1)"
+
+      - name: Verify Wrangler
+        run: npx wrangler@4.129.0 --version
+
+      - name: Wrangler dry-run
+        run: npx wrangler@4.129.0 deploy --config apps/gods-eye-view/wrangler.jsonc --dry-run
+
+      - name: Deploy dedicated Worker
+        run: npx wrangler@4.129.0 deploy --config apps/gods-eye-view/wrangler.jsonc
+
+      - name: Verify production endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            status=$(curl -L -sS -o /tmp/eye.html -w '%{http_code}' --max-time 20 https://eye.phanthuanxtra.com/ || true)
+            if [ "$status" = "200" ] && grep -qi "GOD'S EYE\|God's Eye View" /tmp/eye.html; then
+              echo "Production endpoint verified: HTTP $status"
+              exit 0
+            fi
+            echo "Endpoint not ready (attempt $attempt/12, HTTP ${status:-unknown}); waiting..."
+            sleep 10
+          done
+          echo "Production endpoint verification failed"
+          exit 1
