@@ -92,15 +92,92 @@ Other branches remain and are **not** to be deleted solely from naming/age. Each
 
 These open PRs are protected from automatic cleanup until their intended disposition is explicitly established.
 
-## 8. Remaining safe actions
+## 8. Branch/PR integration audit — VERIFIED 2026-09-09
+
+Current `main` is `d5df543c1fffbedba45491b0418ef161a009a086`. GitHub branch inventory contains the historical branches; PR search shows which branches have actually been merged.
+
+### A. Integrated branches — evidence supports cleanup candidate status
+
+The following branches correspond to PRs whose state is **MERGED + CLOSED**. Their branch heads in the current branch inventory match the recorded PR head SHAs, so there is no evidence of post-merge work on those refs:
+
+- `ai1/fix-telegram-bundle-autopublish` — PR #27 merged.
+- `ai1/issue-30-webhook-diagnostics` — PR #32 merged.
+- `ai1/issue-34-telegram-silent-fix` — PR #35 merged.
+- `ai1/telegram-no-response-hardening` — PR #29 merged.
+- `ai1/telegram-pt-xtra-plate` — PR #26 merged.
+- `ai1/telegram-webhook-self-heal` — PR #28 merged.
+- `ai1/vip-vehicle-intelligence-live` — PR #33 merged.
+- `audit/ai6-ci-vip-coverage-2026-09-06` — PR #36 merged.
+- `audit/upgrade-full-system-backup` — PR #44 merged.
+- `chore/ai-handoff-protocol` — PR #42 merged.
+- `chore/clear-legacy-car-catalog` — PR #7 merged.
+- `ci/application-validation` — PR #5 merged.
+- `ci/cloudflare-deploy` — PR #12 merged.
+- `feat/ai-search-production-knowledge-v2` — PR #23 merged.
+- `feat/controlled-car-import` — PR #8 merged.
+- `feat/gods-eye-view-dedicated-worker` — PR #52 merged.
+- `feat/gods-eye-view-ux-hardening` — PR #50 merged.
+- `feat/luxury-multi-industry-home` — PR #11 merged.
+- `feat/private-appointment-vvip` — PR #15 merged.
+- `feat/v10-s21-termux-opencode-android` — PR #43 merged.
+- `feature/ai-peer-executor-hardening` — PR #45 merged.
+- `feature/apk-mvp` — PR #39 merged.
+- `feature/backup-integrity-hardening` — PR #46 merged.
+- `feature/mobile-bots-hardening` — PR #40 merged.
+- `feature/multi-ai-developer-gateway` — PR #41 merged.
+- `feature/telegram-auto-post` — PR #16 merged.
+- `feature/workers-ai-glm-apk-acceleration` — PR #48 merged.
+- `fix/ai-chat-phan-thuan-identity` — PR #24 merged.
+- `fix/ai-chat-telegram-notification` — PR #25 merged.
+- `fix/cloudflare-r2-deploy-auth` — PR #17 merged.
+- `fix/cloudflare-token-env` — PR #14 merged.
+- `fix/cloudflare-wrangler-version` — PR #13 merged.
+- `fix/cms-contract-d1-catalog` — PR #6 merged.
+- `fix/homepage-dynamic-featured-price-label` — PR #10 merged.
+- `fix/pt-xtra-not-publish-gate` — PR #38 merged.
+- `fix/remove-runtime-ddl` — PR #4 merged.
+- `fix/telegram-bots-conversation-bridge` — PR #21 merged; earlier PRs #19/#20 on the same branch were closed unmerged.
+- `fix/ui-luxury-font-color-icons` — PR #9 merged.
+- `fix/website-ai-chat-2026-bot` — PR #18 merged.
+
+**Cleanup interpretation:** these are evidence-backed branch cleanup candidates, not automatic deletion targets. No deletion was performed in this audit because the GitHub connector does not expose a branch-delete mutation and because cleanup should remain conservative.
+
+### B. Exact duplicate of an integrated branch — strongest cleanup candidate
+
+`feature/mobile-bots-hardening-reconciled` points to the exact same commit SHA as `feature/mobile-bots-hardening`: `b620bb113965391c95f62a51123746ae9164c8ca`.
+
+Direct comparison against `main` reports `ahead_by: 0` and no files changed relative to the branch's merge-base. This is strong evidence that the reconciled branch contains no unique work beyond the already-merged PR #40 line.
+
+**Recommendation:** delete `feature/mobile-bots-hardening-reconciled` after confirming no external workflow/document refers to the branch. This is a cleanup recommendation only; no deletion performed automatically.
+
+### C. Unmerged branches with verified unique work — RETAIN
+
+- `codex/production-health-check`: PR #49 is open/draft. Compare against current `main` reports **ahead_by 1** with unique `scripts/production-health-check.mjs`. RETAIN pending explicit review/disposition.
+- `checkpoint/20260908-continuation`: PR #47 is open. Compare reports **ahead_by 1**, unique modification to `developer-gateway/TASK-LEDGER.md`. RETAIN as handoff/checkpoint history until intentionally reconciled.
+- `audit/ai6-vip-document-ingestion-2026-09-06`: PR #37 is open. Compare reports **ahead_by 4** with changes to `src/vip-telegram.js`, `tests/vip-telegram.test.mjs`, and the Cloudflare deploy workflow. RETAIN; this is real unmerged functionality.
+- `ai1/vip-vehicle-intelligence`: no merged PR identified for this branch; compare reports **ahead_by 3** with `src/vip-vehicle-intelligence.js`, its tests, and documentation. RETAIN.
+- `ai2/tests-pt-xtra` and `ai5/integration-e2e` currently point to the same 7-commit line and compare **ahead_by 7** from `main`, with PT Xtra/Telegram/vehicle-AI source and tests. RETAIN; unique unmerged line.
+- `ai4/cloudflare-e2e` compares **ahead_by 8** and includes Cloudflare workflow changes plus the same PT Xtra/Telegram/vehicle-AI source/test line. RETAIN.
+- `audit/ai6-handoff-2026-09-06` compares **ahead_by 1** with unique `audit/AI6_HANDOFF_2026-09-06.md`. RETAIN until handoff history is intentionally consolidated.
+
+### D. Stale branches with no unique delta — cleanup candidates, but not yet deleted
+
+- `tmp/telegram-diagnostic-main-check-3` compares `main` with **ahead_by 0** and no files changed; it is behind only. This is evidence of no unique work on that ref.
+- `tmp-xtra-ui6` compares `main` with **ahead_by 0** and no files changed; it is behind only. This is evidence of no unique work on that ref.
+
+These two are cleanup candidates subject to a final reference check. Other `tmp-*` branches were not individually compared in this pass, so they are **not** yet classified for deletion.
+
+## 9. Remaining safe actions
 
 1. Keep `eye.phanthuanxtra.com` deferred and out of the current health gate.
 2. Verify Cloudflare Worker/custom-domain linkage before any destructive action on the duplicate repository.
-3. Review remaining historical branches individually against their PRs/merge state before cleanup.
-4. Keep production `phanthuanxtra.com` Worker untouched during repository cleanup.
-5. Address npm audit findings and Wrangler version drift only as separately proposed upgrades; do not silently introduce them.
-6. Do not close, merge, or delete open PR branches without establishing their intended disposition.
+3. Treat merged-PR branches above as evidence-backed cleanup candidates, but do not mass-delete without a final reference check.
+4. Strongest immediate branch cleanup candidates identified by evidence: `feature/mobile-bots-hardening-reconciled`, `tmp/telegram-diagnostic-main-check-3`, and `tmp-xtra-ui6`.
+5. Retain all branches with verified unique unmerged work, especially PR #49, #47, #37 and the AI1/AI2/AI4/AI5 VIP lines.
+6. Keep production `phanthuanxtra.com` Worker untouched during repository cleanup.
+7. Address npm audit findings and Wrangler version drift only as separately proposed upgrades; do not silently introduce them.
+8. Do not close, merge, or delete open PR branches without establishing their intended disposition.
 
 ## Handoff rule
 
-Authoritative state: **PR #51 merged → Android CI PASS → Cloudflare CI PASS → production Worker deploy PASS → Version ID recorded → GEV explicitly deferred → duplicate repo deletion blocked pending Cloudflare linkage inspection → `refactor/apk-architecture-v1` branch deletion VERIFIED → remaining open PR branches protected pending individual review.**
+Authoritative state: **PR #51 merged → Android CI PASS → Cloudflare CI PASS → production Worker deploy PASS → Version ID recorded → GEV explicitly deferred → duplicate repo deletion blocked pending Cloudflare linkage inspection → `refactor/apk-architecture-v1` branch deletion VERIFIED → merged PR branches classified as cleanup candidates → unmerged branches with unique work classified for retention → exact stale/duplicate branch candidates identified → no destructive cleanup performed without final reference/Cloudflare verification.**
