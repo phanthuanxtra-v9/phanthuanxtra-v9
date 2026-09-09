@@ -1,0 +1,1 @@
+Final scope marker: use current main as canonical production implementation; consolidate historical A1-A5 as architecture/validation lineage; use Workers AI through native binding; preserve fallback; validate before merge.
