@@ -1,0 +1,1 @@
+PR scope: consolidate historical A1-A5 architecture without duplicate runtime implementations; retain current main production code; document Workers AI acceleration using the verified native binding path.
