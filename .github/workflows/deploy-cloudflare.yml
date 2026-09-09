@@ -121,7 +121,8 @@ jobs:
 
   deploy:
     name: Deploy production Worker (Production)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Deploy on verified pushes to main AND on an explicitly started manual run.
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 15
