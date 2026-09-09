@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import gateway from '../developer-gateway/src/index.js';
+import gateway, { createInMemoryRateLimiter } from '../developer-gateway/src/index.js';
 
 const env = {
   GATEWAY_READ_TOKEN: 'local-test-token',
@@ -59,10 +59,12 @@ test('cors allows exact configured origin and denies arbitrary origins', async (
   assert.equal(preflight.status, 403);
 });
 
-test('rate limiter denies after configured local window budget', async () => {
-  const limitedEnv = { ...env, GATEWAY_ALLOW_LOCAL_RATE_LIMITER: 'true', GITHUB_ACTIONS_DISPATCH_TOKEN: undefined };
-  for (let i = 0; i < 10; i += 1) {
-    const response = await call('/v1/codex/tasks', { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify({ instruction: 'audit' }) }, limitedEnv);
-    assert.equal(response.status, 503);
-  }
+test('in-memory limiter enforces the bounded task budget', async () => {
+  const limiter = createInMemoryRateLimiter({ limit: 2, windowMs: 60000 });
+  assert.equal((await limiter.check('same-client', 1000)).allowed, true);
+  assert.equal((await limiter.check('same-client', 1001)).allowed, true);
+  const blocked = await limiter.check('same-client', 1002);
+  assert.equal(blocked.allowed, false);
+  assert.ok(blocked.retryAfter >= 1);
+  assert.equal((await limiter.check('other-client', 1002)).allowed, true);
 });
