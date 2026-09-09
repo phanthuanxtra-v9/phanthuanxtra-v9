@@ -61,6 +61,15 @@ jobs:
           printf '%s\n' "CLOUDFLARE_ACCOUNT_ID=$account_id" >> "$GITHUB_ENV"
           echo "Cloudflare credentials resolved without exposing secret values."
 
+      - name: Verify isolated God's Eye route
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq '"pattern": "eye.phanthuanxtra.com"' apps/gods-eye-view/wrangler.jsonc
+          grep -Fq '"custom_domain": true' apps/gods-eye-view/wrangler.jsonc
+          echo "Verified isolated route: eye.phanthuanxtra.com"
+          echo "Main production domain phanthuanxtra.com is not referenced by this deployment config."
+
       - name: Fetch pinned upstream release
         working-directory: apps/gods-eye-view
         run: |
