@@ -1,0 +1,1 @@
+PR scope is limited to the evidence-based A1-A5 consolidation contract and Workers AI acceleration policy. No production route, secret, credential or Cloudflare binding is changed.
