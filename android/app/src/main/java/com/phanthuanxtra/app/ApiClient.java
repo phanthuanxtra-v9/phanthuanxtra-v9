@@ -43,11 +43,7 @@ public final class ApiClient {
         }
     }
 
-    /**
-     * Streaming request boundary for binary uploads. The payload is never materialized as a
-     * byte[] by this class. A fixed content length is preferred so HttpURLConnection can avoid
-     * buffering the request body; callers must enforce their own maximum payload size.
-     */
+    /** Streaming request boundary for binary uploads. */
     public String requestStream(String method, String path, InputStream raw, long contentLength, String contentType) throws Exception {
         if (raw == null) throw new IllegalArgumentException("raw input is null");
         checkInterrupted();
@@ -179,14 +175,32 @@ public final class ApiClient {
         }
     }
 
+    /** Typed API failure with a sanitized user-facing message and bounded diagnostic detail. */
     public static final class ApiException extends Exception {
         public final int statusCode;
         public final String responseBody;
+        public final String userMessage;
 
         public ApiException(int statusCode, String responseBody) {
-            super("API HTTP " + statusCode + (responseBody.isEmpty() ? "" : ": " + responseBody.trim()));
+            super(userMessageFor(statusCode));
             this.statusCode = statusCode;
-            this.responseBody = responseBody;
+            this.responseBody = responseBody == null ? "" : responseBody;
+            this.userMessage = userMessageFor(statusCode);
+        }
+
+        private static String userMessageFor(int statusCode) {
+            if (statusCode == 400) return "Yêu cầu không hợp lệ. Kiểm tra dữ liệu rồi thử lại.";
+            if (statusCode == 401) return "Phiên xác thực không hợp lệ hoặc token đã hết hiệu lực.";
+            if (statusCode == 403) return "Bạn không có quyền thực hiện thao tác này.";
+            if (statusCode == 404) return "Không tìm thấy tài nguyên yêu cầu.";
+            if (statusCode == 408) return "Máy chủ phản hồi quá chậm. Vui lòng thử lại.";
+            if (statusCode == 409) return "Dữ liệu đang xung đột. Hãy tải lại rồi thử lại.";
+            if (statusCode == 413) return "Tệp tải lên vượt quá giới hạn cho phép.";
+            if (statusCode == 415) return "Định dạng dữ liệu không được hỗ trợ.";
+            if (statusCode == 422) return "Dữ liệu không vượt qua kiểm tra hợp lệ.";
+            if (statusCode == 429) return "Có quá nhiều yêu cầu. Vui lòng chờ rồi thử lại.";
+            if (statusCode >= 500) return "Máy chủ đang gặp sự cố. Vui lòng thử lại sau.";
+            return "API trả về lỗi HTTP " + statusCode + ".";
         }
     }
 }
