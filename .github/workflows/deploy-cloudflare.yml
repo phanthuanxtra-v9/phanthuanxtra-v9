@@ -70,7 +70,7 @@ jobs:
             tests/production-gates.test.mjs \
             tests/vip-vehicle-intelligence.test.mjs
 
-      - name: Resolve Cloudflare credentials
+      - name: Resolve credentials and Wrangler dry-run
         shell: bash
         env:
           CF_PRIMARY_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -97,7 +97,6 @@ jobs:
             exit 1
           fi
           export CLOUDFLARE_API_TOKEN="$token"
-          printf '%s\n' "CLOUDFLARE_API_TOKEN=$token" >> "$GITHUB_ENV"
           echo "Cloudflare token source selected: ${token_source}"
 
           account_id="${CF_CONFIGURED_ACCOUNT_ID:-}"
@@ -113,16 +112,15 @@ jobs:
             echo "A valid Cloudflare account ID could not be resolved from the authenticated Wrangler identity."
             exit 1
           fi
-          printf '%s\n' "CLOUDFLARE_ACCOUNT_ID=$account_id" >> "$GITHUB_ENV"
+          export CLOUDFLARE_ACCOUNT_ID="$account_id"
           echo "Cloudflare credentials resolved without exposing secret values."
-
-      - name: Wrangler dry-run validation
-        run: npx wrangler@4.129.0 deploy --dry-run
+          npx wrangler@4.129.0 deploy --dry-run
 
   deploy:
     name: Deploy production Worker (Production)
-    # Deploy on verified pushes to main AND on an explicitly started manual run.
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+    # Production mutation is intentionally restricted to a verified push to main.
+    # workflow_dispatch remains validation-only; it must never bypass the production gate.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -142,7 +140,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Resolve Cloudflare credentials
+      - name: Resolve credentials, verify Wrangler, migrate and deploy
         shell: bash
         env:
           CF_PRIMARY_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -169,7 +167,6 @@ jobs:
             exit 1
           fi
           export CLOUDFLARE_API_TOKEN="$token"
-          printf '%s\n' "CLOUDFLARE_API_TOKEN=$token" >> "$GITHUB_ENV"
           echo "Cloudflare token source selected: ${token_source}"
 
           account_id="${CF_CONFIGURED_ACCOUNT_ID:-}"
@@ -185,35 +182,20 @@ jobs:
             echo "A valid Cloudflare account ID could not be resolved from the authenticated Wrangler identity."
             exit 1
           fi
-          printf '%s\n' "CLOUDFLARE_ACCOUNT_ID=$account_id" >> "$GITHUB_ENV"
+          export CLOUDFLARE_ACCOUNT_ID="$account_id"
           echo "Cloudflare credentials resolved without exposing secret values."
 
-      - name: Verify Wrangler
-        run: npx wrangler@4.129.0 --version
-
-      - name: Wrangler dry-run
-        run: npx wrangler@4.129.0 deploy --dry-run
-
-      - name: Detect D1 migration changes
-        id: migrations
-        shell: bash
-        run: |
-          set -euo pipefail
+          npx wrangler@4.129.0 --version
+          npx wrangler@4.129.0 deploy --dry-run
 
           if git diff --name-only HEAD^ HEAD | grep -q '^migrations/'; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "D1 migrations changed in this commit; remote migration step required."
+            echo "D1 migrations changed in this commit; applying remote migrations."
+            npx wrangler@4.129.0 d1 migrations apply phanthuanxtra-db --remote
           else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No D1 migration changes in this commit; skipping remote migration step."
           fi
 
-      - name: Apply D1 migrations
-        if: steps.migrations.outputs.changed == 'true'
-        run: npx wrangler@4.129.0 d1 migrations apply phanthuanxtra-db --remote
-
-      - name: Deploy to Cloudflare
-        run: npx wrangler@4.129.0 deploy
+          npx wrangler@4.129.0 deploy
 
       - name: Deployment completed
         run: |

@@ -1,13 +1,13 @@
-name: Deploy God's Eye View
+name: Validate God's Eye View
 
 on:
-  workflow_dispatch:
-  push:
+  pull_request:
     branches:
       - main
     paths:
       - "apps/gods-eye-view/**"
       - ".github/workflows/deploy-gods-eye-view.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -17,65 +17,33 @@ env:
   GEV_UPSTREAM_COMMIT: 65bc522f49dc1166eca533996be8e789ad36cfe5
 
 concurrency:
-  group: gods-eye-view-production
+  group: gods-eye-view-validation
   cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
-    name: Build and deploy God's Eye View
+  build-and-validate:
+    name: Build and validate God's Eye View
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - name: Checkout PHAN THUẦN XTRA
         uses: actions/checkout@v5
 
-      - name: Resolve Cloudflare credentials
-        shell: bash
-        env:
-          CF_PRIMARY_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CF_BACKUP_TOKEN: ${{ secrets.CLOUDFLARE_BACKUP_API_TOKEN }}
-          CF_CONFIGURED_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          set -euo pipefail
-          token="${CF_PRIMARY_TOKEN:-}"
-          if [ -z "$token" ]; then
-            token="${CF_BACKUP_TOKEN:-}"
-          fi
-          if [ -z "$token" ]; then
-            echo "Cloudflare API token is unavailable to this workflow run."
-            exit 1
-          fi
-          export CLOUDFLARE_API_TOKEN="$token"
-          printf '%s\n' "CLOUDFLARE_API_TOKEN=$token" >> "$GITHUB_ENV"
-
-          account_id="${CF_CONFIGURED_ACCOUNT_ID:-}"
-          if [ -z "$account_id" ]; then
-            echo "CLOUDFLARE_ACCOUNT_ID secret is unavailable; resolving account from authenticated Wrangler identity."
-            whoami_output="$(npx wrangler@4.129.0 whoami --json 2>&1)"
-            account_id="$(printf '%s\n' "$whoami_output" | jq -r '.accounts[0].id // empty')"
-          fi
-          if ! printf '%s' "$account_id" | grep -Eq '^[0-9a-fA-F]{32}$'; then
-            echo "A valid Cloudflare account ID could not be resolved."
-            exit 1
-          fi
-          printf '%s\n' "CLOUDFLARE_ACCOUNT_ID=$account_id" >> "$GITHUB_ENV"
-          echo "Cloudflare credentials resolved without exposing secret values."
-
-      - name: Verify isolated God's Eye route
+      - name: Verify isolated route configuration
         shell: bash
         run: |
           set -euo pipefail
           grep -Fq '"pattern": "eye.phanthuanxtra.com"' apps/gods-eye-view/wrangler.jsonc
           grep -Fq '"custom_domain": true' apps/gods-eye-view/wrangler.jsonc
           echo "Verified isolated route: eye.phanthuanxtra.com"
-          echo "Main production domain phanthuanxtra.com is not referenced by this deployment config."
+          echo "Production deployment is intentionally not performed by this validation workflow."
 
       - name: Fetch pinned upstream release
         working-directory: apps/gods-eye-view
         run: |
           set -euo pipefail
           rm -rf upstream
-          git clone --depth 1 https://github.com/bilawalsidhu/gods-eye-view.git upstream
+          git clone --depth 1 "$GEV_UPSTREAM_REPOSITORY" upstream
           cd upstream
           git fetch --depth 1 origin "$GEV_UPSTREAM_COMMIT"
           git checkout --detach "$GEV_UPSTREAM_COMMIT"
@@ -105,27 +73,5 @@ jobs:
           test -s dist/index.html
           echo "Build output verified: $(du -sh dist | cut -f1)"
 
-      - name: Verify Wrangler
-        run: npx wrangler@4.129.0 --version
-
-      - name: Wrangler dry-run
+      - name: Wrangler dry-run validation
         run: npx wrangler@4.129.0 deploy --config apps/gods-eye-view/wrangler.jsonc --dry-run
-
-      - name: Deploy dedicated Worker
-        run: npx wrangler@4.129.0 deploy --config apps/gods-eye-view/wrangler.jsonc
-
-      - name: Verify production endpoint
-        shell: bash
-        run: |
-          set -euo pipefail
-          for attempt in {1..12}; do
-            status=$(curl -L -sS -o /tmp/eye.html -w '%{http_code}' --max-time 20 https://eye.phanthuanxtra.com/ || true)
-            if [ "$status" = "200" ] && grep -qi "GOD'S EYE\|God's Eye View" /tmp/eye.html; then
-              echo "Production endpoint verified: HTTP $status"
-              exit 0
-            fi
-            echo "Endpoint not ready (attempt $attempt/12, HTTP ${status:-unknown}); waiting..."
-            sleep 10
-          done
-          echo "Production endpoint verification failed"
-          exit 1
