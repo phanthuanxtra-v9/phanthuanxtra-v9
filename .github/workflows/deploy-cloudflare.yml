@@ -22,6 +22,10 @@ concurrency:
   group: cloudflare-production-deploy
   cancel-in-progress: false
 
+env:
+  # Keep Cloudflare credentials scoped to the resolver steps. The resolver
+  # exports them to the current process and persists them for later steps.
+
 jobs:
   validate:
     name: CI / Validate
@@ -91,12 +95,12 @@ jobs:
 
           account_id="${CF_CONFIGURED_ACCOUNT_ID:-}"
           if ! printf '%s' "$account_id" | grep -Eq '^[0-9a-fA-F]{32}$'; then
-            echo "CLOUDFLARE_ACCOUNT_ID secret unavailable; resolving account from the authenticated token via the phanthuanxtra.com zone."
-            zone_response="$(curl -fsS -H "Authorization: Bearer $token" -H "Content-Type: application/json" "https://api.cloudflare.com/client/v4/zones?name=phanthuanxtra.com&per_page=1")"
-            account_id="$(printf '%s' "$zone_response" | jq -r '.result[0].account.id // empty')"
+            echo "CLOUDFLARE_ACCOUNT_ID secret unavailable; resolving account from authenticated Wrangler identity."
+            whoami_output="$(npx wrangler@4.129.0 whoami --json 2>&1)"
+            account_id="$(printf '%s' "$whoami_output" | jq -r '.accounts[0].id // empty')"
           fi
           if ! printf '%s' "$account_id" | grep -Eq '^[0-9a-fA-F]{32}$'; then
-            echo "A valid Cloudflare account ID could not be resolved."
+            echo "A valid Cloudflare account ID could not be resolved from the authenticated Wrangler identity."
             exit 1
           fi
           printf '%s\n' "CLOUDFLARE_ACCOUNT_ID=$account_id" >> "$GITHUB_ENV"
@@ -148,12 +152,12 @@ jobs:
 
           account_id="${CF_CONFIGURED_ACCOUNT_ID:-}"
           if ! printf '%s' "$account_id" | grep -Eq '^[0-9a-fA-F]{32}$'; then
-            echo "CLOUDFLARE_ACCOUNT_ID secret unavailable; resolving account from the authenticated token via the phanthuanxtra.com zone."
-            zone_response="$(curl -fsS -H "Authorization: Bearer $token" -H "Content-Type: application/json" "https://api.cloudflare.com/client/v4/zones?name=phanthuanxtra.com&per_page=1")"
-            account_id="$(printf '%s' "$zone_response" | jq -r '.result[0].account.id // empty')"
+            echo "CLOUDFLARE_ACCOUNT_ID secret unavailable; resolving account from authenticated Wrangler identity."
+            whoami_output="$(npx wrangler@4.129.0 whoami --json 2>&1)"
+            account_id="$(printf '%s' "$whoami_output" | jq -r '.accounts[0].id // empty')"
           fi
           if ! printf '%s' "$account_id" | grep -Eq '^[0-9a-fA-F]{32}$'; then
-            echo "A valid Cloudflare account ID could not be resolved."
+            echo "A valid Cloudflare account ID could not be resolved from the authenticated Wrangler identity."
             exit 1
           fi
           printf '%s\n' "CLOUDFLARE_ACCOUNT_ID=$account_id" >> "$GITHUB_ENV"
