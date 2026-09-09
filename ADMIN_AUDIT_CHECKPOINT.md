@@ -60,3 +60,8 @@ Next agent must read this checkpoint and inspect the latest PR/CI before modifyi
 - Added authenticated `/api/app/v1/leads` GET/PUT/DELETE with bounded status allowlist and affected-row checks on branch `fix/admin-postmerge-contract-audit`.
 - This is a compatibility fix, not a guessed endpoint: it matches the existing Android `ApiClient` base-path model and existing lead schema/operations.
 - Do not merge this follow-up until its CI gates are green.
+
+## Post-merge security hardening — 2026-09-09
+- Found admin lead mutation accepted arbitrary status values and returned success when the target lead did not exist. Fixed with allowlist + affected-row checks on branch `fix/postmerge-security-hardening`.
+- Found App API dashboard could throw against a missing D1 binding instead of returning a controlled 503. Added explicit D1 guard.
+- No schema/resource/config assumptions added. CI must pass before merge.
