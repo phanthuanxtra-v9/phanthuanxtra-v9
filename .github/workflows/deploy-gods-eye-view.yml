@@ -13,8 +13,6 @@ permissions:
   contents: read
 
 env:
-  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
   GEV_UPSTREAM_REPOSITORY: https://github.com/bilawalsidhu/gods-eye-view.git
   GEV_UPSTREAM_COMMIT: 65bc522f49dc1166eca533996be8e789ad36cfe5
 
@@ -30,6 +28,38 @@ jobs:
     steps:
       - name: Checkout PHAN THUẦN XTRA
         uses: actions/checkout@v5
+
+      - name: Resolve Cloudflare credentials
+        shell: bash
+        env:
+          CF_PRIMARY_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_BACKUP_TOKEN: ${{ secrets.CLOUDFLARE_BACKUP_API_TOKEN }}
+          CF_CONFIGURED_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          token="${CF_PRIMARY_TOKEN:-}"
+          if [ -z "$token" ]; then
+            token="${CF_BACKUP_TOKEN:-}"
+          fi
+          if [ -z "$token" ]; then
+            echo "Cloudflare API token is unavailable to this workflow run."
+            exit 1
+          fi
+          printf '%s\n' "CLOUDFLARE_API_TOKEN=$token" >> "$GITHUB_ENV"
+
+          account_id="${CF_CONFIGURED_ACCOUNT_ID:-}"
+          if [ -z "$account_id" ]; then
+            echo "CLOUDFLARE_ACCOUNT_ID secret is unavailable; resolving account from authenticated token."
+            whoami_output="$(npx wrangler@4.129.0 whoami 2>&1)"
+            printf '%s\n' "$whoami_output" | sed -E 's/[A-Za-z0-9_-]{20,}/[REDACTED]/g' | head -80
+            account_id="$(printf '%s\n' "$whoami_output" | grep -Eo '[0-9a-fA-F]{32}' | head -1 || true)"
+          fi
+          if ! printf '%s' "$account_id" | grep -Eq '^[0-9a-fA-F]{32}$'; then
+            echo "A valid Cloudflare account ID could not be resolved."
+            exit 1
+          fi
+          printf '%s\n' "CLOUDFLARE_ACCOUNT_ID=$account_id" >> "$GITHUB_ENV"
+          echo "Cloudflare credentials resolved without exposing secret values."
 
       - name: Fetch pinned upstream release
         working-directory: apps/gods-eye-view
