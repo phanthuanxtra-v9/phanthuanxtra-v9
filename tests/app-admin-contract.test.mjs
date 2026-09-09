@@ -14,6 +14,8 @@ test('app admin exposes authenticated lead CRUD contract',()=>{
   assert.match(source,/note/);
   assert.match(source,/updated_at/);
   assert.match(source,/Không tìm thấy lead/);
+  assert.match(source,/request\.method!=='GET'&&request\.method!=='PUT'&&request\.method!=='DELETE'/);
+  assert.match(source,/Allow:"GET,PUT,DELETE"/);
 });
 
 test('lead management migration adds operational fields without dropping data',()=>{
