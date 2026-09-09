@@ -59,11 +59,13 @@ jobs:
           node --check src/media.js
           node --check src/ai-chat.js
           node --check src/plate-branding.js
+          node --check src/ai-copy.js
           node --check public/script.js
 
           node --test \
             tests/telegram.test.mjs \
             tests/ai-chat.test.mjs \
+            tests/ai-copy.test.mjs \
             tests/pt-xtra-media.test.mjs \
             tests/pt-xtra-plate.test.mjs \
             tests/plate-branding.test.mjs \
@@ -118,8 +120,6 @@ jobs:
 
   deploy:
     name: Deploy production Worker (Production)
-    # Production mutation is intentionally restricted to a verified push to main.
-    # workflow_dispatch remains validation-only; it must never bypass the production gate.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: validate
     runs-on: ubuntu-latest
