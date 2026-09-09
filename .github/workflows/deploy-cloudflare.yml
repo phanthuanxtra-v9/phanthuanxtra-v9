@@ -22,10 +22,6 @@ concurrency:
   group: cloudflare-production-deploy
   cancel-in-progress: false
 
-env:
-  # Keep Cloudflare credentials scoped to the resolver steps. The resolver
-  # exports them to the current process and persists them for later steps.
-
 jobs:
   validate:
     name: CI / Validate
@@ -82,9 +78,19 @@ jobs:
           CF_CONFIGURED_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
+          primary_present=false
+          backup_present=false
+          configured_account_present=false
+          [ -n "${CF_PRIMARY_TOKEN:-}" ] && primary_present=true
+          [ -n "${CF_BACKUP_TOKEN:-}" ] && backup_present=true
+          [ -n "${CF_CONFIGURED_ACCOUNT_ID:-}" ] && configured_account_present=true
+          echo "Secret presence: primary_token=${primary_present}, backup_token=${backup_present}, account_id=${configured_account_present}"
+
           token="${CF_PRIMARY_TOKEN:-}"
+          token_source="primary"
           if [ -z "$token" ]; then
             token="${CF_BACKUP_TOKEN:-}"
+            token_source="backup"
           fi
           if [ -z "$token" ]; then
             echo "Cloudflare API token is unavailable to this workflow run."
@@ -92,12 +98,16 @@ jobs:
           fi
           export CLOUDFLARE_API_TOKEN="$token"
           printf '%s\n' "CLOUDFLARE_API_TOKEN=$token" >> "$GITHUB_ENV"
+          echo "Cloudflare token source selected: ${token_source}"
 
           account_id="${CF_CONFIGURED_ACCOUNT_ID:-}"
           if ! printf '%s' "$account_id" | grep -Eq '^[0-9a-fA-F]{32}$'; then
-            echo "CLOUDFLARE_ACCOUNT_ID secret unavailable; resolving account from authenticated Wrangler identity."
-            whoami_output="$(npx wrangler@4.129.0 whoami --json 2>&1)"
-            account_id="$(printf '%s' "$whoami_output" | jq -r '.accounts[0].id // empty')"
+            echo "Configured account ID is absent or invalid; resolving account from authenticated Wrangler identity."
+            whoami_output="$(npx wrangler@4.129.0 whoami 2>&1)" || {
+              echo "Wrangler identity check failed; Cloudflare token authentication/permissions must be fixed."
+              exit 1
+            }
+            account_id="$(printf '%s\n' "$whoami_output" | grep -Eo '[0-9a-fA-F]{32}' | head -1 || true)"
           fi
           if ! printf '%s' "$account_id" | grep -Eq '^[0-9a-fA-F]{32}$'; then
             echo "A valid Cloudflare account ID could not be resolved from the authenticated Wrangler identity."
@@ -139,9 +149,19 @@ jobs:
           CF_CONFIGURED_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
+          primary_present=false
+          backup_present=false
+          configured_account_present=false
+          [ -n "${CF_PRIMARY_TOKEN:-}" ] && primary_present=true
+          [ -n "${CF_BACKUP_TOKEN:-}" ] && backup_present=true
+          [ -n "${CF_CONFIGURED_ACCOUNT_ID:-}" ] && configured_account_present=true
+          echo "Secret presence: primary_token=${primary_present}, backup_token=${backup_present}, account_id=${configured_account_present}"
+
           token="${CF_PRIMARY_TOKEN:-}"
+          token_source="primary"
           if [ -z "$token" ]; then
             token="${CF_BACKUP_TOKEN:-}"
+            token_source="backup"
           fi
           if [ -z "$token" ]; then
             echo "Cloudflare API token is unavailable to this workflow run."
@@ -149,12 +169,16 @@ jobs:
           fi
           export CLOUDFLARE_API_TOKEN="$token"
           printf '%s\n' "CLOUDFLARE_API_TOKEN=$token" >> "$GITHUB_ENV"
+          echo "Cloudflare token source selected: ${token_source}"
 
           account_id="${CF_CONFIGURED_ACCOUNT_ID:-}"
           if ! printf '%s' "$account_id" | grep -Eq '^[0-9a-fA-F]{32}$'; then
-            echo "CLOUDFLARE_ACCOUNT_ID secret unavailable; resolving account from authenticated Wrangler identity."
-            whoami_output="$(npx wrangler@4.129.0 whoami --json 2>&1)"
-            account_id="$(printf '%s' "$whoami_output" | jq -r '.accounts[0].id // empty')"
+            echo "Configured account ID is absent or invalid; resolving account from authenticated Wrangler identity."
+            whoami_output="$(npx wrangler@4.129.0 whoami 2>&1)" || {
+              echo "Wrangler identity check failed; Cloudflare token authentication/permissions must be fixed."
+              exit 1
+            }
+            account_id="$(printf '%s\n' "$whoami_output" | grep -Eo '[0-9a-fA-F]{32}' | head -1 || true)"
           fi
           if ! printf '%s' "$account_id" | grep -Eq '^[0-9a-fA-F]{32}$'; then
             echo "A valid Cloudflare account ID could not be resolved from the authenticated Wrangler identity."
