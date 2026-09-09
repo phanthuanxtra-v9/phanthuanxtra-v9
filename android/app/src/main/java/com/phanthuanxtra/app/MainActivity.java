@@ -26,9 +26,10 @@ public class MainActivity extends Activity {
   void build(){
     LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(24,24,24,24);
     root.addView(tv("PHAN THUẦN XTRA\nQUẢN LÝ PHANTHUANXTRA.COM"));
-    token=new EditText(this);token.setHint("APP API token");token.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);root.addView(token);
+    boolean tokenSaved=!authStore.get().isEmpty();
+    token=new EditText(this);token.setHint(tokenSaved?"APP API token • ĐÃ LƯU • nhập mới để thay":"APP API token");token.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);root.addView(token);
     root.addView(btn("LƯU TOKEN",v->saveToken()));
-    root.addView(btn("XÓA TOKEN",v->{authStore.clear();token.setText("");output.setText("Đã xóa token khỏi thiết bị.");}));
+    root.addView(btn("XÓA TOKEN",v->{authStore.clear();token.setText("");token.setHint("APP API token");output.setText("Đã xóa token khỏi thiết bị.");}));
     root.addView(btn("KIỂM TRA KẾT NỐI",v->callPublic("GET","/health")));
     root.addView(btn("DASHBOARD",v->call("GET","/dashboard",null,null,null)));
     root.addView(btn("KHO XE",v->call("GET","/cars",null,null,null)));
@@ -44,9 +45,9 @@ public class MainActivity extends Activity {
     root.addView(btn("KHÁCH HÀNG / LEADS",v->call("GET","/leads",null,null,null)));
     root.addView(btn("THÊM XE + AI",v->startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE),PICK_NEW)));
     root.addView(btn("MỞ PHANTHUANXTRA.COM",v->startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(SITE)))));
-    output=tv("Sẵn sàng.");ScrollView sv=new ScrollView(this);sv.addView(output);root.addView(sv,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);token.setText(authStore.get());
+    output=tv("Sẵn sàng.");ScrollView sv=new ScrollView(this);sv.addView(output);root.addView(sv,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);
   }
-  void saveToken(){try{authStore.save(token.getText().toString());output.setText("Đã lưu token an toàn trên thiết bị.");}catch(Exception e){output.setText("Không thể lưu token: "+e.getMessage());}}
+  void saveToken(){try{String value=token.getText().toString().trim();if(value.isEmpty()){output.setText(authStore.get().isEmpty()?"Chưa có token để lưu.":"Token hiện tại được giữ nguyên; nhập token mới để thay.");return;}authStore.save(value);token.setText("");token.setHint("APP API token • ĐÃ LƯU • nhập mới để thay");output.setText("Đã lưu token an toàn trên thiết bị; giá trị bí mật đã được ẩn.");}catch(Exception e){output.setText("Không thể lưu token: "+e.getMessage());}}
   void runAsync(Runnable task){if(executor==null||executor.isShutdown()||busy)return;busy=true;ui(()->output.setText("Đang xử lý..."));executor.execute(()->{try{task.run();}finally{busy=false;}});}
   void ui(Runnable task){if(isFinishing()||isDestroyed())return;mainHandler.post(()->{if(!isFinishing()&&!isDestroyed())task.run();});}
   void call(String method,String path,String json,byte[] raw,String type){runAsync(()->{try{String r=api.requestChecked(method,path,json,raw,type==null?"application/json":type);ui(()->output.setText(r));}catch(Exception e){ui(()->output.setText("Lỗi: "+e.getMessage()));}});}
