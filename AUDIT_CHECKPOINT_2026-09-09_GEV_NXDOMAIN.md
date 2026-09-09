@@ -9,7 +9,7 @@
 - Merge commit: `4c93ea298341a45c8dbe97063a5cf9a2d8920bbd`.
 - Base: `main`.
 - Head branch: `refactor/apk-architecture-v1`.
-- The merged branch is no longer required for the integrated code and is safe to delete.
+- The merged branch was no longer required for the integrated code and was safe to delete.
 
 ## 2. Post-merge CI — VERIFIED
 
@@ -71,28 +71,36 @@ A GitHub code search for explicit references to the duplicate repository inside 
 
 **Safety decision:** do NOT delete the duplicate repository yet. Cloudflare Worker/custom-domain linkage cannot be independently inspected from the current environment. Deleting it before that verification would violate the production safety boundary.
 
-## 7. Branch inventory / cleanup
+## 7. Branch inventory / cleanup — UPDATED
 
-Current remote branch inventory contains the merged `refactor/apk-architecture-v1` plus numerous historical `ai*`, `audit/*`, `checkpoint/*`, `chore/*`, `ci/*`, `codex/*`, `feat/*`, `feature/*`, `fix/*`, `refactor/*`, `tmp/*`, and `unified-v2` branches.
-
-Confirmed cleanup candidate:
-
-- `refactor/apk-architecture-v1` — merged by PR #51; safe to delete.
-
-The currently available GitHub connector does not expose a direct branch-delete mutation. Do not simulate deletion by force-moving the branch ref. If needed from Windows PowerShell, the owner can safely run:
+The owner executed the correct local deletion command from the repository working directory:
 
 `git push origin --delete refactor/apk-architecture-v1`
 
-Other branches are **not** to be deleted solely from naming/age. Each requires merged/unused verification first.
+Result: **`- [deleted] refactor/apk-architecture-v1`**.
+
+A subsequent `git branch -r` listing no longer contains `origin/refactor/apk-architecture-v1`. GitHub branch search also returns no matching branch. The merged PR #51 branch cleanup is therefore **VERIFIED COMPLETE**.
+
+Other branches remain and are **not** to be deleted solely from naming/age. Each requires individual merged/unused verification.
+
+### Open PRs currently identified
+
+- PR #49 — `codex/production-health-check` — **OPEN, DRAFT**, not merged. It adds mandatory production runtime verification and must not be deleted/merged automatically.
+- PR #47 — `checkpoint/20260908-continuation` — **OPEN**, documentation/checkpoint only, not merged. Retain until its history/replacement is intentionally reconciled.
+- PR #37 — `audit/ai6-vip-document-ingestion-2026-09-06` — **OPEN**, not merged; contains VIP Telegram document ingestion changes. No production claim should be made from the branch alone.
+- PR #1 — `ai/ui-performance` — **OPEN**, not merged; mobile UI performance change only. Its PR body states it was not deployed to production.
+
+These open PRs are protected from automatic cleanup until their intended disposition is explicitly established.
 
 ## 8. Remaining safe actions
 
 1. Keep `eye.phanthuanxtra.com` deferred and out of the current health gate.
 2. Verify Cloudflare Worker/custom-domain linkage before any destructive action on the duplicate repository.
-3. Review historical branches individually for merged/unused status before cleanup.
+3. Review remaining historical branches individually against their PRs/merge state before cleanup.
 4. Keep production `phanthuanxtra.com` Worker untouched during repository cleanup.
 5. Address npm audit findings and Wrangler version drift only as separately proposed upgrades; do not silently introduce them.
+6. Do not close, merge, or delete open PR branches without establishing their intended disposition.
 
 ## Handoff rule
 
-Authoritative state: **PR #51 merged → Android CI PASS → Cloudflare CI PASS → production Worker deploy PASS → Version ID recorded → GEV explicitly deferred → duplicate repo deletion blocked pending Cloudflare linkage inspection → merged branch identified as safe-to-delete → other branches require individual verification.**
+Authoritative state: **PR #51 merged → Android CI PASS → Cloudflare CI PASS → production Worker deploy PASS → Version ID recorded → GEV explicitly deferred → duplicate repo deletion blocked pending Cloudflare linkage inspection → `refactor/apk-architecture-v1` branch deletion VERIFIED → remaining open PR branches protected pending individual review.**
