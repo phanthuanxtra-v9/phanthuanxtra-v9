@@ -4,9 +4,14 @@ const MODEL_PRIMARY = "@cf/zai-org/glm-4.7-flash";
 const MODEL_FALLBACK = "@cf/meta/llama-3.2-3b-instruct";
 const AI_SEARCH_IDS = ["ai-search-mcp", "ai-search-auto"];
 const MAX_MESSAGE = 4000;
-const MAX_HISTORY = 12;
+const MAX_HISTORY = 8;
 const MAX_CARS = 20;
-const MAX_KNOWLEDGE_CHUNKS = 6;
+const MAX_KNOWLEDGE_CHUNKS = 5;
+const MAX_KNOWLEDGE_CONTEXT = 8000;
+const MAX_OUTPUT_TOKENS = 500;
+const AI_CACHE_TTL_MS = 60_000;
+const AI_CACHE_MAX = 64;
+const aiResponseCache = new Map();
 
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "Access-Control-Allow-Origin": "https://phanthuanxtra.com", "Access-Control-Allow-Headers": "content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" } });
 const clean = (v, n = MAX_MESSAGE) => String(v ?? "").trim().slice(0, n);
@@ -60,7 +65,7 @@ async function searchKnowledge(env, query) {
     const context = chunks.map(chunk=>chunk.content||chunk.text||"").filter(Boolean).join("\n\n---\n\n");
     const scores = chunks.map(c=>Number(c.score ?? c.relevance_score ?? 0)).filter(Number.isFinite);
     const topScore = scores.length ? Math.max(...scores) : 0;
-    return { text:`${BRAND_KNOWLEDGE}\n\n${context}`.slice(0,12000), evidence:identity || !!context, topScore };
+    return { text:`${BRAND_KNOWLEDGE}\n\n${context}`.slice(0,MAX_KNOWLEDGE_CONTEXT), evidence:identity || !!context, topScore };
   } catch (error) { console.warn("ai_search_query",String(error?.message||error)); return { text:BRAND_KNOWLEDGE, evidence:identity, topScore:identity?1:0 }; }
 }
 
@@ -70,9 +75,30 @@ async function ensureConversation(env, conversationId, visitorId, channel="websi
   return cid;
 }
 async function loadHistory(env,cid){const q=await env.DB.prepare("SELECT role,content FROM ai_messages WHERE conversation_id=? ORDER BY id DESC LIMIT ?").bind(cid,MAX_HISTORY).all();return(q.results||[]).reverse().map(x=>({role:x.role,content:x.content}));}
+
+function cacheKey(messages,cars,knowledge){
+  const last=messages[messages.length-1]?.content||"";
+  if(!last || PHONE_RE.test(last))return null;
+  const catalog=cars.map(c=>`${c.id}|${c.price}|${c.status}|${c.updated_at||""}`).join(";");
+  return `${MODEL_PRIMARY}|${last}|${catalog}|${knowledge.slice(0,2000)}`;
+}
+function getCached(key){
+  if(!key)return null;
+  const hit=aiResponseCache.get(key);
+  if(!hit)return null;
+  if(Date.now()-hit.at>AI_CACHE_TTL_MS){aiResponseCache.delete(key);return null;}
+  return hit.text;
+}
+function setCached(key,text){
+  if(!key)return;
+  aiResponseCache.set(key,{at:Date.now(),text});
+  while(aiResponseCache.size>AI_CACHE_MAX)aiResponseCache.delete(aiResponseCache.keys().next().value);
+}
+
 async function runAI(env,messages,cars,knowledge){
   if(!env.AI)throw new Error("Workers AI binding AI is not configured");
-  const request={messages:[{role:"system",content:systemPrompt(cars,knowledge)},...messages],max_tokens:700,temperature:0.15};
+  const key=cacheKey(messages,cars,knowledge); const cached=getCached(key); if(cached)return cached;
+  const request={messages:[{role:"system",content:systemPrompt(cars,knowledge)},...messages],max_tokens:MAX_OUTPUT_TOKENS,temperature:0.15};
   let response;
   try {
     response=await env.AI.run(MODEL_PRIMARY,request);
@@ -84,7 +110,7 @@ async function runAI(env,messages,cars,knowledge){
   }
   const text=typeof response==="string"?response:response?.response;
   if(!text)throw new Error("Workers AI returned no response");
-  return clean(text,8000);
+  const output=clean(text,8000); setCached(key,output); return output;
 }
 function extractContact(text){const phone=(text.match(PHONE_RE)?.[0]||"").trim();let name="";const m=text.match(/(?:tôi|mình|em|anh|chị)\s+(?:tên\s+(?:là)?|là)\s+([A-Za-zÀ-ỹ][A-Za-zÀ-ỹ' -]{1,80})/i);if(m)name=clean(m[1],120).replace(/[,.!?]+$/g,"").trim();return {name,phone};}
 async function saveLead(env,conversationId,phone,name,message){if(!phone||!env.DB)return false;const normalized=phone.replace(/\D/g,"");if(normalized.length<9)return false;await env.DB.prepare("INSERT INTO leads (name,phone,car_id,message) VALUES (?,?,?,?)").bind(clean(name,120),clean(phone,30),"",`[AI CHAT ${conversationId}] ${clean(message,1800)}`).run();await env.DB.prepare("UPDATE ai_conversations SET name=?,phone=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(clean(name,120)||null,clean(phone,30),conversationId).run();return true;}
@@ -102,7 +128,7 @@ export async function handleAiChat(request,env){
   const identityQuery=IDENTITY_QUERY_RE.test(message); const vehicleQuery=VEHICLE_RE.test(message); const pending=await pendingUnknown(env,conversationId);
   if(pending && (contact.name||contact.phone)){
     await env.DB.prepare("UPDATE ai_unknown_questions SET name=COALESCE(?,name),phone=COALESCE(?,phone),updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(contact.name||null,contact.phone||null,pending.id).run();
-    await env.DB.prepare("UPDATE ai_conversations SET name=COALESCE(?,name),phone=COALESCE(?,phone),updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(contact.name||null,contact.phone||null,conversationId).run();
+    await env.DB.prepare("UPDATE ai_conversations SET name=COALESCE(?,name),phone=COALESCE(?,phone),updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(contact.name||null,contact.phone||null,conversationId);
   }
   const allowed = identityQuery || vehicleQuery;
   const needsHuman = !allowed || (!identityQuery && !vehicleQuery && !knowledge.evidence);
