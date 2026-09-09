@@ -5,7 +5,7 @@ Compact reference for AI integration decisions. Supplements, and does not overri
 ## AI provider policy
 - **Workers AI:** preferred for workloads that fit Cloudflare-hosted models; keeps execution at the edge and avoids an external provider key.
 - **OpenAI API:** use when required capabilities exceed Workers AI. The OpenAI key MUST stay in Cloudflare Worker Secrets/Secrets Store and MUST never be embedded in APK, WebView, source, logs, or client payloads.
-- Select the provider per workload using verified capability, latency, current quota/cost, privacy, and operational requirements. Never assume current quota/pricing.
+- Select per workload using verified capability, latency, current quota/cost, privacy, and operational requirements. Never assume current quota/pricing.
 
 ## Bindings
 | Binding | Use | Rule |
