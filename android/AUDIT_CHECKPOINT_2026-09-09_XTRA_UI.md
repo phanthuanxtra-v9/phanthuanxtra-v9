@@ -4,54 +4,61 @@ Date: 2026-09-09
 Branch: `refactor/apk-architecture-v1`
 
 ## Objective
-Upgrade the first APK interface into a premium automotive operations cockpit inspired by the product discipline of Tesla and the bold precision of Lamborghini, without copying proprietary branding, layouts, logos, or typefaces.
+Upgrade the APK into a premium automotive operations cockpit inspired by Tesla product discipline and Lamborghini precision, without copying proprietary branding, layouts, logos, or typefaces.
 
 ## Implemented
 - XTRA dark canvas: black / carbon / graphite.
 - Champagne gold reserved for primary actions and important focus.
-- Emerald jade used for LIVE / AI / healthy states.
+- Emerald jade reserved for LIVE / AI / healthy states.
 - Ice-white and silver typography hierarchy.
-- Global Android theme switched from Material Light to dark NoActionBar.
-- Operator Hub redesigned as a premium command center.
-- Cloudflare API token field appears first.
-- GitHub token field appears second.
-- Both tokens remain encrypted locally with Android Keystore + AES/GCM.
-- Tokens are never injected into the Ask AI Agent WebView.
-- Ask AI Agent remains at the bottom of the Operator Hub.
-- Quick controls retain access to APK management and phanthuanxtra.com.
+- Global Android theme is dark NoActionBar.
+- Operator Hub is a premium command center.
+- Cloudflare API token field appears first; GitHub token field second.
+- Both provider tokens remain encrypted locally with Android Keystore + AES/GCM.
+- Provider tokens are never injected into Ask AI Agent WebView/chat.
+- MainActivity keeps the existing production API contract.
+- MainActivity controls now inherit XTRA premium button/input surfaces globally.
+- Buttons have a minimum 52dp height for safer touch targets.
+- Inputs have a minimum 52dp height, graphite surfaces, visible focus border, and high-contrast text.
+- Button ripple/focus treatment uses the XTRA gold signature without introducing generic purple/blue UI.
 
 ## MainActivity audit — current state
-The operational MainActivity still uses a functional programmatic LinearLayout with default Android Button/EditText controls. CRUD, search, gallery, AI upload, leads, and website actions are present, but the screen has not yet been fully converted to the XTRA visual hierarchy. This is an identified UI-only follow-up; API contracts must remain unchanged.
+MainActivity remains a functional programmatic LinearLayout containing connection, dashboard, inventory, search, vehicle CRUD, gallery, leads, AI intake, and website actions. The latest UI pass upgrades the native controls globally through the AppTheme rather than changing API behavior or rewriting the proven CRUD code.
 
 ### Accessibility / interaction observations
-- Existing controls are native Android widgets, which provides baseline touch/accessibility behavior.
-- The screen is vertically scrollable for the output area, but the operational controls themselves are all placed in one long vertical stack.
-- Next UI pass should group actions into semantic sections (connection, inventory, vehicle detail, gallery, publishing/leads) and preserve clear touch targets.
-- Do not introduce destructive-action gestures or hidden controls; DELETE must remain explicit and confirmed.
+- Native Android Button/EditText widgets remain in use, preserving baseline accessibility semantics.
+- Minimum control height is 52dp for the primary interactive widgets.
+- Focused inputs receive a 2dp champagne-gold border and readable hint/text colors.
+- Destructive DELETE remains an explicit confirmation flow.
+- The next architectural UI pass may split the long MainActivity stack into semantic command sections while preserving these controls and API paths.
 
-## Verification evidence
-Latest checkpoint commit under audit: `f8575bc77196e836b240128f7cf1c42edabdce50`.
+## Commits / verification state
+- `edf2147dafcb04e779408a15331ab996f12e2f2c` — XTRA AppTheme control styles.
+- `f2eec7b8f78445b8b367ef1722b11f39f407dbce` — XTRA premium button drawable.
+- `47d52d39053d7f1967cb40dd433070f0ac479710` — XTRA graphite input drawable.
+- Earlier UI/security commits remain in branch history: `b90a11050a68f345ebb8c673879795b528011c8f`, `2fdcdef3b90f7eb49503c58f04e389c03361a2ba`, `f8575bc77196e836b240128f7cf1c42edabdce50`.
 
-GitHub Actions verified after the checkpoint:
-- Android APK MVP run `34318548361` / run #151: **SUCCESS**.
+## Previous CI evidence
+- Android APK MVP run `34318548361` / #151: **SUCCESS**.
   - Production App API smoke test: SUCCESS.
   - Gradle `:app:assembleDebug --no-daemon`: SUCCESS.
   - APK output verification: SUCCESS.
   - Artifact upload: SUCCESS.
-- Deploy Cloudflare Worker run `34318548282` / run #224: **VALIDATION SUCCESS**.
+- Deploy Cloudflare Worker run `34318548282` / #224: **VALIDATION SUCCESS**.
   - JavaScript syntax/tests: SUCCESS.
   - Cloudflare credential resolution: SUCCESS.
   - Wrangler dry-run validation: SUCCESS.
-  - Production deploy job: **SKIPPED**, because this refactor branch is not a production-deploy branch.
+  - Production deploy job: **SKIPPED** because this refactor branch is not a production-deploy branch.
 
-These results verify CI/build validation for the checkpoint. They do **not** constitute physical-device validation or production Worker deployment.
+## Current verification gate
+The commits after run #151 must receive fresh GitHub Actions verification before claiming the new UI build passes. No production deployment is implied by this refactor.
 
 ## Runtime gate still required
 Physical Android device regression on Samsung S21 Ultra: launch → credentials persistence → navigation → API health → Dashboard → Kho xe → Leads → Thêm xe + AI → gallery/edit → Ask AI Agent → return navigation.
 
 ## Multi-AI handoff rules
 1. Read this checkpoint and `android/DESIGN_XTRA.md` before changing UI.
-2. Preserve the black/gold/jade design tokens and security boundaries.
+2. Preserve black/gold/jade design tokens and security boundaries.
 3. Never commit real Cloudflare/GitHub tokens.
 4. Never inject provider credentials into WebView/chat.
 5. Do not invent production API endpoints.
@@ -61,13 +68,12 @@ Physical Android device regression on Samsung S21 Ultra: launch → credentials 
 9. Windows 10 PowerShell is the operator environment; no Wrangler installation in Termux is required.
 
 ## PR state
-PR #51 remains **OPEN / DRAFT / NOT MERGED**. Head is `f8575bc77196e836b240128f7cf1c42edabdce50`; mergeability reported by GitHub is `true`. No merge action has been taken.
+PR #51 remains **OPEN / DRAFT / NOT MERGED**. Its head branch is `refactor/apk-architecture-v1`. Merge action is not authorized by this step and has not been taken.
 
 ## Next ordered work
-1. ~~Check CI for this commit.~~ **VERIFIED PASS**.
-2. Fix compile/lint/runtime issues if CI reports any. **No CI failure currently reported.**
-3. Convert MainActivity operational screens to the XTRA visual hierarchy without changing API contracts.
-4. Add/verify accessible navigation and touch targets.
-5. Run physical-device regression on S21 Ultra when a device run is available.
-6. Update this checkpoint with evidence.
-7. Only then evaluate PR #51 readiness.
+1. Verify fresh CI for the latest UI commits.
+2. Fix any compile/lint/runtime failures immediately if reported.
+3. If CI passes, perform the physical-device regression gate.
+4. Then evaluate a deeper MainActivity section/navigation refactor only if it materially improves usability without API changes.
+5. Update this checkpoint with fresh evidence.
+6. Only then evaluate PR #51 readiness; do not merge without explicit approval.
