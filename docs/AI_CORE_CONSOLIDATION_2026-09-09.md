@@ -69,6 +69,16 @@ Acceleration rules:
 6. Use Workers AI selectively for high-value runtime tasks: chat reasoning, vehicle interpretation, validation assistance and structured classification.
 7. Do not create speculative model bindings, secrets or model IDs without evidence from the repository/Cloudflare configuration.
 
+## Execution checkpoint
+
+- Consolidation branch created from current `main`.
+- Workers AI primary path verified in `src/ai-chat.js` using native `env.AI.run(...)`.
+- Primary model verified as `@cf/zai-org/glm-4.7-flash`.
+- Fallback verified as `@cf/meta/llama-3.2-3b-instruct`.
+- Operator reported Workers AI usage at `0/10k neurons today`; this value is recorded as runtime state and is not independently read from the private dashboard.
+- No Cloudflare credentials, secrets, routes, domains or production bindings changed.
+- No historical A1-A5 branch has been merged blindly.
+
 ## Safety gates
 
 - No Cloudflare credential changes.
@@ -90,6 +100,6 @@ Acceleration rules:
 
 ## Current status
 
-**IN PROGRESS — consolidation branch created.**
+**READY FOR FINAL CODE-LEVEL RECONCILIATION AND VALIDATION.**
 
-No historical A1-A5 branch has been merged into this branch. The production `main` remains authoritative.
+The production `main` remains authoritative.
