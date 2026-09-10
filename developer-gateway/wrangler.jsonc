@@ -5,11 +5,16 @@
   "compatibility_date": "2026-08-11",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
+  "ai": {
+    "binding": "AI"
+  },
   "vars": {
     "GATEWAY_MODE": "readonly",
     "PRODUCTION_MUTATIONS_ENABLED": "false",
     "AI_PEER_FAILOVER_ENABLED": "true",
-    "AI_PEER_POLICY_VERSION": "1"
+    "AI_PEER_POLICY_VERSION": "2",
+    "UNIFIED_AI_ENABLED": "true",
+    "UNIFIED_AI_MODEL": "@cf/meta/llama-3.1-8b-instruct"
   }
   // Set GATEWAY_READ_TOKEN as a Cloudflare secret; never commit it.
   // Set GATEWAY_ALLOWED_ORIGINS as a secret/variable with exact APK/web origins.
