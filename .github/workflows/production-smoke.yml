@@ -106,3 +106,5 @@ jobs:
           else
             echo 'Authenticated XTRA Unified AI smoke: BLOCKED by missing GitHub GATEWAY_READ_TOKEN secret.'
           fi
+
+# Verification trigger: run after gateway credential rotation; never contains secret material.
