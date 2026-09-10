@@ -8,9 +8,11 @@ function dbWithChanges(changes){
   } };
 }
 
+const brandedPlate = { x:0.1, y:0.7, width:0.2, height:0.1 };
 assert.equal(await claimInbox({DB:dbWithChanges(1)},42),true,"a received row must be claimed exactly once");
 assert.equal(await claimInbox({DB:dbWithChanges(0)},42),false,"a duplicate/concurrent delivery must not be claimed");
-assert.equal(canAutoPublish({brand:"BMW",model:"X5",confidence:.85}),true);
-assert.equal(canAutoPublish({brand:"BMW",model:"X5",confidence:.849}),false);
-assert.equal(canAutoPublish({brand:"BMW",model:"",confidence:.99}),false);
-console.log("telegram ingest single-flight tests passed");
+assert.equal(canAutoPublish({brand:"BMW",model:"X5",confidence:.85,plate_bbox:brandedPlate}),true);
+assert.equal(canAutoPublish({brand:"BMW",model:"X5",confidence:.849,plate_bbox:brandedPlate}),false);
+assert.equal(canAutoPublish({brand:"BMW",model:"",confidence:.99,plate_bbox:brandedPlate}),false);
+assert.equal(canAutoPublish({brand:"BMW",model:"X5",confidence:.99,plate_bbox:null}),false);
+console.log("telegram ingest single-flight + branding gate tests passed");
