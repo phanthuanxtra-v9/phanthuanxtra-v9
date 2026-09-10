@@ -120,3 +120,12 @@ Cập nhật cuối file này:
 
 ## 12. IMPORTANT SECURITY NOTE
 Never place actual `ADMIN_TOKEN`, Cloudflare API tokens, GitHub PATs, Telegram bot tokens, OpenAI keys or other secrets in this file. Use GitHub/Cloudflare secret stores and reference only variable names.
+
+
+## ADMIN CONTINUITY SYNC — 2026-09-10
+- Canonical Admin distinction: `admin.phanthuanxtra.com` is the PHAN THUAN XTRA vehicle/content publishing Admin; `ask-ai-agent.phanthuanmodelactor.workers.dev/admin` is Ask AI Admin and must remain a separate security/runtime boundary.
+- Current Cloudflare CI hardening is tracked in PR #61: production deploy job explicitly targets GitHub Environment `production`; no secret values are documented.
+- GitHub production secrets reported by owner: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`; backup token also exists. Never record values.
+- Admin acceptance path: auth → dashboard → vehicle CRUD → media upload/ordering → publish → public website → API/D1/R2 → Android/S21 regression.
+- Evidence rule: do not claim `admin.phanthuanxtra.com` production health or credentials until runtime/domain mapping is directly verified.
+- Next AI: read this section plus current `main`, PR #61, and latest workflow evidence before modifying Admin.
