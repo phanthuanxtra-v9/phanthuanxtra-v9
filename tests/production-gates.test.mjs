@@ -1,4 +1,5 @@
 import test from 'node:test';
+import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import { canAutoPublish } from '../src/telegram-ingest.js';
 import { handleAiChat } from '../src/ai-chat.js';
@@ -83,4 +84,10 @@ test('production gate: malformed media key is rejected with 400, not an uncaught
   assert.equal(response.status, 400);
   assert.equal(data.error, 'Invalid media key');
   assert.equal(getCalled, false);
+});
+
+
+test('production gate: hidden vehicles are excluded from public catalog query', async () => {
+  const src = fs.readFileSync(new URL('../src/index.js', import.meta.url),'utf8');
+  assert.match(src,/SELECT \* FROM cars WHERE status <> 'hidden'/);
 });
