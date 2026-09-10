@@ -66,6 +66,6 @@ Do not create duplicates unless direct evidence proves the existing resource can
 ## Last registry update
 - Date: 2026-09-10
 - Agent: ChatGPT
-- Registry checkpoint: `f9f8024fa7afc18a452e6793e607a02afe51fba1`
+- Registry checkpoint: `678e8258f0465630403b36c39213b51663e454e2`
 - Admin Cloudflare Version: `d32431ad-fb43-4ad9-83d5-27876cad7f1b`
 - Blocker: public `/admin` = HTTP 403.
