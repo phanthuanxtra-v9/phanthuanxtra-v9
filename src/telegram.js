@@ -23,7 +23,7 @@ function buildCaption(car,aiCopy=""){
   out+=`\n📞 <b>LIÊN HỆ</b>\nPhan Thuần Xtra\n0866 997 891\n🌐 phanthuanxtra.com`;return out.slice(0,1024);
 }
 async function imagesFor(db,carId){try{const q=await db.prepare("SELECT url FROM car_images WHERE car_id=? ORDER BY sort_order,id").bind(carId).all();return(q.results||[]).map(x=>clean(x.url)).filter(x=>/^https?:\/\//i.test(x)).slice(0,30)}catch{return[]}}
-function isBrandedMediaUrl(url){return /^https:\/\/phanthuanxtra\.com\/media\/vehicles\/publish-[a-z0-9._-]+\.jpg$/i.test(clean(url));}
+function isBrandedMediaUrl(url){const value=clean(url);return /^https:\/\/phanthuanxtra\.com\/media\/vehicles\/publish-[a-z0-9._-]+\.jpg$/i.test(value);}
 async function publishCar(env,carId,{force=false,requireBranded=false}={}){
   if(!env.DB)throw new Error("D1 chưa được kết nối");const car=await env.DB.prepare("SELECT * FROM cars WHERE id=?").bind(carId).first();if(!car)throw new Error("Không tìm thấy xe");if(car.status==='hidden')throw new Error("Xe đang ở trạng thái hidden, không được đăng Telegram");
   const existing=await env.DB.prepare("SELECT * FROM telegram_posts WHERE car_id=?").bind(carId).first();if(existing?.status==='published'&&!force)return{duplicate:true,post:existing};if(existing?.status==='pending'&&!force){const age=Date.now()-Date.parse(existing.updated_at||existing.created_at||0);if(age<300000)throw new Error("Bài đăng đang được xử lý, vui lòng thử lại sau")}
