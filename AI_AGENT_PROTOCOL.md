@@ -2,31 +2,44 @@
 
 ## 1. Purpose
 
-This repository is a shared codebase worked on by the owner, Arena Agent, GPT-5.6 Luna, and peer AI agents (AI1–AI5). All agents are peers. No agent is the owner or architectural authority by default.
+This repository is a shared codebase worked on by the owner, Arena Agent, GPT-5.6 Luna, and peer AI agents (AI1–AI5), including AI inference executed through Cloudflare Workers AI. All agents are peers. No agent is the owner or architectural authority by default.
 
 The goal is to make changes safely, reproducibly, and without overwriting valid work from another agent.
 
-## 2. Source of truth
+## 2. Mandatory preflight / source of truth
 
 The source of truth is the Git repository and the current state of `main` plus its pull requests.
 
-**Coordination gate:** before any implementation, every AI MUST read `AI-WORK-REGISTRY.md`. It is the first document for collision control and active-work ownership. It records which logical tasks already have an implementation path and which Markdown files are historical.
+**HARD COORDINATION GATE — applies to EVERY AI, including every Cloudflare Workers AI model invocation:**
 
-Then read:
+Before an AI is allowed to analyze a task, propose an implementation, modify code, create a branch, or mutate infrastructure, it MUST first read:
 
-- `AI-HANDOFF-CHECKPOINT.md`
-- `MASTER_CONTEXT_PHAN_THUAN.md`
-- `project-docs/PROJECT_STATE.md` (if present; reconcile against current main because it may be historical)
-- `project-docs/AI_HANDOFF.md` (if present; reconcile against current main)
-- `TODO.md` (if present)
-- `CHANGELOG.md` (if present)
-- `BUGS.md` (if present)
-- `ARCHITECTURE.md` (if present)
-- `DEPLOYMENT.md` (if present)
+1. `AI-WORK-REGISTRY.md` — mandatory first read for collision control and active ownership;
+2. `AI_AGENT_PROTOCOL.md` — this protocol;
+3. `AI-HANDOFF-CHECKPOINT.md`;
+4. `MASTER_CONTEXT_PHAN_THUAN.md`;
+5. any applicable current-state documents listed below;
+6. the current `main` state and relevant open PRs before implementation.
+
+For Workers AI specifically, the registry/protocol context MUST be supplied to the model as part of the AI task context before inference is used for implementation decisions. A Workers AI call that has not received the current coordination context MUST NOT be treated as an implementation authority.
+
+Then read, when present and relevant:
+
+- `project-docs/PROJECT_STATE.md` (reconcile against current main because it may be historical)
+- `project-docs/AI_HANDOFF.md` (reconcile against current main)
+- `TODO.md`
+- `CHANGELOG.md`
+- `BUGS.md`
+- `ARCHITECTURE.md`
+- `DEPLOYMENT.md`
 
 Historical audit/session Markdown is evidence, not an executable task queue. Never execute an old document's `NEXT ACTION` merely because it exists.
 
 Never assume an old conversation or an old task description is newer than the repository.
+
+### Preflight failure rule
+
+If `AI-WORK-REGISTRY.md` cannot be read, is stale/unavailable, or conflicts materially with current `main`/open PR state, the AI MUST STOP implementation and perform reconciliation first. It may report the discrepancy, but must not create a competing implementation based on an unverified assumption.
 
 ## 3. Agent roles
 
@@ -44,9 +57,11 @@ Arena must not deploy production directly and must not push directly to `main` f
 
 GPT-5.6 Luna acts as reviewer/integration controller: inspect diffs, reason about architecture and security, verify CI, identify regressions, and decide whether a PR is ready for merge when explicitly authorized.
 
-### AI1–AI5
+### AI1–AI5 and Workers AI
 
-AI1–AI5 are peer agents working on the same project. They may inspect or modify any relevant area when necessary. Their labels describe perspectives/specializations, not hierarchy or ownership.
+AI1–AI5 and any Cloudflare Workers AI model are peer participants. Their labels/models describe perspectives or execution engines, not ownership. Every participant is bound by the same mandatory preflight gate and collision protocol.
+
+Workers AI may analyze, classify, draft, review, or recommend, but it must not independently create a second implementation path when the registry/open PR state already identifies an owner. Production mutations remain subject to the repository's CI/CD and approval gates.
 
 ## 4. Standard development flow
 
@@ -54,7 +69,8 @@ Use this flow for normal code changes:
 
 ```text
 READ AI-WORK-REGISTRY
-  -> READ CURRENT STATE / HANDOFF
+  -> READ AI_AGENT_PROTOCOL
+  -> READ CURRENT HANDOFF / MASTER CONTEXT
   -> CHECK GIT/PR STATE
   -> CHECK FOR EXISTING OWNER/PR
   -> INSPECT CODE
@@ -217,75 +233,3 @@ A handoff should state:
 - next recommended action.
 
 **For cross-AI coordination, update `AI-WORK-REGISTRY.md` with the logical workstream, branch/PR, files touched, evidence, blocker and next owner/action.**
-
-Documentation-only changes must not be described as a production deployment unless they actually triggered a production workflow.
-
-## 16. Conflict resolution
-
-If another agent has changed the same area:
-
-1. fetch the latest branch/PR state;
-2. inspect the diff;
-3. preserve valid existing behavior;
-4. merge ideas rather than blindly replacing files;
-5. rerun tests.
-
-Never overwrite another agent's work simply to make the local branch clean.
-
-**Collision rule: one logical task → one active implementation path → one release gate.**
-
-## 17. Completion standard
-
-A task is **not complete** merely because code was written.
-
-A task is complete only when the applicable evidence exists:
-
-```text
-CODE
-+ TEST
-+ CI PASS
-+ REVIEW
-+ MERGE
-+ PRODUCTION DEPLOY (when required)
-+ DOCUMENTED STATE
-```
-
-If production deployment was not required, explicitly say so.
-
-If a real external action was not performed, do not claim it was performed.
-
-## 18. Anti-hallucination rule
-
-When evidence is unavailable, say that it is unavailable.
-
-Never invent:
-
-- CI results;
-- deployment versions;
-- Telegram messages;
-- Cloudflare configuration;
-- GitHub permissions;
-- branch protection/ruleset state;
-- test results;
-- production behavior.
-
-Prefer a verified repository/tool result over memory or assumptions.
-
-## 19. Recommended commit convention
-
-Use concise conventional prefixes:
-
-- `feat:` new functionality
-- `fix:` bug fix
-- `test:` tests
-- `security:` security hardening
-- `refactor:` refactor
-- `perf:` performance
-- `docs:` documentation
-- `chore:` maintenance
-
-## 20. Final principle
-
-**Shared codebase, shared state, peer agents, one production gate.**
-
-No agent wins by overwriting another agent. The repository, tests, CI, and production evidence determine the truth.
