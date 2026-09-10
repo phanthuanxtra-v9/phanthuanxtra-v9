@@ -1,0 +1,51 @@
+name: Deploy Developer Gateway
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'developer-gateway/**'
+      - '.github/workflows/deploy-developer-gateway.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: developer-gateway-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy Developer Gateway (Production)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate gateway
+        run: node --test developer-gateway/test/index.test.mjs
+
+      - name: Resolve Cloudflare credentials and deploy gateway
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "${CLOUDFLARE_API_TOKEN:-}" || { echo 'Cloudflare API token missing'; exit 1; }
+          test -n "${CLOUDFLARE_ACCOUNT_ID:-}" || { echo 'Cloudflare account ID missing'; exit 1; }
+          npx wrangler@4.129.0 whoami
+          npx wrangler@4.129.0 deploy --config developer-gateway/wrangler.jsonc
