@@ -1,3 +1,43 @@
+<div id="login">
+
+<h1>Đăng nhập quản trị</h1>
+
+<p class="notice">
+Mật khẩu quản trị được xác thực an toàn.
+Phiên đăng nhập được lưu trong session trình duyệt.
+</p>
+
+<label for="password">
+ADMIN PASSWORD
+</label>
+
+<input
+  id="password"
+  type="password"
+  autocomplete="current-password"
+  placeholder="Nhập mật khẩu quản trị"
+/>
+
+<button id="loginBtn" type="button">
+Đăng nhập
+</button>
+
+<div id="loginMsg" class="statusline"></div>
+
+</div>
+
+
+<div id="app" class="hidden">
+
+<button id="logout" type="button">
+Đăng xuất
+</button>
+
+</div>
+
+
+<script>
+
 let token = sessionStorage.getItem('ptx_admin_token') || '';
 
 let password = '';
@@ -6,148 +46,121 @@ let leads = [];
 let editing = null;
 let photos = [];
 
-function msg(id, text, ok=false){
-  const el = document.querySelector(id);
-  if(!el) return;
-  el.textContent = text;
-  el.className = 'statusline ' + (ok ? 'ok' : 'err');
+
+function msg(id,text,ok=false){
+
+ const el=document.querySelector(id);
+
+ if(!el)return;
+
+ el.textContent=text;
+
+ el.className='statusline '+(ok?'ok':'err');
+
 }
+
 
 async function login(){
 
-  const input = document.querySelector('#password');
+ const input=document.querySelector('#password');
 
-  if(!input){
-    console.error('Không tìm thấy ô password');
-    return;
-  }
+ if(!input){
 
-  const password = input.value.trim();
+   console.error('Không tìm thấy ô password');
 
-  if(!password){
-    msg('#loginMsg','Vui lòng nhập mật khẩu');
-    return;
-  }
+   return;
 
-  try {
-
-    const res = await fetch('/api/admin/login',{
-      method:'POST',
-      headers:{
-        'Content-Type':'application/json'
-      },
-      body:JSON.stringify({
-        password
-      })
-    });
+ }
 
 
-    const data = await res.json();
+ const password=input.value.trim();
 
 
-    if(!res.ok || !data.ok){
+ if(!password){
 
-      msg(
-        '#loginMsg',
-        data.error || 'Sai mật khẩu'
-      );
+   msg('#loginMsg','Vui lòng nhập mật khẩu');
 
-      return;
-    }
+   return;
+
+ }
 
 
-    sessionStorage.setItem(
-      'ptx_admin_token',
-      data.token
-    );
+ try{
 
 
-    token = data.token;
+ const res=await fetch('/api/admin/login',{
+
+   method:'POST',
+
+   headers:{
+    'Content-Type':'application/json'
+   },
+
+   body:JSON.stringify({
+    password
+   })
+
+ });
 
 
-    location.href='/admin.html?v='+Date.now();
+ const data=await res.json();
 
 
-  } catch(err){
+ if(!res.ok || !data.ok){
 
-    msg(
-      '#loginMsg',
-      'Lỗi kết nối máy chủ'
-    );
+   msg(
+    '#loginMsg',
+    data.error || 'Sai mật khẩu'
+   );
 
-    console.error(err);
+   return;
 
-  }
-
-}
+ }
 
 
-async function api(path,opt={}){
-
-  if(!token){
-    throw new Error('Chưa đăng nhập');
-  }
-
-
-  opt.headers={
-    ...(opt.headers||{}),
-    'Authorization':'Bearer '+token
-  };
+ sessionStorage.setItem(
+  'ptx_admin_token',
+  data.token
+ );
 
 
-  if(opt.body && !opt.headers['Content-Type']){
-    opt.headers['Content-Type']='application/json';
-  }
+ token=data.token;
 
 
-  const res=await fetch(
-    path,
-    opt
-  );
+ location.href='/admin.html?v='+Date.now();
 
 
-  const data=await res.json()
-    .catch(()=>({}));
+ }catch(err){
 
+   msg(
+    '#loginMsg',
+    'Lỗi kết nối máy chủ'
+   );
 
-  if(!res.ok){
+   console.error(err);
 
-    if(res.status===401){
-
-      sessionStorage.removeItem(
-        'ptx_admin_token'
-      );
-
-      location.reload();
-
-    }
-
-
-    throw new Error(
-      data.error || 'Lỗi server'
-    );
-  }
-
-
-  return data;
+ }
 
 }
+
 
 
 function logout(){
 
-  sessionStorage.removeItem(
-    'ptx_admin_token'
-  );
+ sessionStorage.removeItem(
+  'ptx_admin_token'
+ );
 
-  location.reload();
+ location.reload();
 
 }
+
 
 
 document.addEventListener(
 'DOMContentLoaded',
 ()=>{
+
 
  const btn=document.querySelector('#loginBtn');
 
@@ -156,6 +169,7 @@ document.addEventListener(
    btn.onclick=login;
 
  }
+
 
 
  const pass=document.querySelector('#password');
@@ -174,6 +188,7 @@ document.addEventListener(
  }
 
 
+
  const logoutBtn=document.querySelector('#logout');
 
  if(logoutBtn){
@@ -184,3 +199,5 @@ document.addEventListener(
 
 
 });
+
+</script>
