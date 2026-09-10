@@ -56,9 +56,59 @@ Do not create a second Admin-specific masking AI. Reuse the existing Vehicle AI 
 - Vehicle posts must use their dedicated vehicle page/route.
 - Other project content areas must retain their dedicated routes/pages; do not duplicate existing page implementations.
 
-## APK
-- Android build pipeline is part of the release gate.
-- APK must consume the same production API/AI contract as Admin and Telegram flows; do not fork plate-branding logic into the APK.
+## APK — CURRENT PROJECT PROGRESS
+### Latest recorded verified APK milestone
+- Application ID: `com.phanthuanxtra.app`
+- APK version: `1.1.0`
+- `versionCode`: `2`
+- `minSdk`: `26`
+- `targetSdk`: `35`
+- INTERNET permission: enabled.
+- Android App API base: `https://phanthuanxtra.com/api/app/v1`
+- Latest recorded APK source commit: `d3859fc06b5a5c69218883699b4c994558567e02`.
+- Latest recorded Android workflow run: `34090103902` (run number `14`).
+- Recorded build result: **SUCCESS**.
+- Recorded artifact: `phanthuanxtra-apk-debug`.
+- Recorded artifact ID: `10006523773`.
+- Recorded artifact digest: `sha256:60193bf938a38800e0d5d16be5e51e9be72291cd602cafcd88986220535ca76a`.
+- Real-device gate: **S21 Ultra installation + production test USER-CONFIRMED PASS**.
+
+### APK capabilities recorded as implemented
+- Save APP API token locally.
+- Connection/health check.
+- Dashboard.
+- Vehicle inventory (`KHO XE`).
+- Leads/customer list (`KHÁCH HÀNG / LEADS`).
+- Add vehicle using photo picker + Vehicle AI.
+- Upload vehicle image to production media storage.
+- Create vehicle record in production D1 through App API.
+- Open `phanthuanxtra.com` directly.
+
+### APK architecture / release rules
+- APK must consume the same production API/AI contract as Admin and Telegram flows.
+- Plate detection/branding logic must remain in the shared vehicle pipeline; do not fork a second APK-specific masking AI.
+- Production APK releases remain subject to GitHub Actions validation/build gates.
+- A successful CI build alone does **not** equal real-device acceptance; S21 Ultra installation and production exercise must be verified separately.
+- Current APK milestone is an operational MVP/management foundation, not the final management feature set.
+
+### APK next-stage hardening
+- Vehicle detail/edit form.
+- Create/update/delete vehicle workflow.
+- Status changes: available / reserved / sold.
+- Delete with explicit confirmation.
+- Featured toggle.
+- Image gallery management.
+- Lead status and note editing.
+- Search/filter.
+- Retry/offline/error UX.
+- Token validation and clearer authentication failure messages.
+- Production-safe validation before destructive operations.
+- End-to-end verification against the current production Worker after each material API/pipeline change.
+
+### APK verification boundary
+- The repository records the latest APK build and the user-confirmed S21 Ultra production test above.
+- This checkpoint does **not** claim a new APK build/deployment on 2026-09-10 unless a new GitHub Actions run is independently verified.
+- Any AI continuing APK work must first inspect current `main`, relevant Android source/workflows and open PR ownership before changing code.
 
 ## CLOUDFARE RESOURCES — SINGLE INSTANCE
 Verified resource names:
@@ -78,7 +128,8 @@ Verified resource names:
 4. **Dedicated pages:** continue existing PR #55 path.
 5. **VIP document ingestion:** continue existing PR #66 path; PR #37 is superseded.
 6. **Production runtime health:** continue PR #49 path.
-7. **Backup:** verify real backup + restore/readability; do not create another backup workflow.
+7. **APK:** continue mobile management hardening on the existing APK/App API path; preserve the verified S21 Ultra gate and shared production API/AI contract.
+8. **Backup:** verify real backup + restore/readability; do not create another backup workflow.
 
 ## SECURITY
 Never place actual ADMIN_TOKEN, Cloudflare API tokens, GitHub PATs, Telegram bot tokens, OpenAI keys or other secrets in Markdown. Store secrets in the appropriate secret manager and record only variable names/purpose.
@@ -86,8 +137,8 @@ Never place actual ADMIN_TOKEN, Cloudflare API tokens, GitHub PATs, Telegram bot
 ## LAST HANDOFF
 - `LAST_UPDATE_UTC`: 2026-09-10
 - `LAST_AI`: ChatGPT
-- `LAST_COMMIT`: `92adf1495459e28b918d77c61700a1de7c2a7113`
-- `COMPLETED`: PR #70 merged; Admin CRUD connected to shared AI/PT Xtra pipeline; production deployment verified through GitHub Actions.
-- `VERIFIED`: CI/Validate SUCCESS; production Worker deployment SUCCESS; current Cloudflare version evidence `95f7d512-4f27-4336-a4a2-570583e195cf`.
+- `LAST_COMMIT`: documentation update following `92adf1495459e28b918d77c61700a1de7c2a7113`
+- `COMPLETED`: PR #70 merged; Admin CRUD connected to shared AI/PT Xtra pipeline; production deployment verified through GitHub Actions; APK progress and latest recorded S21 Ultra gate documented in this checkpoint.
+- `VERIFIED`: CI/Validate SUCCESS; production Worker deployment SUCCESS; current Cloudflare version evidence `95f7d512-4f27-4336-a4a2-570583e195cf`; latest recorded APK build SUCCESS and S21 Ultra production test USER-CONFIRMED PASS.
 - `BLOCKERS`: Current execution environment cannot resolve `phanthuanxtra.com`, so direct HTTP production verification cannot be completed here. Historical `/admin` 403 remains unresolved until externally reachable smoke test.
-- `NEXT_ACTION`: External/reachable production smoke test for `/admin` + `/admin.html` + Admin APIs and real upload. Only after that mark Admin production GREEN or diagnose edge 403.
+- `NEXT_ACTION`: Continue existing APK management-hardening path in parallel with production Admin verification and existing PR workstreams. Do not create a duplicate APK/API/AI pipeline.
