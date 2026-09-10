@@ -2,114 +2,52 @@ import process from 'node:process';
 
 const instruction = process.env.MULTI_AI_INSTRUCTION?.trim();
 const taskId = process.env.TASK_ID?.trim() || 'unknown';
-const requestedAgent = process.env.AI_PEER_AGENT?.trim() || 'all';
+const gatewayUrl = (process.env.UNIFIED_AI_GATEWAY_URL || 'https://phanthuanxtra-developer-gateway.phanthuanmodelactor.workers.dev').replace(/\/$/, '');
+const gatewayToken = process.env.GATEWAY_READ_TOKEN?.trim();
 
-if (!instruction) {
-  throw new Error('MULTI_AI_INSTRUCTION is required');
-}
+if (!instruction) throw new Error('MULTI_AI_INSTRUCTION is required');
+if (!gatewayToken) throw new Error('GATEWAY_READ_TOKEN is required');
 
 const timeoutMs = Number(process.env.MULTI_AI_TIMEOUT_MS || 30000);
-const maxOutputChars = Number(process.env.MULTI_AI_MAX_OUTPUT_CHARS || 12000);
+const controller = new AbortController();
+const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-function clip(value) {
-  return String(value ?? '').slice(0, maxOutputChars);
-}
+try {
+  const response = await fetch(`${gatewayUrl}/v1/ai/unified`, {
+    method: 'POST',
+    signal: controller.signal,
+    headers: {
+      authorization: `Bearer ${gatewayToken}`,
+      'content-type': 'application/json',
+      'user-agent': 'phanthuanxtra-unified-ai-worker'
+    },
+    body: JSON.stringify({
+      task_id: taskId,
+      mode: 'audit',
+      instruction
+    })
+  });
 
-async function requestJson(url, options) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
-    const text = await response.text();
-    let body;
-    try { body = JSON.parse(text); } catch { body = { raw: text }; }
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${clip(JSON.stringify(body))}`);
-    }
-    return body;
-  } finally {
-    clearTimeout(timer);
+  const text = await response.text();
+  let body;
+  try { body = JSON.parse(text); } catch { body = { raw: text }; }
+
+  if (!response.ok || body?.ok !== true) {
+    throw new Error(`Unified AI HTTP ${response.status}: ${String(JSON.stringify(body)).slice(0, 4000)}`);
   }
+
+  const report = {
+    schema: 'phanthuanxtra.unified-ai-review.v1',
+    task_id: taskId,
+    logical_agent: body.logical_agent || 'xtra-unified-ai',
+    engine: body.engine || 'cloudflare-workers-ai',
+    model: body.model || null,
+    production_mutation: false,
+    independent_peer_workers: 0,
+    response: String(body.response || '').slice(0, 12000)
+  };
+
+  console.log(JSON.stringify(report, null, 2));
+} finally {
+  clearTimeout(timer);
 }
-
-async function openAiCompatible({ name, baseUrl, apiKey, model, system }) {
-  if (!baseUrl || !apiKey) {
-    return { name, status: 'not_configured' };
-  }
-  const url = `${baseUrl.replace(/\\/$/, '')}/chat/completions`;
-  try {
-    const body = await requestJson(url, {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        'content-type': 'application/json',
-        'user-agent': 'phanthuanxtra-multi-ai-worker'
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0.1,
-        max_tokens: 1800,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: instruction }
-        ]
-      })
-    });
-    const content = body?.choices?.[0]?.message?.content ?? body?.output?.[0]?.content ?? '';
-    return { name, status: 'ok', model, response: clip(content) };
-  } catch (error) {
-    return { name, status: 'error', model, error: clip(error.message) };
-  }
-}
-
-const common = `You are a peer AI worker for the PHAN THUAN XTRA production repository.
-Continue the supplied task from the existing GitHub Markdown checkpoint.
-Do not modify files, deploy production, expose secrets, or invent test results.
-Return concise findings with severity (critical/high/medium/low), evidence, concrete recommendations, and an explicit next checkpoint.
-Repository: phanthuanxtra-v9/phanthuanxtra-v9.`;
-
-const allWorkers = {
-  mistral: openAiCompatible({
-    name: 'mistral-code-engineer',
-    baseUrl: 'https://api.mistral.ai/v1',
-    apiKey: process.env.MISTRAL_API_KEY,
-    model: process.env.MISTRAL_MODEL || 'mistral-large-latest',
-    system: `${common}\nRole: implementation/code engineer. Focus on JavaScript, Cloudflare Workers, APIs, tests, race conditions, and minimal safe patches.`
-  }),
-  gemma: openAiCompatible({
-    name: 'gemma-test-engineer',
-    baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
-    apiKey: process.env.GEMINI_API_KEY,
-    model: process.env.GEMMA_MODEL || 'gemma-4-31b-it',
-    system: `${common}\nRole: test engineer. Focus on regression coverage, edge cases, API contracts, Android integration, and reproducible acceptance tests.`
-  }),
-  llama: openAiCompatible({
-    name: 'llama-security-reviewer',
-    baseUrl: process.env.LLAMA_BASE_URL,
-    apiKey: process.env.LLAMA_API_KEY,
-    model: process.env.LLAMA_MODEL || 'llama',
-    system: `${common}\nRole: independent security and reliability engineer. Focus on authentication, authorization, secret handling, prompt injection, idempotency, concurrency, and production blast radius.`
-  })
-};
-
-const selected = requestedAgent === 'all'
-  ? Object.values(allWorkers)
-  : [allWorkers[requestedAgent] || { name: requestedAgent, status: 'invalid_agent' }];
-
-const results = await Promise.all(selected);
-const configured = results.filter(item => item.status !== 'not_configured').length;
-const successful = results.filter(item => item.status === 'ok').length;
-
-const report = {
-  schema: 'phanthuanxtra.multi-ai-review.v2',
-  task_id: taskId,
-  requested_agent: requestedAgent,
-  generated_at: new Date().toISOString(),
-  configured_workers: configured,
-  successful_workers: successful,
-  production_mutation: false,
-  openai_calls: 0,
-  workers: results
-};
-
-console.log(JSON.stringify(report, null, 2));
