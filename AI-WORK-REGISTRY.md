@@ -22,7 +22,7 @@ If two documents conflict, prefer current repository/source/CI evidence; do not 
 - Repository: `phanthuanxtra-v9/phanthuanxtra-v9`
 - Production Worker: `phanthuanxtra-v2`
 - Mainline contains Admin `/admin` route fix merge `fc1617479aefa0e9b98b4afe1624f5b01b338187`.
-- Latest documentation/coordination commits include `778c7dced7bafdc0d1780d548ac90484f9161048` and `9895da9578147892173f81c6fe04abccd356b43d`.
+- Latest coordination commit: `b34492e71748882fe22fc7d896013a3e7d5e3d41`.
 - Cloudflare deployment for the Admin route fix was independently verified successful with Version ID `d32431ad-fb43-4ad9-83d5-27876cad7f1b`.
 - Public `https://phanthuanxtra.com/admin` still returns HTTP 403 after that deployment. **Production is therefore not GREEN for Admin.**
 - Do not repeat the Worker `/admin` route-code fix before checking the Cloudflare edge/custom-domain/Access/WAF/route layer.
@@ -158,7 +158,7 @@ No secret values. No unsupported deployment claims.
 
 - Date: 2026-09-10
 - Agent: ChatGPT
-- Mainline docs commits: `778c7dced7bafdc0d1780d548ac90484f9161048`, `9895da9578147892173f81c6fe04abccd356b43d`
+- Mainline coordination commit: `b34492e71748882fe22fc7d896013a3e7d5e3d41`
 - Admin production deployment evidence: Cloudflare Version `d32431ad-fb43-4ad9-83d5-27876cad7f1b`
 - Current blocker: public `/admin` returns HTTP 403.
 - Next owner: Release/Production AI (or any AI with Cloudflare edge access) to inspect the edge/custom-domain path before any further Admin route-code changes.
