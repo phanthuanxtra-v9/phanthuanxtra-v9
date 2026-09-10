@@ -448,3 +448,23 @@ Do not invent unsupported Cloudflare APIs. If a platform capability is unavailab
 - Production changes go through GitHub/CI/Cloudflare deployment controls.
 - Do not call Telegram `setWebhook` or mutate Cloudflare configuration merely during diagnosis unless explicitly authorized.
 - Never mark a backup as successful merely because files were copied; verify readability/integrity and, for a recovery milestone, restore a test copy.
+
+
+## HANDOFF-20260910-ADMIN-CONTINUITY
+**Current AI:** ChatGPT
+
+**Admin boundary correction:**
+- `admin.phanthuanxtra.com` = PHAN THUAN XTRA Content/Admin Portal for vehicle listings and website publishing.
+- `ask-ai-agent.phanthuanmodelactor.workers.dev/admin` = Ask AI Admin; it is a separate AI operations surface.
+- Do not merge these domains, routes, authentication models, or runtime assumptions.
+
+**Current CI/security work:**
+- PR #61 adds `environment: production` to the Cloudflare production deploy job so GitHub Environment `production` controls production mutation.
+- Owner reports production environment and repository Cloudflare secrets exist; secret values must never enter Markdown.
+
+**Admin production acceptance:**
+`admin domain → DNS/custom domain → Worker/Pages → auth → Admin API → D1/R2 → publish → public site → Android/S21`
+
+**Evidence boundary:** direct runtime/domain mapping for `admin.phanthuanxtra.com` is not yet independently verified in the current tool session. Do not invent Worker, binding, credential, or deployment information.
+
+**Next actions:** verify PR #61 CI; then use fresh production evidence to trace Admin runtime/API/security/UX and update this handoff after each meaningful change.
