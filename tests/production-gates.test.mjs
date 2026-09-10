@@ -35,10 +35,10 @@ function mockDb() {
 
 const plate = { x:0.42, y:0.58, width:0.16, height:0.06 };
 
-test('production gate: Telegram auto-publish requires identity + confidence >= 0.85, not PT Xtra plate detection', () => {
+test('production gate: Telegram auto-publish requires identity + confidence >= 0.85 and a valid PT Xtra plate bbox', () => {
   assert.equal(canAutoPublish({ brand:'Lexus', model:'LX 600', confidence:0.85, plate_bbox:plate }), true);
-  assert.equal(canAutoPublish({ brand:'Lexus', model:'LX 600', confidence:0.85, plate_bbox:null }), true);
-  assert.equal(canAutoPublish({ brand:'Lexus', model:'LX 600', confidence:0.85 }), true);
+  assert.equal(canAutoPublish({ brand:'Lexus', model:'LX 600', confidence:0.85, plate_bbox:null }), false);
+  assert.equal(canAutoPublish({ brand:'Lexus', model:'LX 600', confidence:0.85 }), false);
   assert.equal(canAutoPublish({ brand:'Lexus', model:'LX 600', confidence:0.849, plate_bbox:plate }), false);
   assert.equal(canAutoPublish({ brand:'Lexus', model:null, confidence:0.99, plate_bbox:plate }), false);
   assert.equal(canAutoPublish({ brand:null, model:'LX 600', confidence:0.99, plate_bbox:plate }), false);
