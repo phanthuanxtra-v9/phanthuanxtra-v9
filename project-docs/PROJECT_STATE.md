@@ -40,3 +40,11 @@
 
 ### Agent model
 AI1–AI5 are equal peer agents. Specializations are perspectives, not hierarchy or ownership.
+
+
+## Admin publishing boundary — 2026-09-10
+- Canonical publishing Admin: `https://admin.phanthuanxtra.com/`.
+- Ask AI Admin is separate: `https://ask-ai-agent.phanthuanmodelactor.workers.dev/admin`.
+- Treat them as separate applications/security boundaries.
+- Current Admin work must be evidence-driven: domain mapping, runtime deployment, API, D1/R2, authentication, publishing, security, UX, tests, and Android/S21 regression.
+- Do not claim Admin production health or credentials without direct evidence.
