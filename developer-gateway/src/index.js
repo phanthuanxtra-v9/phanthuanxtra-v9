@@ -1,4 +1,5 @@
 const MAX_INSTRUCTION_LENGTH = 12000;
+const MAX_CONTEXT_LENGTH = 12000;
 
 const REPOSITORY = 'phanthuanxtra-v9/phanthuanxtra-v9';
 const DEFAULT_BRANCH = 'main';
@@ -21,6 +22,7 @@ const MODES = new Set([
  * - Branch is hard-pinned to main.
  * - audit/test use the zero-cost GitHub Actions workflow and never call OpenAI.
  * - propose-fix is delegated to the Codex GitHub Actions workflow.
+ * - unified AI uses the Cloudflare Workers AI binding as the shared inference engine.
  * - Production deploy/rollback remain disabled.
  * - Secrets are never returned in API responses.
  */
@@ -129,10 +131,96 @@ function productionMutationsEnabled(env) {
   return env.PRODUCTION_MUTATIONS_ENABLED === 'true';
 }
 
+function unifiedAiEnabled(env) {
+  return env.UNIFIED_AI_ENABLED !== 'false';
+}
+
 function workflowForMode(mode) {
   return mode === 'propose-fix'
     ? CODEX_WORKFLOW
     : ZERO_COST_WORKFLOW;
+}
+
+/**
+ * Single logical AI façade.
+ *
+ * The five-agent architecture is collapsed at the application boundary:
+ * ChatGPT coordinates, while Mistral/Gemma/Llama remain specialist peer
+ * roles and Cloudflare Workers AI supplies the shared inference/failover
+ * engine. This endpoint deliberately does not grant production mutation.
+ */
+async function runUnifiedAi(env, task) {
+  if (!unifiedAiEnabled(env)) {
+    return {
+      ok: false,
+      error: 'unified_ai_disabled'
+    };
+  }
+
+  if (!env.AI || typeof env.AI.run !== 'function') {
+    return {
+      ok: false,
+      error: 'cloudflare_workers_ai_not_configured'
+    };
+  }
+
+  const model =
+    env.UNIFIED_AI_MODEL ||
+    '@cf/meta/llama-3.1-8b-instruct';
+
+  const system = `You are XTRA Unified AI for PHAN THUAN XTRA.
+You are one logical engineering intelligence combining these peer roles:
+1) architecture/coordinator,
+2) implementation/code engineer,
+3) test/acceptance engineer,
+4) security/reliability engineer,
+5) Cloudflare Workers AI runtime/failover engineer.
+
+Use the supplied GitHub checkpoint as authoritative context.
+Do not invent repository state, deployment results, credentials, or tests.
+Separate verified facts from recommendations.
+Prefer minimal safe changes and preserve Auto Bot, VIP Bot, Admin, APK, D1/R2 and production CI behavior.
+Never output secrets or ask for secret values.
+Production mutation is disabled by this gateway.`;
+
+  const userContext = String(task.context || '').slice(0, MAX_CONTEXT_LENGTH);
+  const instruction = String(task.instruction || '').slice(0, MAX_INSTRUCTION_LENGTH);
+
+  try {
+    const result = await env.AI.run(model, {
+      messages: [
+        { role: 'system', content: system },
+        {
+          role: 'user',
+          content:
+            `TASK_ID: ${task.taskId}\n` +
+            `MODE: ${task.mode}\n` +
+            `CHECKPOINT:\n${userContext}\n\n` +
+            `INSTRUCTION:\n${instruction}`
+        }
+      ],
+      temperature: 0.1,
+      max_tokens: 1800
+    });
+
+    const response =
+      typeof result?.response === 'string'
+        ? result.response
+        : JSON.stringify(result);
+
+    return {
+      ok: true,
+      engine: 'cloudflare-workers-ai',
+      model,
+      response: response.slice(0, 12000)
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: 'cloudflare_workers_ai_failed',
+      detail: String(error?.message || error).slice(0, 500)
+    };
+  }
 }
 
 /**
@@ -243,7 +331,11 @@ export default {
             env.GATEWAY_MODE ||
             'readonly',
           production_mutations:
-            productionMutationsEnabled(env)
+            productionMutationsEnabled(env),
+          unified_ai:
+            unifiedAiEnabled(env),
+          unified_ai_engine:
+            env.AI ? 'cloudflare-workers-ai' : 'not-configured'
         },
         200,
         headers
@@ -252,6 +344,140 @@ export default {
 
     if (!authenticate(request, env)) {
       return unauthorized(headers);
+    }
+
+    if (
+      request.method === 'POST' &&
+      url.pathname === '/v1/ai/unified'
+    ) {
+      const contentType =
+        request.headers
+          .get('content-type')
+          ?.toLowerCase() || '';
+
+      if (!contentType.includes('application/json')) {
+        return json(
+          {
+            ok: false,
+            error: 'content_type_required'
+          },
+          415,
+          headers
+        );
+      }
+
+      const body = await request.json().catch(() => null);
+
+      if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        return json(
+          { ok: false, error: 'invalid_json' },
+          400,
+          headers
+        );
+      }
+
+      const allowedFields = new Set([
+        'instruction',
+        'context',
+        'mode',
+        'task_id'
+      ]);
+
+      if (Object.keys(body).some(key => !allowedFields.has(key))) {
+        return json(
+          { ok: false, error: 'unexpected_field' },
+          400,
+          headers
+        );
+      }
+
+      if (
+        typeof body.instruction !== 'string' ||
+        !body.instruction.trim()
+      ) {
+        return json(
+          { ok: false, error: 'instruction_required' },
+          400,
+          headers
+        );
+      }
+
+      if (body.instruction.length > MAX_INSTRUCTION_LENGTH) {
+        return json(
+          {
+            ok: false,
+            error: 'instruction_too_long',
+            max_length: MAX_INSTRUCTION_LENGTH
+          },
+          400,
+          headers
+        );
+      }
+
+      if (
+        body.context !== undefined &&
+        (typeof body.context !== 'string' || body.context.length > MAX_CONTEXT_LENGTH)
+      ) {
+        return json(
+          {
+            ok: false,
+            error: 'invalid_context',
+            max_length: MAX_CONTEXT_LENGTH
+          },
+          400,
+          headers
+        );
+      }
+
+      if (
+        body.mode !== undefined &&
+        (typeof body.mode !== 'string' || !MODES.has(body.mode))
+      ) {
+        return json(
+          { ok: false, error: 'invalid_mode' },
+          400,
+          headers
+        );
+      }
+
+      const task = {
+        taskId:
+          typeof body.task_id === 'string' && body.task_id.trim()
+            ? body.task_id.trim().slice(0, 200)
+            : crypto.randomUUID(),
+        instruction: body.instruction.trim(),
+        context: typeof body.context === 'string' ? body.context : '',
+        mode: body.mode || 'audit'
+      };
+
+      const result = await runUnifiedAi(env, task);
+
+      if (!result.ok) {
+        return json(
+          {
+            ok: false,
+            task_id: task.taskId,
+            ...result
+          },
+          result.error === 'unified_ai_disabled' ? 503 : 502,
+          headers
+        );
+      }
+
+      return json(
+        {
+          ok: true,
+          task_id: task.taskId,
+          logical_agent: 'xtra-unified-ai',
+          peer_roles: ['chatgpt', 'mistral', 'gemma', 'llama', 'cloudflare-workers-ai'],
+          engine: result.engine,
+          model: result.model,
+          production_mutation: false,
+          response: result.response
+        },
+        200,
+        headers
+      );
     }
 
     if (
@@ -264,7 +490,10 @@ export default {
           repository: REPOSITORY,
           branch: DEFAULT_BRANCH,
           production_mutations:
-            productionMutationsEnabled(env)
+            productionMutationsEnabled(env),
+          unified_ai: unifiedAiEnabled(env),
+          unified_ai_engine:
+            env.AI ? 'cloudflare-workers-ai' : 'not-configured'
         },
         200,
         headers
@@ -319,8 +548,7 @@ export default {
         {
           ok: true,
           provider: 'cloudflare',
-          status:
-            'pending-cloudflare-credentials',
+          status: env.AI ? 'workers-ai-bound' : 'pending-cloudflare-ai-binding',
           secrets_exposed: false
         },
         200,
