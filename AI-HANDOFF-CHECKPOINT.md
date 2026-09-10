@@ -1,138 +1,93 @@
 # PHAN THUẦN XTRA — AI HANDOFF CHECKPOINT
 
-> Mục đích: mọi AI tiếp theo có thể mở file này và tiếp quản công việc ngay, không cần hỏi lại lịch sử.
+> Canonical handoff for AI1–AI5, Workers AI, Cloudflare Dashboard Ask AI and other coding agents.
 
-## 1. DỰ ÁN
+## CURRENT VERIFIED STATE — 2026-09-10
 - Repository: `phanthuanxtra-v9/phanthuanxtra-v9`
-- Production domain: `https://phanthuanxtra.com/`
+- Branch: `main`
 - Production Worker: `phanthuanxtra-v2`
-- Branch chính: `main`
-- Kiến trúc chuẩn: User → Website/App/Telegram → App API → Developer Gateway → Production Worker → D1/R2/Workers AI → Website.
+- Production domain: `https://phanthuanxtra.com/`
+- PR #70: MERGED.
+- PR #70 merge commit: `92adf1495459e28b918d77c61700a1de7c2a7113`.
+- Post-merge GitHub Actions: CI/Validate SUCCESS; Deploy production Worker SUCCESS.
+- Latest verified Cloudflare Version ID from the immediately preceding production deployment: `95f7d512-4f27-4336-a4a2-570583e195cf`.
+- Admin vehicle CRUD is connected to the shared vehicle/AI/PT Xtra branding path; do not create a second plate-branding pipeline.
 
-## 2. NGUYÊN TẮC BẮT BUỘC CHO AI TIẾP QUẢN
-1. **Verify before claim**: không ghi “đã xong”, “production GREEN”, “deploy thành công”, “API hoạt động” nếu chưa có bằng chứng kiểm tra thực tế.
-2. Khi được yêu cầu `tiến hành ngay`, `làm ngay`, `tiếp tục`, `fix ngay`: nếu có quyền và công cụ thì thực thi → kiểm tra → sửa tiếp nếu lỗi → xác minh production.
-3. Không đoán cấu hình Cloudflare, secrets, binding, API hoặc endpoint. Phải đọc repo/workflow/config thực tế trước.
-4. Không yêu cầu người dùng lặp lại thông tin đã có trong checkpoint này trừ khi thông tin đã thay đổi hoặc thiếu quyền xác thực.
-5. Không dùng ADMIN_TOKEN, API key, secret hoặc credential trong file `.md`. Chỉ ghi tên biến/mục đích, không ghi giá trị.
-6. Mỗi AI sau khi làm việc phải cập nhật checkpoint này hoặc file handoff tương ứng với: thời điểm, commit SHA, việc đã làm, test/evidence, blocker, bước tiếp theo.
+## PRODUCTION VERIFICATION STATUS
+- Production deploy is verified through GitHub Actions.
+- Direct HTTP smoke test from the current execution environment is **NOT AVAILABLE** because DNS resolution for `phanthuanxtra.com` fails in this environment (`curl: Could not resolve host`).
+- Therefore `/admin`, `/admin.html`, and `/api/admin/dashboard` are **NOT currently verified from this environment** after the PR #70 deployment.
+- Historical evidence recorded HTTP 403 on public `/admin`; this remains an unresolved production verification item until a direct reachable test confirms the current state.
+- Do not claim Admin production GREEN until a reachable external HTTP test confirms `/admin` and the relevant Admin API paths.
 
-## 3. MÔ HÌNH AI 5 VAI TRÒ
-Các AI có thể thay phiên nhau. AI nhận việc phải đọc checkpoint trước.
+## AI COORDINATION HARD GATE
+Every AI participant must read, in order, before analysis or implementation:
+1. `AI-WORK-REGISTRY.md`
+2. `AI_AGENT_PROTOCOL.md`
+3. `AI-HANDOFF-CHECKPOINT.md`
+4. `MASTER_CONTEXT_PHAN_THUAN.md`
+5. Relevant current PR/main source and workflows.
 
-- **AI1 — Executor**: triển khai/fix code, CI/CD, Telegram Auto Bot.
-- **AI2 — Auditor**: audit kiến trúc, security, API, D1/R2, regression.
-- **AI3 — AI/Content**: Chat AI, Workers AI, nhận diện xe/ảnh, sinh nội dung.
-- **AI4 — Frontend/Admin**: website, UX, Admin CMS, CRM, responsive.
-- **AI5 — Release/Production**: CI/CD, Cloudflare deployment, smoke test, integration test.
+This applies to AI1–AI5, Cloudflare Workers AI model invocations, Cloudflare Dashboard Ask AI at `dash.cloudflare.com`, and other coding agents. If current coordination context cannot be supplied/read, the AI is advisory only and must not create a competing implementation path.
 
-Vai trò chỉ là mặc định. AI đang online có quyền và công cụ phù hợp có thể tiếp quản bất kỳ hạng mục nào.
+## ONE-TASK / ONE-OWNER / ONE-RELEASE-GATE
+- Search current open PRs before starting work.
+- Continue an existing owner/path instead of creating a duplicate.
+- Do not create duplicate Workers, routes, workflows, migrations or AI pipelines without direct evidence that the existing resource cannot satisfy the requirement.
+- Historical Markdown is evidence only; never execute an old `NEXT ACTION` automatically.
 
-## 4. KIẾN TRÚC AI — KHÔNG PHỤ THUỘC CHATGPT ↔ CLOUDFLARE TRỰC TIẾP
-Đường triển khai ưu tiên:
+## ADMIN — THREE UPLOAD PATHS, ONE AI BRANDING PIPELINE
+All three vehicle-upload paths must converge on the same trusted processing path:
+- Android APK → shared Vehicle/Plate AI → PT Xtra branded publish artifact → publish.
+- Telegram Auto Bot → shared Vehicle/Plate AI → PT Xtra branded publish artifact → publish.
+- Admin CMS → shared Vehicle/Plate AI → PT Xtra branded publish artifact → publish.
 
-`AI → GitHub main → GitHub Actions → validate/test → Cloudflare Worker → production`
+For an image where a plate is visible and confidently detected, the publish artifact must replace the visible plate with `PT Xtra` / `PT XTRA` according to the current branding implementation. The original must not be used as the public artifact. If required branding evidence is missing for a case that requires branding, publishing must be blocked. Images with no visible plate (for example interior shots) must not be incorrectly blocked solely because no plate exists.
 
-Runtime AI ưu tiên:
+Do not create a second Admin-specific masking AI. Reuse the existing Vehicle AI and PT Xtra image-branding implementation.
 
-`Production Worker → Workers AI / AI Gateway → model`
+## TELEGRAM
+- Auto Bot route: `/api/telegram/webhook`.
+- VIP Bot route: `/api/telegram/vip-webhook`.
+- Do not recreate stale `/api/telegram/auto-webhook`.
+- Auto publish target flow: Telegram → inbox/R2 → Vehicle AI → validation → D1/R2 → website → notification.
 
-Mục tiêu: AI có thể làm việc thông qua GitHub mà không cần mỗi AI phải có Cloudflare credential riêng. Không được tạo secret mới nếu chưa audit workflow hiện tại.
+## WEBSITE / CONTENT
+- Vehicle posts must use their dedicated vehicle page/route.
+- Other project content areas must retain their dedicated routes/pages; do not duplicate existing page implementations.
 
-## 5. CHAT AI PHAN THUẦN XTRA
-- File Chat AI hiện đã được cập nhật để nhận biết Phan Thuần / Phan Thuần Xtra và phạm vi thương hiệu.
-- Commit trước đó liên quan Chat AI: `ccaa47520a08b7feefed7685f5b1d244c71091c9`.
-- Khi thay đổi Chat AI: kiểm tra prompt/context, endpoint runtime, Workers AI binding, lỗi fallback và smoke test production.
+## APK
+- Android build pipeline is part of the release gate.
+- APK must consume the same production API/AI contract as Admin and Telegram flows; do not fork plate-branding logic into the APK.
 
-## 6. ADMIN CMS
-Admin hiện có các chức năng chính:
-- Dashboard/control center.
-- Kho xe: tìm kiếm, lọc, thêm/sửa xe, trạng thái, nổi bật.
-- Vehicle publisher: thông tin xe, mô tả, trang bị, thư viện ảnh.
-- CRM Lead: tìm kiếm/lọc/cập nhật trạng thái.
-- Đăng nhập bằng `ADMIN_TOKEN`, token lưu trong browser session và không đưa lên URL.
-- Entry point sạch: `/admin` → `/admin-control.html`.
-- Commit thêm entrypoint `/admin`: `5ae06fedae2b486cfdf6d0baacce77c8cba54e2b`.
+## CLOUDFARE RESOURCES — SINGLE INSTANCE
+Verified resource names:
+- Worker: `phanthuanxtra-v2`
+- D1: `phanthuanxtra-db`
+- R2: `phanthuanxtra-media`
+- Workers AI binding: `AI`
+- Images: `IMAGES`
+- AI Search: `AI_SEARCH`
+- Assets: `ASSETS`
+- Worker cron: `*/5 * * * *`
 
-### Admin API cần kiểm tra khi tiếp quản
-- `/api/admin/dashboard`
-- `/api/admin/cars`
-- `/api/admin/leads`
-- Worker health endpoint/config tương ứng.
+## OPEN / NEXT WORK — DO NOT DUPLICATE
+1. **Production Admin verification:** obtain a reachable external HTTP test for `/admin`, `/admin.html`, `/api/admin/dashboard`, and Admin upload flow. If 403 persists, investigate Cloudflare custom-domain/edge/Access/WAF/route behavior before changing Worker route code again.
+2. **Admin hardening:** continue existing PR/main path; no second CMS implementation.
+3. **PT Xtra plate + AI sales copy:** continue existing implementation path; no second branding/copy pipeline.
+4. **Dedicated pages:** continue existing PR #55 path.
+5. **VIP document ingestion:** continue existing PR #66 path; PR #37 is superseded.
+6. **Production runtime health:** continue PR #49 path.
+7. **Backup:** verify real backup + restore/readability; do not create another backup workflow.
 
-## 7. AUTO BOT — MỤC TIÊU
-Luồng mục tiêu:
-`Telegram @phanthuanxtra_auto_bot → webhook → telegram_inbox → R2/MEDIA → Vehicle AI → vehicle_ai_drafts → validate brand/model/confidence → D1 cars + car_images → website → telegram_posts`
+## SECURITY
+Never place actual ADMIN_TOKEN, Cloudflare API tokens, GitHub PATs, Telegram bot tokens, OpenAI keys or other secrets in Markdown. Store secrets in the appropriate secret manager and record only variable names/purpose.
 
-Bắt buộc trước auto-publish:
-- AI xử lý/che biển số và thay bằng **PT Xtra/PT XTRA** theo yêu cầu hiện hành.
-- AI text tạo nội dung bài xe.
-- Sau publish bot phải báo nhận ảnh, bài website đã tạo/cập nhật; khi xe bán phải hỗ trợ trạng thái/xóa theo flow đã triển khai.
-
-## 8. 5 LĨNH VỰC WEBSITE
-Website không chỉ có xe. Khi phát triển nội dung/route, giữ nguyên nguyên tắc mỗi lĩnh vực có trang/route riêng và bài nội dung phải đi đúng trang riêng của entity/content đó.
-
-## 9. TRẠNG THÁI HIỆN TẠI CẦN XÁC MINH
-- Admin route fix đã được merge vào `main` tại merge commit `fc1617479aefa0e9b98b4afe1624f5b01b338187`.
-- `src/entry.js` trên `main` đã có route trực tiếp `/admin` và `/admin/` → `admin.html`, loại bỏ redirect trung gian.
-- GitHub Actions **push deployment đã thực sự chạy và thành công**.
-- Cloudflare Worker `phanthuanxtra-v2` **đã deploy thành công**.
-- Cloudflare Version ID đã xác minh: `d32431ad-fb43-4ad9-83d5-27876cad7f1b`.
-- Live production `https://phanthuanxtra.com/admin` sau deployment **vẫn trả HTTP 403**.
-- Vì vậy không được đánh dấu production GREEN: GitHub deploy = GREEN, Cloudflare Worker deploy = GREEN, production `/admin` = RED/BLOCKED.
-- Ranh giới điều tra hiện tại nằm ở lớp Cloudflare custom-domain/edge/Access/WAF/route behavior hoặc lớp trước Worker; chưa có bằng chứng để kết luận chính xác rule nào.
-
-## 10. QUY TRÌNH TIẾP QUẢN MỖI LẦN
-### A. Audit nhanh
-1. Đọc file này.
-2. Đọc `README`, workflow CI/CD, `wrangler` config và các file liên quan task.
-3. Kiểm tra `git/main` và commit mới nhất.
-4. Kiểm tra workflow/deployment thực tế.
-
-### B. Thực thi
-1. Xác định root cause.
-2. Thay đổi tối thiểu, an toàn.
-3. Commit rõ ràng.
-4. Chạy validation/test.
-5. Theo dõi deploy.
-
-### C. Verify
-- GitHub commit tồn tại.
-- CI job success.
-- Cloudflare deployment/version xác nhận.
-- Production HTTP/smoke test.
-- Chức năng thực tế test được.
-
-### D. Bàn giao
-Cập nhật cuối file này:
-- `LAST_UPDATE_UTC`
-- `LAST_AI`
-- `LAST_COMMIT`
-- `COMPLETED`
-- `VERIFIED`
-- `BLOCKERS`
-- `NEXT_ACTION`
-
-## 11. CURRENT HANDOFF
+## LAST HANDOFF
 - `LAST_UPDATE_UTC`: 2026-09-10
 - `LAST_AI`: ChatGPT
-- `LAST_COMMIT`: `fc1617479aefa0e9b98b4afe1624f5b01b338187` (Admin route fix merged)
-- `COMPLETED`: Admin route fix merged; real GitHub Actions push deployment and Cloudflare Worker deployment verified.
-- `VERIFIED`: Cloudflare Version ID `d32431ad-fb43-4ad9-83d5-27876cad7f1b`; live `/admin` still HTTP 403.
-- `BLOCKERS`: Chưa có Cloudflare API/dashboard connector trong phiên này để kiểm tra trực tiếp custom-domain, Access, WAF/security rules và Worker route mapping.
-- `NEXT_ACTION`: Khi có Cloudflare access, audit edge/custom-domain/Access/WAF/route mapping cho `/admin`; retest `/admin` và `/admin.html`; chỉ đánh dấu production GREEN khi live endpoint trả response đúng.
-
-## 12. IMPORTANT SECURITY NOTE
-Never place actual `ADMIN_TOKEN`, Cloudflare API tokens, GitHub PATs, Telegram bot tokens, OpenAI keys or other secrets in this file. Use GitHub/Cloudflare secret stores and reference only variable names.
-
-## 13. DEPLOYMENT CONFIGURATION CORRECTION — 2026-09-10
-- Earlier handoff text incorrectly stated that no Wrangler configuration existed at repository root.
-- Later direct inspection verified `wrangler.json` exists on `main` and defines Worker `phanthuanxtra-v2`, static assets, Workers AI binding, R2 `MEDIA`, D1 `DB`, and observability.
-- The earlier “no wrangler config” statement is superseded and must not be used by future AIs.
-
-## 14. HANDOFF FOR NEXT AI — 2026-09-10
-**Current truth:** code fix is merged and deployment is verified, but the public `/admin` endpoint remains blocked with HTTP 403.
-
-**Do not:** repeat the Worker route fix without first checking the Cloudflare edge/custom-domain path; do not claim production GREEN.
-
-**Do next:** inspect the Cloudflare layer responsible for the 403, verify `/admin` and `/admin.html`, then continue Admin CMS hardening (including server-side token validation) only after the route is reachable.
+- `LAST_COMMIT`: `92adf1495459e28b918d77c61700a1de7c2a7113`
+- `COMPLETED`: PR #70 merged; Admin CRUD connected to shared AI/PT Xtra pipeline; production deployment verified through GitHub Actions.
+- `VERIFIED`: CI/Validate SUCCESS; production Worker deployment SUCCESS; current Cloudflare version evidence `95f7d512-4f27-4336-a4a2-570583e195cf`.
+- `BLOCKERS`: Current execution environment cannot resolve `phanthuanxtra.com`, so direct HTTP production verification cannot be completed here. Historical `/admin` 403 remains unresolved until externally reachable smoke test.
+- `NEXT_ACTION`: External/reachable production smoke test for `/admin` + `/admin.html` + Admin APIs and real upload. Only after that mark Admin production GREEN or diagnose edge 403.
