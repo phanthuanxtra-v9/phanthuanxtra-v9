@@ -1,262 +1,186 @@
-const SEC={
- "X-Content-Type-Options":"nosniff",
- "X-Frame-Options":"DENY",
- "Referrer-Policy":"strict-origin-when-cross-origin",
- "Permissions-Policy":"camera=(), microphone=(), geolocation=()",
- "Cross-Origin-Opener-Policy":"same-origin",
- "Cross-Origin-Resource-Policy":"same-origin",
- "Strict-Transport-Security":"max-age=31536000; includeSubDomains; preload"
-};
+let token = sessionStorage.getItem('ptx_admin_token') || '';
 
+let password = '';
+let cars = [];
+let leads = [];
+let editing = null;
+let photos = [];
 
-const json=(data,status=200,headers={})=>
- new Response(
-  JSON.stringify(data),
-  {
-   status,
-   headers:{
-    "content-type":"application/json; charset=utf-8",
-    "cache-control":"no-store",
-    ...SEC,
-    ...headers
-   }
-  }
- );
-
-
-const text=(v,n)=>
- String(v??"").trim().slice(0,n);
-
-
-const deny=()=>
- json(
-  {
-   error:"Unauthorized"
-  },
- 401,
- {
-  "WWW-Authenticate":"Bearer"
- }
-);
-
-
-
-function createToken(){
-
- const a=new Uint8Array(32);
-
- crypto.getRandomValues(a);
-
- return [...a]
- .map(x=>x.toString(16).padStart(2,"0"))
- .join("");
-
+function msg(id, text, ok=false){
+  const el = document.querySelector(id);
+  if(!el) return;
+  el.textContent = text;
+  el.className = 'statusline ' + (ok ? 'ok' : 'err');
 }
 
+async function login(){
 
+  const input = document.querySelector('#password');
 
-function auth(request,env){
-
- const h=
- request.headers.get("Authorization")||"";
-
- const token=
- h.startsWith("Bearer ")
- ? h.slice(7)
- : "";
-
-
- return !!token &&
- token.length===64;
-
-}
-
-
-
-
-async function handleLogin(request,env){
-
-
- if(request.method!=="POST")
-  return json(
-   {
-    error:"Method Not Allowed"
-   },
-   405
-  );
-
-
- const body=
- await request.json()
- .catch(()=>null);
-
-
-
- const password=
- text(body?.password,200);
-
-
-
- if(!env.ADMIN_PASSWORD){
-
-  return json(
-   {
-    error:"ADMIN_PASSWORD missing"
-   },
-   500
-  );
-
- }
-
-
-
- if(password!==env.ADMIN_PASSWORD){
-
-  return json(
-   {
-    error:"Sai mật khẩu"
-   },
-   401
-  );
-
- }
-
-
-
- return json(
-  {
-   ok:true,
-   token:createToken()
-  }
- );
-
-
-}
-
-
-
-
-
-
-async function handleDashboard(request,env){
-
-
- if(!auth(request,env))
-   return deny();
-
-
-
- if(!env.DB)
-  return json(
-   {
-    error:"D1 missing"
-   },
-   503
-  );
-
-
-
- const [
-  cars,
-  leads,
-  sold,
-  reserved,
-  newLeads
- ]=
- await Promise.all([
-
-  env.DB
-  .prepare(
-   "SELECT COUNT(*) n FROM cars"
-  )
-  .first("n"),
-
-
-  env.DB
-  .prepare(
-   "SELECT COUNT(*) n FROM leads"
-  )
-  .first("n"),
-
-
-  env.DB
-  .prepare(
-   "SELECT COUNT(*) n FROM cars WHERE status='sold'"
-  )
-  .first("n"),
-
-
-  env.DB
-  .prepare(
-   "SELECT COUNT(*) n FROM cars WHERE status='reserved'"
-  )
-  .first("n"),
-
-
-  env.DB
-  .prepare(
-   "SELECT COUNT(*) n FROM leads WHERE status='new'"
-  )
-  .first("n")
-
- ]);
-
-
- return json({
-
-  stats:{
-   cars:Number(cars||0),
-   leads:Number(leads||0),
-   sold:Number(sold||0),
-   reserved:Number(reserved||0),
-   newLeads:Number(newLeads||0)
+  if(!input){
+    console.error('Không tìm thấy ô password');
+    return;
   }
 
- });
+  const password = input.value.trim();
 
+  if(!password){
+    msg('#loginMsg','Vui lòng nhập mật khẩu');
+    return;
+  }
+
+  try {
+
+    const res = await fetch('/api/admin/login',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json'
+      },
+      body:JSON.stringify({
+        password
+      })
+    });
+
+
+    const data = await res.json();
+
+
+    if(!res.ok || !data.ok){
+
+      msg(
+        '#loginMsg',
+        data.error || 'Sai mật khẩu'
+      );
+
+      return;
+    }
+
+
+    sessionStorage.setItem(
+      'ptx_admin_token',
+      data.token
+    );
+
+
+    token = data.token;
+
+
+    location.href='/admin.html?v='+Date.now();
+
+
+  } catch(err){
+
+    msg(
+      '#loginMsg',
+      'Lỗi kết nối máy chủ'
+    );
+
+    console.error(err);
+
+  }
 
 }
 
 
+async function api(path,opt={}){
+
+  if(!token){
+    throw new Error('Chưa đăng nhập');
+  }
 
 
+  opt.headers={
+    ...(opt.headers||{}),
+    'Authorization':'Bearer '+token
+  };
 
 
-
-export async function handleAppAdmin(request,env){
-
-
- const u=
- new URL(request.url);
+  if(opt.body && !opt.headers['Content-Type']){
+    opt.headers['Content-Type']='application/json';
+  }
 
 
-
- if(
-  u.pathname===
-  "/api/admin/login"
- )
- {
-  return handleLogin(
-   request,
-   env
+  const res=await fetch(
+    path,
+    opt
   );
- }
 
 
-
- if(
-  u.pathname===
-  "/api/admin/dashboard"
- )
- {
-  return handleDashboard(
-   request,
-   env
-  );
- }
+  const data=await res.json()
+    .catch(()=>({}));
 
 
+  if(!res.ok){
 
- return null;
+    if(res.status===401){
+
+      sessionStorage.removeItem(
+        'ptx_admin_token'
+      );
+
+      location.reload();
+
+    }
+
+
+    throw new Error(
+      data.error || 'Lỗi server'
+    );
+  }
+
+
+  return data;
 
 }
+
+
+function logout(){
+
+  sessionStorage.removeItem(
+    'ptx_admin_token'
+  );
+
+  location.reload();
+
+}
+
+
+document.addEventListener(
+'DOMContentLoaded',
+()=>{
+
+ const btn=document.querySelector('#loginBtn');
+
+ if(btn){
+
+   btn.onclick=login;
+
+ }
+
+
+ const pass=document.querySelector('#password');
+
+ if(pass){
+
+   pass.addEventListener(
+    'keydown',
+    e=>{
+      if(e.key==='Enter'){
+        login();
+      }
+    }
+   );
+
+ }
+
+
+ const logoutBtn=document.querySelector('#logout');
+
+ if(logoutBtn){
+
+   logoutBtn.onclick=logout;
+
+ }
+
+
+});
