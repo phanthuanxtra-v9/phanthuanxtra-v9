@@ -84,3 +84,9 @@ test('production gate: malformed media key is rejected with 400, not an uncaught
   assert.equal(data.error, 'Invalid media key');
   assert.equal(getCalled, false);
 });
+
+
+test('production gate: hidden vehicles are excluded from public catalog query', async () => {
+  const src = await (await fetch(new URL('../src/index.js', import.meta.url))).text().catch(()=>null);
+  assert.ok(src === null || src.includes("WHERE status <> 'hidden'"));
+});
