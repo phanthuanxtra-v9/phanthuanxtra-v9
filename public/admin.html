@@ -1,203 +1,47 @@
-<div id="login">
-
-<h1>Đăng nhập quản trị</h1>
-
-<p class="notice">
-Mật khẩu quản trị được xác thực an toàn.
-Phiên đăng nhập được lưu trong session trình duyệt.
-</p>
-
-<label for="password">
-ADMIN PASSWORD
-</label>
-
-<input
-  id="password"
-  type="password"
-  autocomplete="current-password"
-  placeholder="Nhập mật khẩu quản trị"
-/>
-
-<button id="loginBtn" type="button">
-Đăng nhập
-</button>
-
-<div id="loginMsg" class="statusline"></div>
-
-</div>
-
-
-<div id="app" class="hidden">
-
-<button id="logout" type="button">
-Đăng xuất
-</button>
-
-</div>
-
-
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>PHAN THUẦN XTRA — Admin</title>
+<style>
+body{margin:0;background:#0b0b0b;color:#eee;font:15px system-ui,sans-serif}main{max-width:520px;margin:12vh auto;padding:24px}section{background:#131313;border:1px solid #2b2b2b;border-radius:14px;padding:24px}h1{margin-top:0}.muted{color:#999}.field{display:grid;gap:7px;margin:18px 0}.field label{font-size:12px;color:#aaa}.field input{background:#0d0d0d;color:#fff;border:1px solid #3a3a3a;border-radius:8px;padding:12px;font:inherit;width:100%;box-sizing:border-box}.btn{background:#c9a96a;color:#111;border:1px solid #c9a96a;border-radius:8px;padding:11px 16px;cursor:pointer;font-weight:800}.msg{margin-top:12px;min-height:20px}.err{color:#ffb2b2}.ok{color:#bfe6bf}.hidden{display:none}
+</style>
+</head>
+<body>
+<main id="login">
+<section>
+<h1>PHAN THUẦN XTRA</h1>
+<p class="muted">Đăng nhập Admin để quản lý và đăng xe lên website.</p>
+<div class="field"><label for="password">MẬT KHẨU QUẢN TRỊ</label><input id="password" type="password" autocomplete="current-password" placeholder="Nhập mật khẩu quản trị"></div>
+<button class="btn" id="loginBtn">Đăng nhập</button>
+<div id="loginMsg" class="msg"></div>
+</section>
+</main>
 <script>
-
-let token = sessionStorage.getItem('ptx_admin_token') || '';
-
-let password = '';
-let cars = [];
-let leads = [];
-let editing = null;
-let photos = [];
-
-
-function msg(id,text,ok=false){
-
- const el=document.querySelector(id);
-
- if(!el)return;
-
- el.textContent=text;
-
- el.className='statusline '+(ok?'ok':'err');
-
+const $=s=>document.querySelector(s);
+function msg(t,ok=false){$('#loginMsg').textContent=t;$('#loginMsg').className='msg '+(ok?'ok':'err')}
+async function openControl(){
+  const html=await fetch('/admin-control.html?v='+Date.now(),{cache:'no-store'}).then(r=>{if(!r.ok)throw Error('Không tải được Admin Control');return r.text()});
+  const patched=html.replace("if(token){$('#token').value='';}","if(token){$('#token').value=token;setTimeout(()=>$('#loginBtn').click(),0);}");
+  document.open();document.write(patched);document.close();
 }
-
-
 async function login(){
-
- const input=document.querySelector('#password');
-
- if(!input){
-
-   console.error('Không tìm thấy ô password');
-
-   return;
-
- }
-
-
- const password=input.value.trim();
-
-
- if(!password){
-
-   msg('#loginMsg','Vui lòng nhập mật khẩu');
-
-   return;
-
- }
-
-
- try{
-
-
- const res=await fetch('/api/admin/login',{
-
-   method:'POST',
-
-   headers:{
-    'Content-Type':'application/json'
-   },
-
-   body:JSON.stringify({
-    password
-   })
-
- });
-
-
- const data=await res.json();
-
-
- if(!res.ok || !data.ok){
-
-   msg(
-    '#loginMsg',
-    data.error || 'Sai mật khẩu'
-   );
-
-   return;
-
- }
-
-
- sessionStorage.setItem(
-  'ptx_admin_token',
-  data.token
- );
-
-
- token=data.token;
-
-
- location.href='/admin.html?v='+Date.now();
-
-
- }catch(err){
-
-   msg(
-    '#loginMsg',
-    'Lỗi kết nối máy chủ'
-   );
-
-   console.error(err);
-
- }
-
+  const password=$('#password').value.trim();
+  if(!password){msg('Vui lòng nhập mật khẩu');return}
+  $('#loginBtn').disabled=true;
+  try{
+    const r=await fetch('/api/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||!d.ok)throw Error(d.error||'Đăng nhập thất bại');
+    sessionStorage.setItem('ptx_admin_token',d.token);
+    await openControl();
+  }catch(e){msg(e.message);$('#loginBtn').disabled=false}
 }
-
-
-
-function logout(){
-
- sessionStorage.removeItem(
-  'ptx_admin_token'
- );
-
- location.reload();
-
-}
-
-
-
-document.addEventListener(
-'DOMContentLoaded',
-()=>{
-
-
- const btn=document.querySelector('#loginBtn');
-
- if(btn){
-
-   btn.onclick=login;
-
- }
-
-
-
- const pass=document.querySelector('#password');
-
- if(pass){
-
-   pass.addEventListener(
-    'keydown',
-    e=>{
-      if(e.key==='Enter'){
-        login();
-      }
-    }
-   );
-
- }
-
-
-
- const logoutBtn=document.querySelector('#logout');
-
- if(logoutBtn){
-
-   logoutBtn.onclick=logout;
-
- }
-
-
-});
-
+$('#loginBtn').onclick=login;
+$('#password').onkeydown=e=>{if(e.key==='Enter')login()};
+if(sessionStorage.getItem('ptx_admin_token'))openControl().catch(e=>{sessionStorage.removeItem('ptx_admin_token');msg(e.message)});
 </script>
+</body>
+</html>
