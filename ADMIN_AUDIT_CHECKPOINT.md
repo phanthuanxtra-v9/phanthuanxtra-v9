@@ -78,3 +78,8 @@ Next agent must read this checkpoint and inspect the latest PR/CI before modifyi
 - Source secret scan searches for `ADMIN_TOKEN`, `APP_API_TOKEN`, `console.log`, and `fetch(` returned no indexed matches; this is a repository-search signal, not a substitute for runtime secret inspection.
 - No TODOs were found in indexed `src` search.
 - Next gate: obtain fresh workflow/runtime evidence before making deployment claims; continue source/API/security audit without inventing Cloudflare state.
+
+## Deployment configuration audit — 2026-09-10
+- Direct GitHub inspection found `package.json` scripts reference `wrangler deploy`, but no `wrangler.toml` or `wrangler.jsonc` exists at `main` root and GitHub code search returned no indexed workflow/config matches.
+- This is a deployment-evidence/configuration gap, not permission to invent a Worker name, bindings, or environment values. No Cloudflare configuration was fabricated.
+- Current action: preserve mainline and continue evidence-based audit. A real deployment/runtime check requires an existing connected Cloudflare deployment surface or verified repository deployment configuration.
