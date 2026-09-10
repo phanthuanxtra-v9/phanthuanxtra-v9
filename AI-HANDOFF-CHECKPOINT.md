@@ -73,10 +73,14 @@ Bắt buộc trước auto-publish:
 Website không chỉ có xe. Khi phát triển nội dung/route, giữ nguyên nguyên tắc mỗi lĩnh vực có trang/route riêng và bài nội dung phải đi đúng trang riêng của entity/content đó.
 
 ## 9. TRẠNG THÁI HIỆN TẠI CẦN XÁC MINH
-- GitHub commit cho Admin đã tồn tại: `5ae06fedae2b486cfdf6d0baacce77c8cba54e2b`.
-- Chat AI đã có commit cập nhật: `ccaa47520a08b7feefed7685f5b1d244c71091c9`.
-- **Không mặc định production đã deploy** chỉ vì commit tồn tại.
-- Bước release tiếp theo: kiểm tra GitHub Actions run của commit mới → job deploy Cloudflare → Worker deployment/version → smoke test `https://phanthuanxtra.com/` → test `/admin` → test Chat AI.
+- Admin route fix đã được merge vào `main` tại merge commit `fc1617479aefa0e9b98b4afe1624f5b01b338187`.
+- `src/entry.js` trên `main` đã có route trực tiếp `/admin` và `/admin/` → `admin.html`, loại bỏ redirect trung gian.
+- GitHub Actions **push deployment đã thực sự chạy và thành công**.
+- Cloudflare Worker `phanthuanxtra-v2` **đã deploy thành công**.
+- Cloudflare Version ID đã xác minh: `d32431ad-fb43-4ad9-83d5-27876cad7f1b`.
+- Live production `https://phanthuanxtra.com/admin` sau deployment **vẫn trả HTTP 403**.
+- Vì vậy không được đánh dấu production GREEN: GitHub deploy = GREEN, Cloudflare Worker deploy = GREEN, production `/admin` = RED/BLOCKED.
+- Ranh giới điều tra hiện tại nằm ở lớp Cloudflare custom-domain/edge/Access/WAF/route behavior hoặc lớp trước Worker; chưa có bằng chứng để kết luận chính xác rule nào.
 
 ## 10. QUY TRÌNH TIẾP QUẢN MỖI LẦN
 ### A. Audit nhanh
@@ -112,11 +116,23 @@ Cập nhật cuối file này:
 ## 11. CURRENT HANDOFF
 - `LAST_UPDATE_UTC`: 2026-09-10
 - `LAST_AI`: ChatGPT
-- `LAST_COMMIT`: `5ae06fedae2b486cfdf6d0baacce77c8cba54e2b` (Admin entrypoint)
-- `COMPLETED`: persistent AI handoff checkpoint added to repository.
-- `VERIFIED`: GitHub commit/write verified; production deployment still requires workflow + live verification.
-- `BLOCKERS`: Cloudflare production deployment for the latest Admin changes has not been independently confirmed in this handoff.
-- `NEXT_ACTION`: verify CI/CD → Cloudflare Worker deployment → production smoke tests; then continue Admin CMS hardening and integration with Chat AI/vehicle publishing.
+- `LAST_COMMIT`: `fc1617479aefa0e9b98b4afe1624f5b01b338187` (Admin route fix merged)
+- `COMPLETED`: Admin route fix merged; real GitHub Actions push deployment and Cloudflare Worker deployment verified.
+- `VERIFIED`: Cloudflare Version ID `d32431ad-fb43-4ad9-83d5-27876cad7f1b`; live `/admin` still HTTP 403.
+- `BLOCKERS`: Chưa có Cloudflare API/dashboard connector trong phiên này để kiểm tra trực tiếp custom-domain, Access, WAF/security rules và Worker route mapping.
+- `NEXT_ACTION`: Khi có Cloudflare access, audit edge/custom-domain/Access/WAF/route mapping cho `/admin`; retest `/admin` và `/admin.html`; chỉ đánh dấu production GREEN khi live endpoint trả response đúng.
 
 ## 12. IMPORTANT SECURITY NOTE
 Never place actual `ADMIN_TOKEN`, Cloudflare API tokens, GitHub PATs, Telegram bot tokens, OpenAI keys or other secrets in this file. Use GitHub/Cloudflare secret stores and reference only variable names.
+
+## 13. DEPLOYMENT CONFIGURATION CORRECTION — 2026-09-10
+- Earlier handoff text incorrectly stated that no Wrangler configuration existed at repository root.
+- Later direct inspection verified `wrangler.json` exists on `main` and defines Worker `phanthuanxtra-v2`, static assets, Workers AI binding, R2 `MEDIA`, D1 `DB`, and observability.
+- The earlier “no wrangler config” statement is superseded and must not be used by future AIs.
+
+## 14. HANDOFF FOR NEXT AI — 2026-09-10
+**Current truth:** code fix is merged and deployment is verified, but the public `/admin` endpoint remains blocked with HTTP 403.
+
+**Do not:** repeat the Worker route fix without first checking the Cloudflare edge/custom-domain path; do not claim production GREEN.
+
+**Do next:** inspect the Cloudflare layer responsible for the 403, verify `/admin` and `/admin.html`, then continue Admin CMS hardening (including server-side token validation) only after the route is reachable.
