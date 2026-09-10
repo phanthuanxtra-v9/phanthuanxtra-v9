@@ -10,15 +10,21 @@ The goal is to make changes safely, reproducibly, and without overwriting valid 
 
 The source of truth is the Git repository and the current state of `main` plus its pull requests.
 
-Before changing code, read:
+**Coordination gate:** before any implementation, every AI MUST read `AI-WORK-REGISTRY.md`. It is the first document for collision control and active-work ownership. It records which logical tasks already have an implementation path and which Markdown files are historical.
 
-- `project-docs/PROJECT_STATE.md`
-- `project-docs/AI_HANDOFF.md` (if present)
+Then read:
+
+- `AI-HANDOFF-CHECKPOINT.md`
+- `MASTER_CONTEXT_PHAN_THUAN.md`
+- `project-docs/PROJECT_STATE.md` (if present; reconcile against current main because it may be historical)
+- `project-docs/AI_HANDOFF.md` (if present; reconcile against current main)
 - `TODO.md` (if present)
 - `CHANGELOG.md` (if present)
 - `BUGS.md` (if present)
 - `ARCHITECTURE.md` (if present)
 - `DEPLOYMENT.md` (if present)
+
+Historical audit/session Markdown is evidence, not an executable task queue. Never execute an old document's `NEXT ACTION` merely because it exists.
 
 Never assume an old conversation or an old task description is newer than the repository.
 
@@ -47,12 +53,13 @@ AI1–AI5 are peer agents working on the same project. They may inspect or modif
 Use this flow for normal code changes:
 
 ```text
-READ CURRENT STATE
-  -> READ HANDOFF
+READ AI-WORK-REGISTRY
+  -> READ CURRENT STATE / HANDOFF
   -> CHECK GIT/PR STATE
+  -> CHECK FOR EXISTING OWNER/PR
   -> INSPECT CODE
   -> IDENTIFY DONE VS MISSING
-  -> CREATE BRANCH
+  -> CREATE BRANCH ONLY IF NO EXISTING IMPLEMENTATION PATH
   -> IMPLEMENT
   -> ADD/UPDATE TESTS
   -> RUN RELEVANT TESTS
@@ -63,7 +70,7 @@ READ CURRENT STATE
   -> REVIEW
   -> MERGE ONLY WHEN GATES PASS
   -> PRODUCTION DEPLOY VIA GITHUB ACTIONS
-  -> UPDATE PROJECT STATE/HANDOFF
+  -> UPDATE AI-WORK-REGISTRY + HANDOFF
 ```
 
 Do not restart completed work merely because a task was reopened in conversation.
@@ -76,6 +83,7 @@ Do not restart completed work merely because a task was reopened in conversation
 - Never force-push `main`.
 - Never delete or rewrite another agent's branch without explicit authorization.
 - Do not work on the same logical task in multiple branches simultaneously unless explicitly coordinated.
+- If an existing PR already owns the logical task, review/update that path instead of creating a competing implementation.
 
 ## 6. Pull request rules
 
@@ -208,6 +216,8 @@ A handoff should state:
 - remaining risks;
 - next recommended action.
 
+**For cross-AI coordination, update `AI-WORK-REGISTRY.md` with the logical workstream, branch/PR, files touched, evidence, blocker and next owner/action.**
+
 Documentation-only changes must not be described as a production deployment unless they actually triggered a production workflow.
 
 ## 16. Conflict resolution
@@ -221,6 +231,8 @@ If another agent has changed the same area:
 5. rerun tests.
 
 Never overwrite another agent's work simply to make the local branch clean.
+
+**Collision rule: one logical task → one active implementation path → one release gate.**
 
 ## 17. Completion standard
 
