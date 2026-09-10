@@ -1,4 +1,5 @@
 import test from 'node:test';
+import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import { canAutoPublish } from '../src/telegram-ingest.js';
 import { handleAiChat } from '../src/ai-chat.js';
@@ -87,6 +88,6 @@ test('production gate: malformed media key is rejected with 400, not an uncaught
 
 
 test('production gate: hidden vehicles are excluded from public catalog query', async () => {
-  const src = await (await fetch(new URL('../src/index.js', import.meta.url))).text().catch(()=>null);
-  assert.ok(src === null || src.includes("WHERE status <> 'hidden'"));
+  const src = fs.readFileSync(new URL('../src/index.js', import.meta.url),'utf8');
+  assert.match(src,/SELECT \* FROM cars WHERE status <> 'hidden'/);
 });
