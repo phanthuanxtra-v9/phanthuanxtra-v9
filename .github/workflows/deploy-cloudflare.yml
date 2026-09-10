@@ -86,18 +86,30 @@ jobs:
           [ -n "${CF_CONFIGURED_ACCOUNT_ID:-}" ] && configured_account_present=true
           echo "Secret presence: primary_token=${primary_present}, backup_token=${backup_present}, account_id=${configured_account_present}"
 
-          token="${CF_PRIMARY_TOKEN:-}"
-          token_source="primary"
-          if [ -z "$token" ]; then
-            token="${CF_BACKUP_TOKEN:-}"
-            token_source="backup"
-          fi
-          if [ -z "$token" ]; then
-            echo "Cloudflare API token is unavailable to this workflow run."
-            exit 1
-          fi
-          export CLOUDFLARE_API_TOKEN="$token"
-          echo "Cloudflare token source selected: ${token_source}"
+          select_cloudflare_token() {
+            local candidate
+            if [ -n "${CF_PRIMARY_TOKEN:-}" ]; then
+              export CLOUDFLARE_API_TOKEN="${CF_PRIMARY_TOKEN}"
+              if npx wrangler@4.129.0 whoami >/dev/null 2>&1; then
+                echo "Cloudflare token source selected: primary"
+                return 0
+              fi
+              echo "Primary Cloudflare token failed authentication; testing backup token."
+            fi
+
+            if [ -n "${CF_BACKUP_TOKEN:-}" ]; then
+              export CLOUDFLARE_API_TOKEN="${CF_BACKUP_TOKEN}"
+              if npx wrangler@4.129.0 whoami >/dev/null 2>&1; then
+                echo "Cloudflare token source selected: backup"
+                return 0
+              fi
+            fi
+
+            echo "Neither configured Cloudflare token authenticated successfully."
+            return 1
+          }
+
+          select_cloudflare_token
 
           account_id="${CF_CONFIGURED_ACCOUNT_ID:-}"
           if ! printf '%s' "$account_id" | grep -Eq '^[0-9a-fA-F]{32}$'; then
@@ -157,18 +169,29 @@ jobs:
           [ -n "${CF_CONFIGURED_ACCOUNT_ID:-}" ] && configured_account_present=true
           echo "Secret presence: primary_token=${primary_present}, backup_token=${backup_present}, account_id=${configured_account_present}"
 
-          token="${CF_PRIMARY_TOKEN:-}"
-          token_source="primary"
-          if [ -z "$token" ]; then
-            token="${CF_BACKUP_TOKEN:-}"
-            token_source="backup"
-          fi
-          if [ -z "$token" ]; then
-            echo "Cloudflare API token is unavailable to this workflow run."
-            exit 1
-          fi
-          export CLOUDFLARE_API_TOKEN="$token"
-          echo "Cloudflare token source selected: ${token_source}"
+          select_cloudflare_token() {
+            if [ -n "${CF_PRIMARY_TOKEN:-}" ]; then
+              export CLOUDFLARE_API_TOKEN="${CF_PRIMARY_TOKEN}"
+              if npx wrangler@4.129.0 whoami >/dev/null 2>&1; then
+                echo "Cloudflare token source selected: primary"
+                return 0
+              fi
+              echo "Primary Cloudflare token failed authentication; testing backup token."
+            fi
+
+            if [ -n "${CF_BACKUP_TOKEN:-}" ]; then
+              export CLOUDFLARE_API_TOKEN="${CF_BACKUP_TOKEN}"
+              if npx wrangler@4.129.0 whoami >/dev/null 2>&1; then
+                echo "Cloudflare token source selected: backup"
+                return 0
+              fi
+            fi
+
+            echo "Neither configured Cloudflare token authenticated successfully."
+            return 1
+          }
+
+          select_cloudflare_token
 
           account_id="${CF_CONFIGURED_ACCOUNT_ID:-}"
           if ! printf '%s' "$account_id" | grep -Eq '^[0-9a-fA-F]{32}$'; then
