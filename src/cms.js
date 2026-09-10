@@ -32,10 +32,7 @@ async function readJson(request) {
   return request.json().catch(() => null);
 }
 
-async function initCmsDb(db) {
-  // Database schema is managed exclusively through D1 migrations.
-  // No runtime DDL or schema mutation is performed here.
-}
+async function initCmsDb(db) {}
 
 async function audit(db, action, resource, resourceId, summary) {
   await db.prepare("INSERT INTO cms_audit_log (actor,action,resource,resource_id,summary) VALUES (?,?,?,?,?)")
@@ -102,39 +99,37 @@ async function listCars(db, url) {
   return Promise.all((q.results || []).map(async car => ({ ...car, images: await imagesFor(db, car.id) })));
 }
 
-async function handleCars(request, env, parts) {
-  const db = env.DB;
+export async function handleAdminCars(request, env) {
+  const url = new URL(request.url);
+  if (!url.pathname.startsWith("/api/admin/cars")) return null;
+  if (!env.DB) return response({ error: "D1 chưa được kết nối" }, 503);
+  const parts = url.pathname.replace(/^\/api\/admin\/cars\/?/, "").split("/").filter(Boolean);
   const id = parts[0] || "";
   if (request.method === "GET") {
     if (id) {
       if (!safeId(id)) return response({ error: "ID không hợp lệ" }, 400);
-      const car = await db.prepare("SELECT * FROM cars WHERE id=?").bind(id).first();
+      const car = await env.DB.prepare("SELECT * FROM cars WHERE id=?").bind(id).first();
       if (!car) return response({ error: "Không tìm thấy xe" }, 404);
-      return response({ car: { ...car, images: await imagesFor(db, id) } });
+      return response({ car: { ...car, images: await imagesFor(env.DB, id) } });
     }
-    return response({ cars: await listCars(db, new URL(request.url)) });
+    return response({ cars: await listCars(env.DB, url) });
   }
-
   if (request.method === "DELETE") {
     if (!id || !safeId(id)) return response({ error: "ID không hợp lệ" }, 400);
     if ((request.headers.get("X-CMS-Confirm") || "").toLowerCase() !== "delete") return response({ error: "Thiếu X-CMS-Confirm: delete" }, 428);
-    const existing = await db.prepare("SELECT id,brand,model FROM cars WHERE id=?").bind(id).first();
+    const existing = await env.DB.prepare("SELECT id,brand,model FROM cars WHERE id=?").bind(id).first();
     if (!existing) return response({ error: "Không tìm thấy xe" }, 404);
-    await db.batch([
-      db.prepare("DELETE FROM car_images WHERE car_id=?").bind(id),
-      db.prepare("DELETE FROM cars WHERE id=?").bind(id)
-    ]);
-    await audit(db, "delete", "car", id, `${existing.brand} ${existing.model}`);
+    await env.DB.batch([env.DB.prepare("DELETE FROM car_images WHERE car_id=?").bind(id), env.DB.prepare("DELETE FROM cars WHERE id=?").bind(id)]);
+    await audit(env.DB, "delete", "car", id, `${existing.brand} ${existing.model}`);
     return response({ ok: true, deleted: id });
   }
-
   if (request.method !== "POST" && request.method !== "PUT") return response({ error: "Method Not Allowed" }, 405, { Allow: "GET,POST,PUT,DELETE" });
   const body = await readJson(request);
   if (!body) return response({ error: "JSON không hợp lệ" }, 400);
   let existing = {};
   if (request.method === "PUT") {
     if (!id || !safeId(id)) return response({ error: "ID không hợp lệ" }, 400);
-    existing = await db.prepare("SELECT * FROM cars WHERE id=?").bind(id).first();
+    existing = await env.DB.prepare("SELECT * FROM cars WHERE id=?").bind(id).first();
     if (!existing) return response({ error: "Không tìm thấy xe" }, 404);
   }
   const parsed = carPayload(body, existing);
@@ -142,24 +137,25 @@ async function handleCars(request, env, parts) {
   const v = parsed.value;
   const carId = request.method === "POST" ? text(body.id, 81) : id;
   if (request.method === "POST" && !safeId(carId)) return response({ error: "id phải gồm 3-81 ký tự, chỉ chữ/số/-/_" }, 400);
-
   try {
     if (request.method === "POST") {
-      await db.prepare(`INSERT INTO cars (id,brand,model,year,mileage,price,fuel,category,color,status,description,features_json,featured,cover_image) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-        .bind(carId, v.brand, v.model, v.year, v.mileage, v.price, v.fuel, v.category, v.color, v.status, v.description, JSON.stringify(v.features), v.featured ? 1 : 0, v.cover_image).run();
-      await audit(db, "create", "car", carId, `${v.brand} ${v.model}`);
+      await env.DB.prepare(`INSERT INTO cars (id,brand,model,year,mileage,price,fuel,category,color,status,description,features_json,featured,cover_image) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(carId, v.brand, v.model, v.year, v.mileage, v.price, v.fuel, v.category, v.color, v.status, v.description, JSON.stringify(v.features), v.featured ? 1 : 0, v.cover_image).run();
+      await audit(env.DB, "create", "car", carId, `${v.brand} ${v.model}`);
     } else {
-      await db.prepare(`UPDATE cars SET brand=?,model=?,year=?,mileage=?,price=?,fuel=?,category=?,color=?,status=?,description=?,features_json=?,featured=?,cover_image=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
-        .bind(v.brand, v.model, v.year, v.mileage, v.price, v.fuel, v.category, v.color, v.status, v.description, JSON.stringify(v.features), v.featured ? 1 : 0, v.cover_image, carId).run();
-      await audit(db, "update", "car", carId, `${v.brand} ${v.model}`);
+      await env.DB.prepare(`UPDATE cars SET brand=?,model=?,year=?,mileage=?,price=?,fuel=?,category=?,color=?,status=?,description=?,features_json=?,featured=?,cover_image=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(v.brand, v.model, v.year, v.mileage, v.price, v.fuel, v.category, v.color, v.status, v.description, JSON.stringify(v.features), v.featured ? 1 : 0, v.cover_image, carId).run();
+      await audit(env.DB, "update", "car", carId, `${v.brand} ${v.model}`);
     }
-    if (Object.prototype.hasOwnProperty.call(body, "images")) await replaceImages(db, carId, body.images);
-    return response({ ok: true, id: carId, car: { ...(await db.prepare("SELECT * FROM cars WHERE id=?").bind(carId).first()), images: await imagesFor(db, carId) } }, request.method === "POST" ? 201 : 200);
+    if (Object.prototype.hasOwnProperty.call(body, "images")) await replaceImages(env.DB, carId, body.images);
+    return response({ ok: true, id: carId, car: { ...(await env.DB.prepare("SELECT * FROM cars WHERE id=?").bind(carId).first()), images: await imagesFor(env.DB, carId) } }, request.method === "POST" ? 201 : 200);
   } catch (error) {
     if (String(error?.message || error).includes("UNIQUE")) return response({ error: "ID bài đăng đã tồn tại" }, 409);
     console.error(error);
     return response({ error: "Không thể lưu bài xe" }, 500);
   }
+}
+
+async function handleCars(request, env, parts) {
+  return handleAdminCars(new Request(new URL(`/api/admin/cars/${parts.join("/")}`, request.url), request), env);
 }
 
 async function handleLeads(request, env, parts) {
@@ -188,25 +184,11 @@ async function handleLeads(request, env, parts) {
 
 async function dashboard(db) {
   const rows = await Promise.all([
-    ["cars", "SELECT COUNT(*) n FROM cars"],
-    ["featured", "SELECT COUNT(*) n FROM cars WHERE featured=1"],
-    ["available", "SELECT COUNT(*) n FROM cars WHERE status='available'"],
-    ["reserved", "SELECT COUNT(*) n FROM cars WHERE status='reserved'"],
-    ["sold", "SELECT COUNT(*) n FROM cars WHERE status='sold'"],
-    ["hidden", "SELECT COUNT(*) n FROM cars WHERE status='hidden'"],
-    ["leads", "SELECT COUNT(*) n FROM leads"],
-    ["newLeads", "SELECT COUNT(*) n FROM leads WHERE status='new'"],
-    ["wonLeads", "SELECT COUNT(*) n FROM leads WHERE status='won'"],
-    ["auditEvents", "SELECT COUNT(*) n FROM cms_audit_log"]
+    ["cars", "SELECT COUNT(*) n FROM cars"], ["featured", "SELECT COUNT(*) n FROM cars WHERE featured=1"], ["available", "SELECT COUNT(*) n FROM cars WHERE status='available'"], ["reserved", "SELECT COUNT(*) n FROM cars WHERE status='reserved'"], ["sold", "SELECT COUNT(*) n FROM cars WHERE status='sold'"], ["hidden", "SELECT COUNT(*) n FROM cars WHERE status='hidden'"], ["leads", "SELECT COUNT(*) n FROM leads"], ["newLeads", "SELECT COUNT(*) n FROM leads WHERE status='new'"], ["wonLeads", "SELECT COUNT(*) n FROM leads WHERE status='won'"], ["auditEvents", "SELECT COUNT(*) n FROM cms_audit_log"]
   ].map(async ([key, sql]) => [key, Number((await db.prepare(sql).first("n")) || 0)]));
   return Object.fromEntries(rows);
 }
-
-async function handleAudit(request, env) {
-  if (request.method !== "GET") return response({ error: "Method Not Allowed" }, 405, { Allow: "GET" });
-  const q = await env.DB.prepare("SELECT id,actor,action,resource,resource_id,summary,created_at FROM cms_audit_log ORDER BY created_at DESC LIMIT 200").all();
-  return response({ events: q.results || [] });
-}
+async function handleAudit(request, env) { if (request.method !== "GET") return response({ error: "Method Not Allowed" }, 405, { Allow: "GET" }); const q = await env.DB.prepare("SELECT id,actor,action,resource,resource_id,summary,created_at FROM cms_audit_log ORDER BY created_at DESC LIMIT 200").all(); return response({ events: q.results || [] }); }
 
 export async function handleCmsApi(request, env) {
   const url = new URL(request.url);
@@ -224,8 +206,5 @@ export async function handleCmsApi(request, env) {
     if (resource === "cars") return handleCars(request, env, parts);
     if (resource === "leads") return handleLeads(request, env, parts);
     return response({ error: "CMS endpoint not found" }, 404);
-  } catch (error) {
-    console.error("CMS API error", error);
-    return response({ error: "Internal Server Error" }, 500);
-  }
+  } catch (error) { console.error("CMS API error", error); return response({ error: "Internal Server Error" }, 500); }
 }
