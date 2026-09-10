@@ -29,45 +29,18 @@
 | Telegram VIP | EXISTING | `/api/telegram/vip-webhook` | Do not create another VIP route/cron. |
 
 ## Single-instance Cloudflare rule
-Existing verified infrastructure:
-- Worker `phanthuanxtra-v2`
-- D1 `phanthuanxtra-db`
-- R2 `phanthuanxtra-media`
-- Workers AI `AI`
-- Images `IMAGES`
-- AI Search `AI_SEARCH`
-- Assets `ASSETS`
-- Worker cron `*/5 * * * *`
+Existing verified infrastructure: Worker `phanthuanxtra-v2`; D1 `phanthuanxtra-db`; R2 `phanthuanxtra-media`; Workers AI `AI`; Images `IMAGES`; AI Search `AI_SEARCH`; Assets `ASSETS`; Worker cron `*/5 * * * *`.
 
 Do not create duplicates unless direct evidence proves the existing resource cannot satisfy the requirement.
 
 ## Markdown authority
-**Operational:**
-- `AI-WORK-REGISTRY.md`
-- `AI_AGENT_PROTOCOL.md`
-- `AI-HANDOFF-CHECKPOINT.md`
-- `MASTER_CONTEXT_PHAN_THUAN.md`
-- `SECURITY.md` (security baseline; reconcile against current source)
+**Operational:** `AI-WORK-REGISTRY.md`, `AI_AGENT_PROTOCOL.md`, `AI-HANDOFF-CHECKPOINT.md`, `MASTER_CONTEXT_PHAN_THUAN.md`, `SECURITY.md` (reconcile security baseline against current source).
 
-**Requires reconciliation before use:**
-- `ADMIN_AUDIT_CHECKPOINT.md`
-- `PHAN_THUAN_XTRA_STATUS.md`
-- `project-docs/PROJECT_STATE.md`
-- `project-docs/AI_HANDOFF.md`
+**Requires reconciliation before use:** `ADMIN_AUDIT_CHECKPOINT.md`, `PHAN_THUAN_XTRA_STATUS.md`, `project-docs/PROJECT_STATE.md`, `project-docs/AI_HANDOFF.md`.
 
-**Historical/read-only evidence:**
-- `AUDIT_CHECKPOINT_2026-09-09_0859.md`
-- `AUDIT_CHECKPOINT_2026-09-09_ADMIN.md`
-- `AUDIT_CHECKPOINT_2026-09-09_API_GATE.md`
-- `AUDIT_CHECKPOINT_2026-09-09_GATE.md`
-- `AUDIT_CHECKPOINT_2026-09-09_GEV_NXDOMAIN.md`
-- `AUDIT_CHECKPOINT_2026-09-09_REPO_CONSOLIDATION.md`
-- `AUDIT_HANDOFF_2026-09-08.md`
-- `AUDIT_SESSION_2026-09-08_0625.md`
-- `AUDIT_SESSION_2026-09-08_1300.md`
-- Android audit/design Markdown under `android/`.
+**Historical/read-only evidence:** root audit/checkpoint/session Markdown from 2026-09-08/09 and Android audit/design Markdown under `android/`.
 
-## Stale/conflicting claims explicitly found
+## Stale/conflicting claims found
 - `ADMIN_AUDIT_CHECKPOINT.md`: old `ADMIN_TOKEN` model and obsolete claim that Wrangler config is absent.
 - `PHAN_THUAN_XTRA_STATUS.md`: stale latest commit/deployment state.
 - `project-docs/PROJECT_STATE.md`: dated 2026-09-06; older deployment evidence.
@@ -87,12 +60,12 @@ Do not create duplicates unless direct evidence proves the existing resource can
 3. Review PR #54 plate branding + AI copy.
 4. Review PR #55 dedicated pages.
 5. Review PR #66 VIP document hardening.
-6. Verify/extend PR #49 runtime health gate.
+6. Verify/extend PR #49 production runtime health gate.
 7. Verify existing backup + restore path.
 
 ## Last registry update
 - Date: 2026-09-10
 - Agent: ChatGPT
-- Registry checkpoint commit: `255724e664b4db095f9a797889d7c5aa3cf66286`
+- Registry checkpoint: `75f148c2e4552edf0393c2deebca0ec30d36860b`
 - Admin Cloudflare Version: `d32431ad-fb43-4ad9-83d5-27876cad7f1b`
 - Blocker: public `/admin` = HTTP 403.
