@@ -21,8 +21,8 @@ If two documents conflict, prefer current repository/source/CI evidence; do not 
 
 - Repository: `phanthuanxtra-v9/phanthuanxtra-v9`
 - Production Worker: `phanthuanxtra-v2`
-- Mainline currently contains Admin `/admin` route fix merge `fc1617479aefa0e9b98b4afe1624f5b01b338187`.
-- Latest documentation checkpoint commit: `778c7dced7bafdc0d1780d548ac90484f9161048`.
+- Mainline contains Admin `/admin` route fix merge `fc1617479aefa0e9b98b4afe1624f5b01b338187`.
+- Latest documentation/coordination commits include `778c7dced7bafdc0d1780d548ac90484f9161048` and `9895da9578147892173f81c6fe04abccd356b43d`.
 - Cloudflare deployment for the Admin route fix was independently verified successful with Version ID `d32431ad-fb43-4ad9-83d5-27876cad7f1b`.
 - Public `https://phanthuanxtra.com/admin` still returns HTTP 403 after that deployment. **Production is therefore not GREEN for Admin.**
 - Do not repeat the Worker `/admin` route-code fix before checking the Cloudflare edge/custom-domain/Access/WAF/route layer.
@@ -37,7 +37,7 @@ If two documents conflict, prefer current repository/source/CI evidence; do not 
 | Dedicated website detail/ecosystem pages | **OPEN** | PR #55 `feat/site-detail-pages` | Existing scope covers vehicle detail + 4 ecosystem areas. Do not create duplicate routes/pages. |
 | VIP document ingestion | **OPEN / newer** | PR #66 `fix(vip): harden Telegram document ingestion on current main` | PR #66 supersedes the older PR #37 scope. Do not implement a second VIP document-ingestion path. |
 | Production runtime health gate | **OPEN / DRAFT** | PR #49 | Existing CI/runtime-health work. Do not create another mandatory production health workflow without comparing PR #49. |
-| Docs/Admin continuity | **SUPERSEDED ON MAIN** | PR #62 | Main already contains newer handoff state. Treat PR #62 as redundant; do not merge it blindly. |
+| Docs/Admin continuity | **CLOSED / SUPERSEDED** | PR #62 | Closed as superseded after newer mainline registry/handoff updates. Do not recreate the same docs sync PR. |
 | Old VIP document ingestion | **SUPERSEDED** | PR #37 | Use PR #66/current-main reconciliation instead. |
 | Old checkpoint documentation | **HISTORICAL** | PR #47 | Do not use its old roadmap/state as current truth. |
 | Old UI performance | **OPEN / HISTORICAL SCOPE** | PR #1 | Do not duplicate its changes; inspect whether current main already contains equivalent behavior before touching UI performance. |
@@ -158,7 +158,7 @@ No secret values. No unsupported deployment claims.
 
 - Date: 2026-09-10
 - Agent: ChatGPT
-- Mainline docs commit: `778c7dced7bafdc0d1780d548ac90484f9161048`
+- Mainline docs commits: `778c7dced7bafdc0d1780d548ac90484f9161048`, `9895da9578147892173f81c6fe04abccd356b43d`
 - Admin production deployment evidence: Cloudflare Version `d32431ad-fb43-4ad9-83d5-27876cad7f1b`
 - Current blocker: public `/admin` returns HTTP 403.
 - Next owner: Release/Production AI (or any AI with Cloudflare edge access) to inspect the edge/custom-domain path before any further Admin route-code changes.
