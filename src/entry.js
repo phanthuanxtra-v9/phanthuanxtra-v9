@@ -9,6 +9,7 @@ import { handleVipTelegram } from "./vip-telegram.js";
 import { handleTelegramLookup } from "./telegram-lookup.js";
 import { handleAppApi } from "./app-api.js";
 import { handleAppAdmin } from "./app-admin.js";
+import { handleAdminVehiclePipeline } from "./admin-vehicle-pipeline.js";
 import { reconcileTelegramNotifications } from "./telegram-notifications.js";
 
 const TELEGRAM_WEBHOOK_URL="https://phanthuanxtra.com/api/telegram/webhook";
@@ -17,21 +18,15 @@ export default {
   async fetch(request, env, ctx) {
     try {
       const url = new URL(request.url);
-
-      // Serve the admin entry point directly. The previous /admin asset was a
-      // client/meta redirect to /admin.html, which can be rejected or cached
-      // differently by the edge before the Worker reaches the SPA. Keeping the
-      // canonical /admin URL inside the Worker removes that extra redirect.
       if (url.pathname === "/admin" || url.pathname === "/admin/") {
         const adminUrl = new URL("/admin.html", request.url);
-        return env.ASSETS.fetch(new Request(adminUrl, {
-          method: "GET",
-          headers: request.headers
-        }));
+        return env.ASSETS.fetch(new Request(adminUrl, { method: "GET", headers: request.headers }));
       }
-
       const aiChatResponse = await handleAiChat(request, env);
       if (aiChatResponse) return aiChatResponse;
+      const adminPipeline = await handleAdminVehiclePipeline(request, env);
+      if (adminPipeline instanceof Response) return adminPipeline;
+      if (adminPipeline instanceof Request) request = adminPipeline;
       const appAdminResponse = await handleAppAdmin(request, env);
       if (appAdminResponse) return appAdminResponse;
       const appApiResponse = await handleAppApi(request, env);
