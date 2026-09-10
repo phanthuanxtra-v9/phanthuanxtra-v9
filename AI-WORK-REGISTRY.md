@@ -1,8 +1,8 @@
 # PHAN THUẦN XTRA — SHARED AI WORK REGISTRY
 
-> One operational registry for AI1–AI5, Cloudflare Workers AI, and any other coding agent. It prevents duplicate implementations, stale Markdown task execution, and duplicate infrastructure.
+> One operational registry for AI1–AI5, Cloudflare Workers AI, Cloudflare Dashboard Ask AI, and any other coding agent. It prevents duplicate implementations, stale Markdown task execution, and duplicate infrastructure.
 
-**HARD RULE: every AI participant, including every Workers AI model invocation, must read this registry before analysis or implementation.** `main` + current open PRs + this registry determine active work. Historical Markdown is evidence only; never execute an old `NEXT ACTION` automatically.
+**HARD RULE: every AI participant, including Cloudflare Dashboard Ask AI and every Workers AI model invocation, must read this registry before analysis or implementation.** `main` + current open PRs + this registry determine active work. Historical Markdown is evidence only; never execute an old `NEXT ACTION` automatically.
 
 ## Mandatory AI preflight
 1. Read `AI-WORK-REGISTRY.md` first.
@@ -13,6 +13,8 @@
 6. Only then inspect/modify code or infrastructure.
 
 **Workers AI gate:** before a Workers AI model is used to make an implementation decision, the current registry + protocol context must be supplied to that model. If the context cannot be supplied/read, the model is advisory only and must not create a new implementation path.
+
+**Cloudflare Dashboard Ask AI gate:** any Ask AI session opened from `dash.cloudflare.com` that is used for PHAN THUẦN XTRA must first receive/read the current `AI-WORK-REGISTRY.md` and `AI_AGENT_PROTOCOL.md`, plus the relevant current handoff/context. Ask AI must treat those files as the coordination source of truth, check existing PR/implementation ownership before proposing implementation, and must not create a competing Worker, route, workflow, migration, or feature when an existing path is recorded. If the current repository context cannot be supplied/read, Ask AI is advisory only and must not be used as authority for a new implementation path. The dashboard Ask AI is subject to the same one-task/one-owner/one-release-gate rule as all other AI participants.
 
 ## Current truth
 - Repository: `phanthuanxtra-v9/phanthuanxtra-v9`
@@ -77,6 +79,6 @@ Do not create duplicates unless direct evidence proves the existing resource can
 - Date: 2026-09-10
 - Agent: ChatGPT
 - Protocol enforcement commit: `c78c7482d8a10f79167e12bdeb34e0c0f12614a7`
-- Registry checkpoint: pending this update
+- Registry enforcement commit: pending this update
 - Admin Cloudflare Version: `d32431ad-fb43-4ad9-83d5-27876cad7f1b`
 - Blocker: public `/admin` = HTTP 403.
