@@ -21,7 +21,7 @@
 | Vehicle + ecosystem pages | OPEN | PR #55 | Review existing dedicated routes; no duplicate pages. |
 | VIP document ingestion | OPEN/newer | PR #66 | Use PR #66/current main; PR #37 is superseded. |
 | Production runtime health | OPEN/DRAFT | PR #49 | Review/extend PR #49; no second health workflow. |
-| Admin docs continuity | CLOSED/SUPERSEDED | PR #62 | Do not recreate/merge the stale docs snapshot. |
+| Admin docs continuity | SUPERSEDED | PR #62 | Do not merge/recreate the stale docs snapshot; close only after confirming no unique content remains. |
 | Old checkpoint | HISTORICAL | PR #47 | Do not use as current state. |
 | Old UI performance | OPEN | PR #1 | Inspect current main before duplicating any UI optimization. |
 | Backup | IMPLEMENTED, NOT OPERATIONALLY PROVEN | `full-system-backup.yml`, `scripts/full-system-backup.mjs` | Verify real backup + restore/readability; do not create another backup workflow/bot/cron. |
@@ -66,6 +66,6 @@ Do not create duplicates unless direct evidence proves the existing resource can
 ## Last registry update
 - Date: 2026-09-10
 - Agent: ChatGPT
-- Registry checkpoint: `678e8258f0465630403b36c39213b51663e454e2`
+- Registry checkpoint: `4f76ca594963d4864a9693985320d56aeba15cea`
 - Admin Cloudflare Version: `d32431ad-fb43-4ad9-83d5-27876cad7f1b`
 - Blocker: public `/admin` = HTTP 403.
