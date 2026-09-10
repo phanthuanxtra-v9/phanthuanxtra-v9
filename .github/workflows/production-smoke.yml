@@ -97,7 +97,7 @@ jobs:
 
       - name: Smoke summary
         run: |
-          echo 'Production smoke suite passed:'
+          echo 'Production smoke suite passed for current deployment.'
           echo '- website'
           echo '- /api/health'
           echo '- /api/cars'
