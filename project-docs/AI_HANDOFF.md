@@ -35,3 +35,11 @@ AI1, AI2, AI3, AI4 and AI5 are equal peer agents working on the same project. Ro
 
 ## Next agent
 Read `PROJECT_STATE.md` and this file first. Run #69 is the current production verification checkpoint. Preserve Telegram idempotence, AI human-handoff behavior, and vehicle data integrity when extending the pipeline.
+
+
+## ADMIN CONTINUITY — 2026-09-10
+- `admin.phanthuanxtra.com` is the PHAN THUAN XTRA vehicle/content publishing Admin, not Ask AI Admin.
+- Ask AI Admin remains `ask-ai-agent.phanthuanmodelactor.workers.dev/admin` and is a separate boundary.
+- Do not invent credentials or Cloudflare resource mappings.
+- Admin release gate: CI → deployment evidence → auth smoke test → CRUD/media/publish → public-site verification → security regression → Android/S21 regression.
+- GitHub Environment `production` is now explicitly bound to the Cloudflare production deploy job by PR #61.
