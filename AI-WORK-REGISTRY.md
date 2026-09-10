@@ -1,8 +1,18 @@
 # PHAN THUẦN XTRA — SHARED AI WORK REGISTRY
 
-> One operational registry for AI1–AI5 and any other coding agent. It prevents duplicate implementations, stale Markdown task execution, and duplicate infrastructure.
+> One operational registry for AI1–AI5, Cloudflare Workers AI, and any other coding agent. It prevents duplicate implementations, stale Markdown task execution, and duplicate infrastructure.
 
-**Operational rule:** read this file first. `main` + current open PRs + this registry determine active work. Historical audit Markdown is evidence only; never execute an old `NEXT ACTION` automatically.
+**HARD RULE: every AI participant, including every Workers AI model invocation, must read this registry before analysis or implementation.** `main` + current open PRs + this registry determine active work. Historical Markdown is evidence only; never execute an old `NEXT ACTION` automatically.
+
+## Mandatory AI preflight
+1. Read `AI-WORK-REGISTRY.md` first.
+2. Read `AI_AGENT_PROTOCOL.md`.
+3. Read current handoff/context: `AI-HANDOFF-CHECKPOINT.md` and `MASTER_CONTEXT_PHAN_THUAN.md`.
+4. Reconcile relevant project-state/handoff documents against current `main`.
+5. Check current `main` and relevant open PRs for an existing implementation owner.
+6. Only then inspect/modify code or infrastructure.
+
+**Workers AI gate:** before a Workers AI model is used to make an implementation decision, the current registry + protocol context must be supplied to that model. If the context cannot be supplied/read, the model is advisory only and must not create a new implementation path.
 
 ## Current truth
 - Repository: `phanthuanxtra-v9/phanthuanxtra-v9`
@@ -52,7 +62,7 @@ Do not create duplicates unless direct evidence proves the existing resource can
 2. Search open PRs for the same logical feature/files.
 3. If a PR already owns the task, review/continue it; do not start a competing implementation.
 4. One logical task → one active implementation path → one release gate.
-5. After meaningful work, update this registry or canonical handoff with branch/PR, files, commit, tests, production evidence, blocker and next owner.
+5. After meaningful work, update this registry or canonical handoff with branch/PR, files, commit, tests, production evidence, blocker and next owner/action.
 
 ## Current queue
 1. Admin 403 edge/custom-domain/Access/WAF investigation.
@@ -66,6 +76,7 @@ Do not create duplicates unless direct evidence proves the existing resource can
 ## Last registry update
 - Date: 2026-09-10
 - Agent: ChatGPT
-- Registry checkpoint: `4f76ca594963d4864a9693985320d56aeba15cea`
+- Protocol enforcement commit: `c78c7482d8a10f79167e12bdeb34e0c0f12614a7`
+- Registry checkpoint: pending this update
 - Admin Cloudflare Version: `d32431ad-fb43-4ad9-83d5-27876cad7f1b`
 - Blocker: public `/admin` = HTTP 403.
