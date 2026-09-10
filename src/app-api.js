@@ -16,23 +16,15 @@ if(r.method!=='POST')return json({error:"Method Not Allowed"},405,{Allow:"GET,PO
 async function leads(r,e){
   if(!e.DB)return json({error:"D1 chưa được kết nối"},503);
   if(r.method==='GET'){
-    const q=await e.DB.prepare("SELECT * FROM leads ORDER BY created_at DESC LIMIT 500").all();
-    return json({leads:q.results||[]});
+    const u=new URL(r.url),q=text(u.searchParams.get('q'),120),status=text(u.searchParams.get('status'),30);
+    const allowed=new Set(["new","contacted","qualified","won","lost"]); if(status&&!allowed.has(status))return json({error:"Trạng thái lead không hợp lệ"},400);
+    let sql="SELECT * FROM leads",args=[],where=[]; if(q){where.push("(name LIKE ? OR phone LIKE ? OR car_id LIKE ? OR message LIKE ? OR note LIKE ?)");const x=`%${q}%`;args.push(x,x,x,x,x)} if(status){where.push("status=?");args.push(status)} if(where.length)sql+=" WHERE "+where.join(" AND "); sql+=" ORDER BY created_at DESC,id DESC LIMIT 500";
+    const result=await e.DB.prepare(sql).bind(...args).all(); return json({leads:result.results||[],count:(result.results||[]).length,statuses:[...allowed]});
   }
-  const b=await body(r),id=num(b?.id);
-  if(!id)return json({error:"ID lead không hợp lệ"},400);
-  if(r.method==='PUT'){
-    const status=text(b.status||'new',30);
-    const allowed=new Set(["new","contacted","qualified","won","lost"]);
-    if(!allowed.has(status))return json({error:"Trạng thái lead không hợp lệ"},400);
-    await e.DB.prepare("UPDATE leads SET status=?,note=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(status,text(b.note,3000),id).run();
-    return json({ok:true,id,status});
-  }
-  if(r.method==='DELETE'){
-    const result=await e.DB.prepare("DELETE FROM leads WHERE id=?").bind(id).run();
-    if(Number(result?.meta?.changes||0)!==1)return json({error:"Không tìm thấy lead"},404);
-    return json({ok:true,id,deleted:true});
-  }
+  const b=await body(r),id=num(b?.id); if(!Number.isInteger(id)||id<1)return json({error:"ID lead không hợp lệ"},400);
+  const allowed=new Set(["new","contacted","qualified","won","lost"]);
+  if(r.method==='PUT'){const status=text(b.status||'new',30);if(!allowed.has(status))return json({error:"Trạng thái lead không hợp lệ"},400);const result=await e.DB.prepare("UPDATE leads SET status=?,note=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(status,text(b.note,3000),id).run();if(Number(result?.meta?.changes||0)!==1)return json({error:"Không tìm thấy lead"},404);return json({ok:true,id,status});}
+  if(r.method==='DELETE'){const result=await e.DB.prepare("DELETE FROM leads WHERE id=?").bind(id).run();if(Number(result?.meta?.changes||0)!==1)return json({error:"Không tìm thấy lead"},404);return json({ok:true,id,deleted:true});}
   return json({error:"Method Not Allowed"},405,{Allow:"GET,PUT,DELETE"});
 }
 async function upload(r,e){if(!e.MEDIA)return json({error:"MEDIA chưa được kết nối"},503);if(r.method!=='POST')return json({error:"Method Not Allowed"},405,{Allow:"POST"});const type=r.headers.get("content-type")||"application/octet-stream";if(!type.startsWith("image/"))return json({error:"Chỉ nhận image/*"},415);const len=Number(r.headers.get("content-length")||0);if(len>12*1024*1024)return json({error:"Ảnh vượt quá 12MB"},413);const bytes=await r.arrayBuffer();if(bytes.byteLength>12*1024*1024)return json({error:"Ảnh vượt quá 12MB"},413);const ext=(type.split('/')[1]||'jpeg').replace(/[^a-z0-9]/gi,'').slice(0,10)||'jpeg';const mediaId=crypto.randomUUID(),key=`app/${new Date().toISOString().slice(0,10)}/${mediaId}.${ext}`;await e.MEDIA.put(key,bytes,{httpMetadata:{contentType:type,cacheControl:"public,max-age=31536000,immutable"}});return json({ok:true,key,url:`/media/${encodeURIComponent(key)}`},201)}
