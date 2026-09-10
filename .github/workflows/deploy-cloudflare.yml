@@ -122,6 +122,7 @@ jobs:
     # workflow_dispatch remains validation-only; it must never bypass the production gate.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: validate
+    environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
