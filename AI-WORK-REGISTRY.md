@@ -93,6 +93,6 @@ Do not create duplicates unless direct evidence proves the existing resource can
 ## Last registry update
 - Date: 2026-09-10
 - Agent: ChatGPT
-- Registry commit: `77f89909d97bb63e62f4343193d15341b7f9233c`
+- Registry checkpoint commit: `255724e664b4db095f9a797889d7c5aa3cf66286`
 - Admin Cloudflare Version: `d32431ad-fb43-4ad9-83d5-27876cad7f1b`
 - Blocker: public `/admin` = HTTP 403.
