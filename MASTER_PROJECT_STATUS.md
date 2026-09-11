@@ -11,7 +11,7 @@ This is the only project-status / continuity document. Current `main` source, cu
 
 ## 2. CURRENT ARCHITECTURE
 
-- Main: `5fa34d0511e710794c2072d3de7d8d2d238dc9f0` (PR #82 merge)
+- Main: `f5ac7d411c199a240cd263dbb0e409e3d113f8f6` (PR #83 merge)
 - Production Worker: `phanthuanxtra-v2`
 - Entry: `src/entry.js`
 - Website: `https://phanthuanxtra.com`
@@ -31,99 +31,102 @@ AI-1 through AI-6 are one engineering/audit team using one source of truth, one 
 PR #82 `fix: canonicalize direct Admin asset` was merged successfully.
 
 - Merge commit: `5fa34d0511e710794c2072d3de7d8d2d238dc9f0`
-- Head before merge: `c85020cf0af52d29000815b6c9b1ef1029972df5`
-- `public/admin` SHA is now exactly the same as canonical `public/admin.html`: `d1331862b0c5e74f2c22da70849b53c73c2f25f2`.
+- `public/admin` SHA is exactly the same as canonical `public/admin.html`: `d1331862b0c5e74f2c22da70849b53c73c2f25f2`.
 - `src/entry.js` explicitly canonicalizes `/admin` and `/admin/` to `/admin.html`, sets UTF-8 content type and `no-store`.
 
-Conclusion: source remediation matches the observed `/admin` legacy-asset incident.
+PR #83 was then merged as the evidence/status continuity update:
+- Merge commit: `f5ac7d411c199a240cd263dbb0e409e3d113f8f6`.
+- `MASTER_PROJECT_STATUS.md` remains the only canonical continuity document.
 
-### 4.2 CI/CD — GREEN for deployment, RED for production smoke
+### 4.2 CI/CD — DEPLOYMENT GREEN / PRODUCTION SMOKE RED
 
-Deploy workflow run `34571728581` / run #348:
-- CI / Validate: SUCCESS.
-- Cloudflare production deploy job: SUCCESS.
-- Main commit deployed by the workflow: `5fa34d0511e710794c2072d3de7d8d2d238dc9f0`.
+Deploy workflow run `34570211871` successfully validated and deployed commit `d090744b757095d3e75160ebedaf69cecfea40f5` after the D1 migration-drift remediation. The production Worker deployment job completed successfully.
 
-Production Smoke run `34571728614` / run #15:
-- FAILED.
-- Website and production Worker basic smoke: SUCCESS.
-- Failure occurred at `Smoke admin authentication boundary`.
-- All later smoke/E2E steps were skipped because of this failure.
+Production Smoke run `34573941824` was dispatched after the GitHub Actions `ADMIN_PASSWORD` secret was created. The job environment showed `ADMIN_PASSWORD: ***`, proving the GitHub secret is injected. Basic website, `/api/health`, `/api/cars`, `/admin.html`, and Worker smoke checks passed.
 
-Therefore deployment is proven, but the production release gate is NOT GREEN.
+The Admin authentication boundary then failed because an invalid password returned **HTTP 500** instead of the required **HTTP 401**. All authenticated D1/R2/Gateway E2E stages were therefore skipped.
 
-### 4.3 Cloudflare production — DEPLOYMENT PROVEN / PRIVILEGED CONFIGURATION NOT FULLY PROVEN
+### 4.3 Admin login — ROOT CAUSE NARROWED / FIX PR OPEN
 
-GitHub Actions proves Wrangler authentication, dry-run and production deployment completed successfully. Repository configuration identifies Worker `phanthuanxtra-v2`, D1 `phanthuanxtra-db`, R2 `phanthuanxtra-media`, AI/AI_SEARCH/IMAGES/ASSETS bindings and the expected cron.
+Runtime path is confirmed by current `main` source:
 
-This ChatGPT session has GitHub access but no privileged Cloudflare management connector. Therefore Worker secrets/routes/version configuration must not be guessed or mutated from ChatGPT.
+`src/entry.js` → `handleAppAdmin()` → `adminLogin()` → `verifyAdminPassword()` → D1 `admin_credentials` query.
 
-Known security blocker from prior authorized inspection remains material: Admin requires both `ADMIN_PASSWORD` and `ADMIN_TOKEN`. The previously inspected production secret inventory contained `ADMIN_PASSWORD` but did not contain `ADMIN_TOKEN`. This is consistent with the production smoke failure at the Admin authentication boundary. Fresh Cloudflare secret inventory is required before declaring the blocker resolved.
+`src/admin-password.js` on `main` performs:
 
-### 4.4 Runtime `/admin` — NOT YET REPROVEN AFTER DEPLOY
+`SELECT password_hash,salt FROM admin_credentials WHERE id=1`
 
-The previous runtime evidence established:
-- `/admin` was serving the legacy 1277-byte `public/admin` asset.
-- `/admin/` and `/admin.html` served the canonical 6341-byte Admin UI.
-- The previous `/admin` response had public cache semantics; `/admin/` had `no-store`.
-- The bytes were valid UTF-8; the apparent mojibake was not the root cause.
+outside the existing PBKDF2/base64 `try/catch`. If that D1 query throws because of a runtime database/schema/binding failure, the exception escapes `verifyAdminPassword()` and the Worker-level handler converts it to HTTP 500.
 
-PR #82 fixes the source asset divergence and was deployed. However, fresh post-deploy HTTP evidence for all three URLs is still required. This environment cannot directly resolve the production hostname, so no post-deploy runtime GREEN claim is made without evidence.
+The exact underlying D1 exception text is **not yet independently captured** in this session because privileged Cloudflare runtime logs are unavailable. Therefore the audit does not claim a specific missing table/binding/migration error without evidence.
 
-### 4.5 Security E2E — BLOCKED / NOT PROVEN
+Remediation PR **#84** is open:
+- Branch: `fix/admin-login-d1-fail-closed-v1`
+- Current head: `e8c3ab0b515a7ddbeee4faf02858891dc7953ff3`
+- Change: D1 credential lookup now fails closed (`false`) instead of throwing.
+- Security behavior: when D1 credential storage is unavailable, the code does **not** fall back to `ADMIN_PASSWORD`; fallback remains only when the query succeeds and no persisted credential row exists.
+- Regression tests cover D1 lookup failure and the intended bootstrap fallback.
+- Admin CI and deploy validation were expanded to execute the Admin password regression suite.
 
-Source review confirms:
-- `src/admin-auth.js` issues and verifies HMAC-SHA-256 signed Admin session tokens with a 60-minute TTL.
-- malformed/random/tampered/expired tokens are rejected.
-- `src/app-admin.js` requires both `ADMIN_PASSWORD` and `ADMIN_TOKEN` for login.
-- protected Admin routes require a valid signed session.
-- Admin D1 CRUD and R2 media E2E exist in `production-smoke.yml`.
+PR #84 has **not been merged** and production has not been mutated by this remediation.
 
-Production smoke did not reach authenticated D1/R2 E2E because the Admin authentication boundary failed first.
+### 4.4 Credential model — SOURCE INCONSISTENCY DOCUMENTED
 
-### 4.6 Password reset — SOURCE GREEN / PRODUCTION BLOCKED
+The Admin implementation intentionally has two credential layers:
+- `ADMIN_PASSWORD` is the bootstrap fallback when `admin_credentials` has no row.
+- D1 `admin_credentials` becomes the persisted password after recovery.
+- `ADMIN_TOKEN` signs the Admin session token and authorizes password recovery.
 
-`public/admin.html` and `public/admin` both contain `Quên mật khẩu?` and the recovery form.
+`app-admin.js` currently requires both `ADMIN_PASSWORD` and `ADMIN_TOKEN` before invoking `verifyAdminPassword()`. This is a separate design inconsistency because `verifyAdminPassword()` already supports a D1 persisted password override. It is not being changed in PR #84 unless later runtime evidence proves it is part of the release blocker.
 
-`src/admin-password.js` uses PBKDF2-SHA-256 with 120,000 iterations and a random 16-byte salt; plaintext passwords are not stored.
+User has confirmed `ADMIN_TOKEN` was configured in Production and redeployed. This is user-provided configuration evidence; the secret value is neither requested nor exposed. This session has no privileged Cloudflare connector to independently enumerate Worker secrets.
 
-`migrations/0013_admin_credentials.sql` creates the D1 credential table.
+### 4.5 Cloudflare production — DEPLOYMENT PROVEN / PRIVILEGED RUNTIME STATE PARTIALLY PROVEN
 
-`POST /api/admin/forgot-password` requires the server-side `ADMIN_TOKEN`, validates the recovery code and stores only the password hash/salt.
+GitHub Actions proves Wrangler authentication, dry-run, migration/deploy execution and Worker deployment. Repository configuration identifies Worker `phanthuanxtra-v2`, D1 `phanthuanxtra-db`, R2 `phanthuanxtra-media`, AI/AI_SEARCH/IMAGES/ASSETS bindings and the expected cron.
 
-Production reset E2E is NOT proven because the required recovery secret is not yet independently confirmed in the live Worker.
+This ChatGPT session has GitHub access but no privileged Cloudflare management connector. Do not guess or mutate Worker secrets/routes/bindings from ChatGPT.
 
-### 4.7 Regression — PARTIALLY PROVEN / GATES REMAIN
+### 4.6 Runtime `/admin` — NOT YET REPROVEN AFTER LATEST DEPLOY
 
-CI test suite includes Telegram, AI chat, PT Xtra media/plate, production-gates and VIP vehicle intelligence tests. Production smoke also contains Gateway, Admin D1 and R2 E2E gates, but these were skipped after the Admin boundary failure.
+PR #82 fixes the source asset divergence and was included in the deployed main lineage. Fresh post-deploy evidence for `/admin`, `/admin/`, and `/admin.html` is still required before declaring the Admin UI route GREEN.
 
-Still unproven by this audit:
+### 4.7 Password reset — SOURCE GREEN / PRODUCTION BLOCKED
+
+`public/admin.html` and `public/admin` contain the recovery UI. `src/admin-password.js` uses PBKDF2-SHA-256 with 120,000 iterations and a random 16-byte salt; plaintext passwords are not stored. `migrations/0013_admin_credentials.sql` creates the credential table. Production reset E2E is not proven.
+
+### 4.8 Regression / release gates — OPEN
+
+Still unproven:
+- Invalid Admin login → 401 in production after remediation deployment.
+- Valid Admin login → signed session and protected dashboard.
+- Authenticated Admin D1 CRUD.
+- Authenticated Admin R2 media write/read/delete.
+- Gateway production smoke completion.
 - Telegram Auto Bot production E2E.
 - VIP webhook/idempotency production E2E.
-- Developer Gateway production smoke completion for this release.
-- Fresh APK 1.2.0 artifact/hash tied to a current CI run plus material S21 device regression.
+- Fresh APK artifact/hash tied to a current CI run plus material S21 device regression.
 - Real backup plus restore/readability test.
-
-Do not mark these GREEN from source presence alone.
 
 ## 5. CURRENT BLOCKERS
 
-1. **ADMIN_TOKEN live configuration is not independently proven.** Do not guess or expose it.
-2. **Production Smoke #15 failed at Admin authentication boundary.**
-3. **Post-deploy `/admin`, `/admin/`, `/admin.html` runtime evidence is still required.**
+1. **Production Admin invalid-credential boundary returns 500 instead of 401.** PR #84 is the controlled remediation.
+2. **The exact underlying D1 runtime exception is not yet captured by privileged Cloudflare logs.** Do not invent its cause beyond the proven uncaught-query boundary.
+3. **PR #84 is not merged; production remains RED.**
 4. **Authenticated Admin D1/R2 E2E did not execute in the failed smoke run.**
 5. **Password-reset E2E is not proven.**
 6. **APK, Telegram/VIP production E2E and backup/restore gates remain open.**
 
 ## 6. IMMEDIATE EXECUTION ORDER
 
-1. Obtain fresh authorized Cloudflare secret/config evidence for `ADMIN_TOKEN` without exposing the value.
-2. If missing, configure it through the authorized Cloudflare secret-management path; do not store it in GitHub files, Markdown, issues or chat.
-3. Re-run Production Smoke and require the Admin boundary, D1 CRUD and R2 CRUD gates to pass.
-4. Recheck `/admin`, `/admin/`, `/admin.html` from a network with production DNS access and record status/content-type/cache behavior.
+1. Complete CI/review validation for PR #84.
+2. Only after CI is green, obtain merge confirmation before merging PR #84.
+3. After merge, let the protected production deployment execute; then rerun Production Smoke.
+4. Require Admin invalid-login 401, valid login/session, unauthenticated 401, authenticated dashboard, D1 CRUD and R2 CRUD to pass.
 5. Run password-reset E2E using the live recovery path without revealing the recovery code.
 6. Complete Telegram/VIP production E2E, APK artifact/device gate and backup restore/readability gate.
 7. Only then perform duplicate infrastructure/branch/Worker cleanup.
+8. Never declare Production GREEN from source presence or skipped tests alone.
 
 ## 7. SAFETY / CONTINUITY
 
