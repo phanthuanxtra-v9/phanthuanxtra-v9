@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       instruction:
-        description: 'Task to execute from the persistent checkpoint'
+        description: 'Task to execute from the canonical project checkpoint'
         required: true
         type: string
       task_id:
@@ -17,8 +17,9 @@ on:
         type: string
         default: feature/multi-ai-developer-gateway
 
+# One execution queue: different task IDs must not execute concurrently.
 concurrency:
-  group: ai-unified-executor-${{ inputs.task_id }}
+  group: ai-unified-executor-single-queue
   cancel-in-progress: false
 
 permissions:
@@ -47,12 +48,11 @@ jobs:
           node --version
           git status --short
 
-      - name: Read persistent checkpoint
+      - name: Read canonical project checkpoint
         run: |
           set -euo pipefail
-          test -f developer-gateway/TASK-LEDGER.md
-          test -f developer-gateway/AI-PEER-CONTINUITY.md
-          cp developer-gateway/TASK-LEDGER.md ai-task-checkpoint.md
+          test -f MASTER_PROJECT_STATUS.md
+          cp MASTER_PROJECT_STATUS.md ai-task-checkpoint.md
           test -s ai-task-checkpoint.md
 
       - name: Run unified Cloudflare Workers AI executor
@@ -65,7 +65,7 @@ jobs:
           TASK_CHECKPOINT: ''
         run: |
           set -euo pipefail
-          export TASK_CHECKPOINT="$(cat developer-gateway/TASK-LEDGER.md)"
+          export TASK_CHECKPOINT="$(cat MASTER_PROJECT_STATUS.md)"
           node developer-gateway/ai-peer-executor.mjs > ai-unified-executor.json
           node -e "const x=require('./ai-unified-executor.json'); if(x.production_mutation!==false) throw new Error('production mutation must remain false'); if(x.logical_agent!=='xtra-unified-ai') throw new Error('wrong logical agent'); if(x.engine!=='cloudflare-workers-ai') throw new Error('wrong inference engine'); if(!x.response) throw new Error('missing unified response');"
           test -s ai-unified-executor.json
@@ -92,6 +92,7 @@ jobs:
             echo 'inference_engine=cloudflare-workers-ai'
             echo "task_id=${{ inputs.task_id }}"
             echo "base_branch=${{ inputs.base_branch }}"
+            echo '- Single execution queue: **enabled**'
             echo '- Independent peer API calls: **0**'
             echo '- Repository writes: **none**'
             echo '- Production mutations: **not attempted**'
