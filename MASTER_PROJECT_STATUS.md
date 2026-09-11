@@ -89,7 +89,27 @@ Required security behavior:
 - Valid signed session permits protected Admin operations.
 - No production secret is stored in source, Markdown, issues, logs or chat.
 
-Known previous production observation: the live Admin UI reported **“Admin credentials chưa được cấu hình”**, indicating that the production runtime did not have the required `ADMIN_PASSWORD` available at that observation point. Do not infer the current secret state from source alone. Re-run the production smoke after the secret is correctly configured in the actual execution environments.
+Known previous production observation: the live Admin UI reported **“Admin credentials chưa được cấu hình”**, and the fresh runtime test returned HTTP 503 with the same error. Cloudflare inspection separately confirmed `ADMIN_PASSWORD` exists and Worker bindings include D1/R2/AI, so the remaining confirmed configuration blocker is that the runtime also requires `ADMIN_TOKEN`, which was not present in the inspected secret inventory. Do not invent or expose its value.
+
+### 5.1 ADMIN SELF-SERVICE PASSWORD RECOVERY — IN PROGRESS
+
+User requirement: Admin login must have **“Quên mật khẩu?”** and allow the owner to set a new password without sending the password to chat.
+
+Implementation branch: `feature/admin-self-service-password-reset-v1`.
+
+Design:
+- `migrations/0013_admin_credentials.sql` creates a single-row D1 credential store.
+- `src/admin-password.js` stores a PBKDF2-SHA-256 password hash with a random salt; plaintext passwords are never stored.
+- Existing `ADMIN_PASSWORD` remains the bootstrap password when no D1 override exists.
+- `/api/admin/forgot-password` verifies the server-side `ADMIN_TOKEN` as the recovery code, then stores the new password hash in D1.
+- `public/admin.html` provides the forgot-password form, recovery-code field, new-password field and confirmation field.
+- New password requires at least 8 characters.
+- The recovery code is never persisted in the browser or source.
+- The Admin CI syntax gate now checks `src/admin-password.js`.
+
+**Important:** this feature does not make password recovery possible without a recovery secret. The recovery code is the existing `ADMIN_TOKEN`; if it is unavailable, it must be set/reset through the authorized Cloudflare secret-management path. Never place that secret in chat.
+
+The branch must pass CI and D1 migration/deploy evidence before merge. Production Admin remains RED until runtime login and reset E2E are proven.
 
 ## 6. PRODUCTION SMOKE / CURRENT GATES
 
