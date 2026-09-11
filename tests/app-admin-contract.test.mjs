@@ -19,6 +19,14 @@ test('app admin exposes authenticated lead CRUD contract',()=>{
   assert.match(source,/Unauthorized/);
 });
 
+test('app admin exposes authenticated R2 media delete with key allowlist',()=>{
+  assert.match(source,/handleMediaDelete/);
+  assert.match(source,/MEDIA_KEY_RE/);
+  assert.match(source,/env\.MEDIA\.delete\(key\)/);
+  assert.match(source,/key\.includes\("\.\."\)/);
+  assert.match(source,/u\.pathname\.startsWith\("\/api\/admin\/media\/"\)/);
+});
+
 test('lead management migration adds operational fields without dropping data',()=>{
   assert.match(migration,/ALTER TABLE leads ADD COLUMN status/);
   assert.match(migration,/ALTER TABLE leads ADD COLUMN note/);
