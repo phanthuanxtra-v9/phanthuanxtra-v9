@@ -62,6 +62,9 @@ jobs:
           node --check public/script.js
 
           node --test \
+            tests/admin-auth.test.mjs \
+            tests/admin-password.test.mjs \
+            tests/app-admin-contract.test.mjs \
             tests/telegram.test.mjs \
             tests/ai-chat.test.mjs \
             tests/pt-xtra-media.test.mjs \

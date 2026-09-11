@@ -28,8 +28,18 @@ function equalBytes(a,b) {
 export async function verifyAdminPassword(env, password) {
   const candidate = String(password || "");
   if (!env.DB || !candidate) return false;
-  const row = await env.DB.prepare("SELECT password_hash,salt FROM admin_credentials WHERE id=1").first();
+
+  let row;
+  try {
+    row = await env.DB.prepare("SELECT password_hash,salt FROM admin_credentials WHERE id=1").first();
+  } catch {
+    // Authentication must fail closed when the credential store is unavailable.
+    // Do not fall back to ADMIN_PASSWORD during a D1 outage/schema error.
+    return false;
+  }
+
   if (!row) return candidate === String(env.ADMIN_PASSWORD || "");
+
   try {
     const hash = await derive(candidate, base64ToBytes(row.salt));
     return equalBytes(hash, base64ToBytes(row.password_hash));
