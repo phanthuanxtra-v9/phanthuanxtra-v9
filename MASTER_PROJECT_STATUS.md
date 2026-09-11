@@ -19,11 +19,9 @@ AI-1 through AI-6 operate as one engineering/audit team. Evidence is shared thro
 
 `AI agents → GitHub branch/PR → CI/audit → protected main → Cloudflare deployment → production runtime verification → production E2E → APK/device verification`
 
-Cloudflare AI/AI Gateway/Workflows may be used where configured and useful, but they never replace runtime evidence. Audit must prefer zero-cost repository/CI/runtime evidence over paid API calls when equivalent evidence exists.
-
 ## 4. CURRENT ARCHITECTURE
 
-- Main: `7f1347acede603826608dd0d5bdf6762fe425294` (PR #84 merge)
+- Main: `65e7c4bd853f6def83b080fce65149e9b9f464f8` (PR #86 status consolidation)
 - Production Worker: `phanthuanxtra-v2`
 - Entry: `src/entry.js`
 - Website: `https://phanthuanxtra.com`
@@ -34,77 +32,66 @@ Cloudflare AI/AI Gateway/Workflows may be used where configured and useful, but 
 
 ## 5. VERIFIED RELEASE EVIDENCE
 
-### 5.1 Source / Admin security — GREEN
+### 5.1 Source / Admin security — SOURCE GREEN
 
 PR #82 canonicalized the direct Admin asset path. PR #84 hardened Admin credential verification so a D1 credential-store exception fails closed instead of escaping as HTTP 500.
 
 - PR #84 merge commit: `7f1347acede603826608dd0d5bdf6762fe425294`
+- PR #86 merge commit: `65e7c4bd853f6def83b080fce65149e9b9f464f8`
 - PR #84 CI checks passed before merge.
 - D1 lookup failure returns authentication failure; it does not fall back to `ADMIN_PASSWORD` during a D1 outage.
-- Regression coverage includes D1 lookup failure and bootstrap fallback behavior.
 
-### 5.2 Production deployment — NOT YET PROVEN FOR PR #84
+### 5.2 Production deployment — RED / NOT PROVEN
 
-The last independently recorded successful production deployment was workflow `34570211871`, which deployed an earlier commit in the D1 migration-drift remediation lineage.
-
-No post-merge deployment run for `7f1347a` has yet been evidenced in this audit session. Therefore the PR #84 code must not be considered production-deployed until a deployment run explicitly proves it.
+No current evidence in this audit proves that the PR #84 Admin fix is deployed to the production Worker. The latest `main` push has triggered CI, including Android APK workflow run `34576279580`, currently/most recently observed in progress. Do not infer Cloudflare deployment from source merge or APK CI.
 
 ### 5.3 Production smoke — RED / PRE-FIX EVIDENCE
 
-Production Smoke run `34573941824` injected the GitHub Actions `ADMIN_PASSWORD` secret and passed basic website, `/api/health`, `/api/cars`, `/admin.html` and Worker checks. It then failed because invalid Admin credentials returned HTTP 500 instead of required HTTP 401. Downstream D1/R2/Gateway E2E stages were skipped.
+Production Smoke run `34573941824` injected the GitHub Actions `ADMIN_PASSWORD` secret and passed basic website, `/api/health`, `/api/cars`, `/admin.html` and Worker checks, then failed because invalid Admin credentials returned HTTP 500 instead of required HTTP 401. Downstream D1/R2/Gateway E2E stages were skipped. This run predates PR #84 and cannot validate the fix.
 
-This smoke run predates PR #84 and therefore cannot validate the fix.
+### 5.4 Production E2E — OPEN
 
-### 5.4 Cloudflare runtime evidence — PARTIAL
+Required gates remain open: Admin invalid/valid login and session, dashboard authorization, D1 CRUD, R2 media CRUD, password reset, Gateway/AI, Telegram Auto Bot, VIP webhook/idempotency, backup/restore, and fresh APK artifact/device verification.
 
-GitHub Actions provides evidence for Wrangler authentication and repository-controlled deployment steps. This ChatGPT session does not have a privileged Cloudflare management connector for independent secret/route/binding enumeration. Do not guess or mutate Cloudflare secrets, routes or bindings without evidence.
+### 5.5 Cloudflare runtime evidence — PARTIAL
 
-### 5.5 Admin runtime — OPEN
+This ChatGPT session does not have a privileged Cloudflare management connector for independent secret/route/binding enumeration. Do not guess or mutate Cloudflare secrets, routes or bindings without evidence.
 
-Fresh post-PR #84 production evidence is required for `/admin`, `/admin/` and `/admin.html`, including correct UTF-8 content, canonical asset behavior and cache headers.
+## 6. PR CONSOLIDATION / NO OVERLAP
 
-### 5.6 Password reset — SOURCE GREEN / PRODUCTION OPEN
+The stale/open PR inventory was audited. Superseded or duplicate work was closed without deleting branches or infrastructure:
 
-Admin recovery uses PBKDF2-SHA-256 with 120,000 iterations and a random 16-byte salt. Plaintext passwords are not stored. Migration `0013_admin_credentials.sql` creates the credential table. Production recovery E2E remains unproven.
+- Closed #1 — obsolete mobile performance branch.
+- Closed #37 — superseded by the newer VIP hardening track.
+- Closed #47 — obsolete checkpoint; this file is now the sole canonical status.
+- Closed #49 — stale draft; production verification is handled by the current production-smoke/deploy gates.
+- Closed #53 — stale Admin UI track superseded by current Admin/security work.
+- Closed #54 — stale AI plate-branding track; must be reintroduced only if current main still needs the capability.
+- Closed #55 — stale website detail-page track; must be reintroduced only after current UX/API audit.
+- Closed #62 — duplicate documentation/checkpoint track.
+- Closed #77 — obsolete/redundant God's Eye revert track.
+- Closed #85 — superseded status-sync PR; replaced by #86.
 
-## 6. PRODUCTION RELEASE GATES — OPEN
+PR #66 remains the only retained open implementation candidate from the stale set because it contains concrete VIP document-ingestion hardening. It is not approved for merge: its branch must be reconciled against current `main` and pass current CI/runtime gates before any merge.
 
-1. Post-merge production deployment of `7f1347a` or an explicitly equivalent deployed commit.
-2. Invalid Admin login → HTTP 401, never 500.
-3. Valid Admin login → HTTP 200 + signed session.
-4. Unauthenticated Admin dashboard → HTTP 401.
-5. Authenticated Admin dashboard access.
-6. Admin D1 create/read/delete E2E.
-7. Admin R2 media write/read/delete E2E.
-8. Developer Gateway health/auth/unified-AI production gate where configured.
-9. Password-reset production E2E.
-10. Fresh APK CI artifact/hash tied to current main plus S21 Ultra regression.
-11. Telegram Auto Bot production E2E.
-12. VIP webhook/idempotency production E2E.
-13. Backup plus restore/readability evidence.
-14. Only after all gates pass: stale PR/branch/infrastructure cleanup with dependency evidence.
+## 7. EXECUTION PRIORITIES
 
-## 7. STALE PR POLICY
-
-Stale or highly diverged PRs must not be merged directly. Useful work must first be reconciled against current `main`, revalidated by CI, and reviewed for compatibility, security, maintainability and production value.
-
-## 8. EXECUTION PRIORITIES
-
-1. Prove deployment of PR #84 to production.
+1. Prove production deployment of the current Admin fix.
 2. Run fresh production smoke and close Admin 401/login/session/D1/R2 gates.
 3. Close password-reset production E2E.
-4. Audit Gateway and AI production paths.
-5. Audit and validate APK artifact plus real-device regression.
-6. Validate Telegram Auto Bot and VIP webhook/idempotency in production.
-7. Execute backup/restore/readability verification.
-8. Reconcile valuable stale PRs only after the production baseline is stable.
-9. Cleanup duplicate branches/workers/infrastructure only with current dependency evidence.
+4. Audit Gateway/AI production paths.
+5. Reconcile PR #66 VIP hardening against current `main`, then CI + production E2E.
+6. Audit APK artifact/hash tied to current `main` and complete S21 Ultra regression.
+7. Validate Telegram Auto Bot and VIP webhook/idempotency in production.
+8. Execute backup/restore/readability verification.
+9. Only then reconsider valuable closed/stale features using fresh branches from current `main`.
 10. Declare **PRODUCTION GREEN / COMPLETE** only when every required gate has current evidence.
 
-## 9. SAFETY / CONTINUITY
+## 8. SAFETY / CONTINUITY
 
 - Never put secrets in chat, Markdown, GitHub issues, source or logs.
 - Never force-push.
 - Never delete a Worker, repo, branch, route or database without current dependency evidence.
-- Never convert skipped tests or missing runtime evidence into GREEN.
-- This file is the only canonical continuity document.
+- Never convert skipped tests, source-only checks, or missing runtime evidence into GREEN.
+- One team, one queue, one canonical status file: `MASTER_PROJECT_STATUS.md`.
+- Every AI must record completed work, evidence, blockers and next action in this file only.
