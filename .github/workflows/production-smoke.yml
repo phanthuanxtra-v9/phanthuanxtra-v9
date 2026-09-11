@@ -48,7 +48,6 @@ jobs:
           check_http_200 "$SITE_URL/api/health" "/api/health"
           check_http_200 "$SITE_URL/api/cars" "/api/cars"
           check_http_200 "$SITE_URL/admin.html" "/admin.html"
-          check_http_200 "$SITE_URL/car-lx600.html" "Existing vehicle detail page"
           check_http_200 "$WORKER_URL/" "Production Worker"
 
       - name: Smoke admin authentication boundary
@@ -178,30 +177,32 @@ jobs:
             | tee /tmp/r2-upload.json
           key="$(jq -r '.key // empty' /tmp/r2-upload.json)"
           test -n "$key"
-          encoded_key="$(python -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=""))' "$key")"
-          curl --fail --silent --show-error --retry 2 --max-time 20 "$SITE_URL/media/$encoded_key" -o /tmp/r2-read.png
-          test -s /tmp/r2-read.png
-          curl --fail --silent --show-error --retry 2 --max-time 20 \
-            -X DELETE "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/r2/buckets/$R2_BUCKET/objects/$encoded_key" \
-            -H "Authorization: Bearer $CF_TOKEN" -H 'Content-Type: application/json' \
-            | tee /tmp/r2-delete.json
-          jq -e '.success == true' /tmp/r2-delete.json >/dev/null
-          status="$(curl --silent --show-error --retry 2 --max-time 20 -o /dev/null -w '%{http_code}' "$SITE_URL/media/$encoded_key")"
-          echo "R2 post-delete GET HTTP $status"
+
+          curl --fail-with-body --silent --show-error --retry 2 --max-time 20 \
+            "$SITE_URL/api/media/$key" -o /tmp/xtra-e2e-download.png
+          cmp /tmp/xtra-e2e.png /tmp/xtra-e2e-download.png
+
+          status="$(curl --silent --show-error --retry 2 --max-time 20 -o /tmp/r2-delete.json -w '%{http_code}' \
+            -X DELETE "$SITE_URL/api/admin/media/$key" \
+            -H "Authorization: Bearer $ADMIN_SESSION")"
+          echo "R2 delete HTTP $status"
+          test "$status" = "200"
+
+          status="$(curl --silent --show-error --retry 2 --max-time 20 -o /tmp/r2-after-delete.json -w '%{http_code}' \
+            "$SITE_URL/api/media/$key")"
+          echo "R2 read after delete HTTP $status"
           test "$status" = "404"
 
       - name: Production detail-page smoke
         shell: bash
         run: |
-          set -euo pipefail
-          status="$(curl --silent --show-error --retry 2 --max-time 20 -o /tmp/car-detail.html -w '%{http_code}' "$SITE_URL/car-lx600.html")"
-          echo "Vehicle detail page HTTP $status"
-          test "$status" = "200"
-          grep -qi 'Lexus\|LX600' /tmp/car-detail.html
+          echo 'Skipped: legacy example page car-lx600.html was intentionally removed from production.'
 
-      - name: Smoke summary
+      - name: Production smoke summary
         run: |
-          echo 'Production smoke passed: website, Worker, Admin auth, Gateway health/auth, authenticated Unified AI, Admin D1 CRUD E2E, R2 write/read/delete, and vehicle detail page.'
-
-# Production gate intentionally fails when required credentials are missing.
-# No secret material is written to the repository.
+          echo "========================================"
+          echo "Production smoke checks passed"
+          echo "Site: $SITE_URL"
+          echo "Worker: $WORKER_URL"
+          echo "Legacy example page: removed"
+          echo "========================================"
