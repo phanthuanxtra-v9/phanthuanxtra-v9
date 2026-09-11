@@ -18,6 +18,7 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    environment: production
     env:
       SITE_URL: https://phanthuanxtra.com
       WORKER_URL: https://phanthuanxtra-v2.phanthuanmodelactor.workers.dev
