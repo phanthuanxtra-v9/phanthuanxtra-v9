@@ -15,6 +15,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: node --check src/admin-auth.js
       - run: node --check src/admin-vehicle-pipeline.js
+      - run: node --check src/app-admin.js
       - run: node --check src/entry.js
-      - run: node --test tests/admin-vehicle-pipeline.test.mjs
+      - run: node --test tests/admin-auth.test.mjs tests/admin-vehicle-pipeline.test.mjs

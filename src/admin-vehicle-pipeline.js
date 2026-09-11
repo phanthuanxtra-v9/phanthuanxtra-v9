@@ -1,11 +1,12 @@
 import { analyzeVehicleImage } from "./vehicle-ai.js";
 import { createPtXtraPlateImage, hasValidPlateBox } from "./plate-branding.js";
+import { verifyAdminToken } from "./admin-auth.js";
 
 const MAX_IMAGES = 30;
 const MAX_BYTES = 12 * 1024 * 1024;
 const clean = v => String(v ?? "").trim();
 function json(data, status = 200) { return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } }); }
-function auth(request) { return (request.headers.get("Authorization") || "").startsWith("Bearer "); }
+async function auth(request, env) { return (await verifyAdminToken(request, env)).ok; }
 function isTrusted(url) { return /^https:\/\/phanthuanxtra\.com\/media\/vehicles\/publish-(?:admin-)?[a-z0-9._-]+\.jpg$/i.test(clean(url)); }
 async function fetchImage(url) {
   if (!/^https?:\/\//i.test(url)) throw new Error("Ảnh Admin phải là URL HTTP(S) để đưa qua AI.");
@@ -26,7 +27,7 @@ async function brandOne(env, url, index, carId) {
 }
 export async function handleAdminVehiclePipeline(request, env) {
   const url = new URL(request.url); if (url.pathname !== "/api/admin/cars" || !["POST", "PUT"].includes(request.method)) return null;
-  if (!auth(request)) return json({ error: "Unauthorized" }, 401);
+  if (!(await auth(request, env))) return json({ error: "Unauthorized" }, 401);
   const body = await request.json().catch(() => null);
   if (!body || !Array.isArray(body.images) || body.images.length === 0) return json({ error: "Admin đăng xe bắt buộc phải có ít nhất 1 ảnh để AI kiểm tra và branding PT Xtra." }, 400);
   const images = body.images.slice(0, MAX_IMAGES).map(x => clean(typeof x === "string" ? x : x?.url)).filter(Boolean); if (!images.length) return json({ error: "Không có URL ảnh hợp lệ." }, 400);
