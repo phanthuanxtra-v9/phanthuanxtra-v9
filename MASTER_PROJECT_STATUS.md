@@ -5,244 +5,130 @@
 > Repository: `phanthuanxtra-v9/phanthuanxtra-v9`
 > Branch: `main`
 
-## 1. SOURCE-OF-TRUTH RULE
+## 1. SOURCE OF TRUTH
 
-This file is the single project-status and continuity document. When records conflict, use this priority:
+This is the only project-status / continuity document. Current `main` source, current CI/CD evidence and current production/runtime evidence outrank historical notes. Do not create competing checkpoint/status Markdown files.
 
-1. Current `main` source/configuration.
-2. Current GitHub Actions evidence.
-3. Current open/merged PR state.
-4. Current production/runtime evidence.
-5. This file (`MASTER_PROJECT_STATUS.md`).
+## 2. CURRENT ARCHITECTURE
 
-Historical Markdown/checkpoint files are no longer project instructions and must not be recreated as competing status documents.
-
-## 2. CURRENT PROJECT
-
-- Project: **PHAN THUẦN XTRA APK / PHAN THUẦN XTRA**
-- Repository: `phanthuanxtra-v9/phanthuanxtra-v9`
-- Branch: `main`
-- Current main HEAD: `555d2500269de5a423908e14ffe4eb43f91cfca8`
+- Main: `5fa34d0511e710794c2072d3de7d8d2d238dc9f0` (PR #82 merge)
 - Production Worker: `phanthuanxtra-v2`
-- Worker entry: `src/entry.js`
+- Entry: `src/entry.js`
 - Website: `https://phanthuanxtra.com`
 - Admin: `https://phanthuanxtra.com/admin`
-- Android application ID: `com.phanthuanxtra.app`
-
-## 3. UNIFIED AI-1 → AI-6 AUDIT COMMAND
-
-AI-1, AI-2, AI-3, AI-4, AI-5 and AI-6 are one engineering/audit team, not six independent projects.
-
-- **AI-1:** Telegram / Vehicle AI / ingestion and vehicle automation.
-- **AI-2:** QA / regression / production gates / data integrity.
-- **AI-3:** GitHub / CI-CD / repository integration.
-- **AI-4:** OpenCode / implementation and code-level execution support.
-- **AI-5:** ChatGPT lead / architecture, remediation and continuity.
-- **AI-6:** Senior Auditor / independent evidence review and release-gate authority.
-
-Operating rule: the six roles collaborate on the same source of truth, same production architecture and same release gates. No role may create a competing Worker, database, branch strategy, status document or secret configuration without evidence.
-
-The project may use available **Cloudflare Workers AI / gateway execution capacity** for audit and remediation workloads. Any stated compute/AI capacity is a utilization target, not a fabricated quota or guarantee. The team must report actual execution evidence rather than claiming a fixed “10,000 neurons/day” quota unless Cloudflare provides that quota directly.
-
-## 4. CLOUDFLARE / WORKERS AUDIT MODE
-
-The canonical target is direct evidence against the live Cloudflare production architecture:
-
-- Worker: `phanthuanxtra-v2`
 - D1: `phanthuanxtra-db`
 - R2: `phanthuanxtra-media`
-- Workers AI binding: `AI`
-- Images binding: `IMAGES`
-- AI Search binding: `AI_SEARCH`
-- Assets binding: `ASSETS`
-- Cron: `*/5 * * * *`
-- Entry: `src/entry.js`
+- APK: `com.phanthuanxtra.app`, source version 1.2.0 / versionCode 3
 
-Audit sequence:
+## 3. UNIFIED AI-1 → AI-6 AUDIT RULE
 
-1. Reconcile `wrangler.json` and Worker source with the intended production resources.
-2. Verify GitHub Actions deploy/dry-run evidence.
-3. Verify reachable production runtime endpoints.
-4. Verify Admin authentication boundaries and authenticated CRUD/media E2E.
-5. Verify D1/R2 behavior and idempotency where applicable.
-6. Verify Worker/route/domain alignment before any cleanup.
-7. Record blockers instead of converting missing runtime access into a false GREEN.
+AI-1 through AI-6 are one engineering/audit team using one source of truth, one production architecture and one release-gate chain. No secret guessing, no force-push, no unreviewed destructive production change, and no false GREEN claim.
 
-Current tooling limitation: this ChatGPT session has GitHub access but no Cloudflare management connector/dashboard mutation API. Therefore no Cloudflare secret, route, Worker setting, binding or production resource is to be guessed or changed from this status update. Public runtime evidence and repository/CI evidence may be audited; privileged Cloudflare mutation requires an available Cloudflare API connection.
+## 4. AUDIT CHAIN — CURRENT EVIDENCE
 
-## 5. ADMIN INCIDENT — REMEDIATION STATUS
+### 4.1 GitHub source / commit — GREEN
 
-The Admin authentication vulnerability was hardened with stateless HMAC-SHA-256 signed sessions.
+PR #82 `fix: canonicalize direct Admin asset` was merged successfully.
 
-- PR #72 merged: `0c211cd8de16ff4ad0fde5f458a4237f5f43126f`.
-- Admin pipeline run `34560451685`: SUCCESS.
-- PR #73 aligned Production Smoke with the hardened Admin login/session flow.
-- PR #74 restored the canonical Admin route behavior.
-- PR #75 removed the legacy `/admin` redirect asset and replaced it with a direct UTF-8 Admin login fallback.
+- Merge commit: `5fa34d0511e710794c2072d3de7d8d2d238dc9f0`
+- Head before merge: `c85020cf0af52d29000815b6c9b1ef1029972df5`
+- `public/admin` SHA is now exactly the same as canonical `public/admin.html`: `d1331862b0c5e74f2c22da70849b53c73c2f25f2`.
+- `src/entry.js` explicitly canonicalizes `/admin` and `/admin/` to `/admin.html`, sets UTF-8 content type and `no-store`.
 
-The source-side Admin route remediation is complete. **Production Admin is not declared fully GREEN until fresh runtime evidence proves `/admin`, `/admin.html`, `/api/admin/login`, `/api/admin/dashboard`, authenticated D1 CRUD and authenticated R2 media paths.**
+Conclusion: source remediation matches the observed `/admin` legacy-asset incident.
 
-Required security behavior:
-- Login requires `ADMIN_PASSWORD` and `ADMIN_TOKEN` server-side.
-- Missing required secrets fail closed.
-- Invalid/malformed/random/tampered/expired session tokens must return 401.
-- Valid signed session permits protected Admin operations.
-- No production secret is stored in source, Markdown, issues, logs or chat.
+### 4.2 CI/CD — GREEN for deployment, RED for production smoke
 
-Known previous production observation: the live Admin UI reported **“Admin credentials chưa được cấu hình”**, and the fresh runtime test returned HTTP 503 with the same error. Cloudflare inspection separately confirmed `ADMIN_PASSWORD` exists and Worker bindings include D1/R2/AI, so the remaining confirmed configuration blocker is that the runtime also requires `ADMIN_TOKEN`, which was not present in the inspected secret inventory. Do not invent or expose its value.
+Deploy workflow run `34571728581` / run #348:
+- CI / Validate: SUCCESS.
+- Cloudflare production deploy job: SUCCESS.
+- Main commit deployed by the workflow: `5fa34d0511e710794c2072d3de7d8d2d238dc9f0`.
 
-### 5.1 ADMIN SELF-SERVICE PASSWORD RECOVERY — IN PROGRESS
+Production Smoke run `34571728614` / run #15:
+- FAILED.
+- Website and production Worker basic smoke: SUCCESS.
+- Failure occurred at `Smoke admin authentication boundary`.
+- All later smoke/E2E steps were skipped because of this failure.
 
-User requirement: Admin login must have **“Quên mật khẩu?”** and allow the owner to set a new password without sending the password to chat.
+Therefore deployment is proven, but the production release gate is NOT GREEN.
 
-Implementation branch: `feature/admin-self-service-password-reset-v1`.
+### 4.3 Cloudflare production — DEPLOYMENT PROVEN / PRIVILEGED CONFIGURATION NOT FULLY PROVEN
 
-Design:
-- `migrations/0013_admin_credentials.sql` creates a single-row D1 credential store.
-- `src/admin-password.js` stores a PBKDF2-SHA-256 password hash with a random salt; plaintext passwords are never stored.
-- Existing `ADMIN_PASSWORD` remains the bootstrap password when no D1 override exists.
-- `/api/admin/forgot-password` verifies the server-side `ADMIN_TOKEN` as the recovery code, then stores the new password hash in D1.
-- `public/admin.html` provides the forgot-password form, recovery-code field, new-password field and confirmation field.
-- New password requires at least 8 characters.
-- The recovery code is never persisted in the browser or source.
-- The Admin CI syntax gate now checks `src/admin-password.js`.
+GitHub Actions proves Wrangler authentication, dry-run and production deployment completed successfully. Repository configuration identifies Worker `phanthuanxtra-v2`, D1 `phanthuanxtra-db`, R2 `phanthuanxtra-media`, AI/AI_SEARCH/IMAGES/ASSETS bindings and the expected cron.
 
-**Important:** this feature does not make password recovery possible without a recovery secret. The recovery code is the existing `ADMIN_TOKEN`; if it is unavailable, it must be set/reset through the authorized Cloudflare secret-management path. Never place that secret in chat.
+This ChatGPT session has GitHub access but no privileged Cloudflare management connector. Therefore Worker secrets/routes/version configuration must not be guessed or mutated from ChatGPT.
 
-The branch must pass CI and D1 migration/deploy evidence before merge. Production Admin remains RED until runtime login and reset E2E are proven.
+Known security blocker from prior authorized inspection remains material: Admin requires both `ADMIN_PASSWORD` and `ADMIN_TOKEN`. The previously inspected production secret inventory contained `ADMIN_PASSWORD` but did not contain `ADMIN_TOKEN`. This is consistent with the production smoke failure at the Admin authentication boundary. Fresh Cloudflare secret inventory is required before declaring the blocker resolved.
 
-## 6. PRODUCTION SMOKE / CURRENT GATES
+### 4.4 Runtime `/admin` — NOT YET REPROVEN AFTER DEPLOY
 
-`.github/workflows/production-smoke.yml` currently checks:
+The previous runtime evidence established:
+- `/admin` was serving the legacy 1277-byte `public/admin` asset.
+- `/admin/` and `/admin.html` served the canonical 6341-byte Admin UI.
+- The previous `/admin` response had public cache semantics; `/admin/` had `no-store`.
+- The bytes were valid UTF-8; the apparent mojibake was not the root cause.
 
-- website `/`
-- `/api/health`
-- `/api/cars`
-- `/admin.html`
-- production Worker root
-- Admin invalid-login boundary = 401
-- Admin unauthenticated dashboard boundary = 401
-- Developer Gateway health and unauthorized boundary
-- configured unified-AI production test
-- required `GATEWAY_READ_TOKEN`
-- Admin D1 create/read/delete E2E
-- required `ADMIN_PASSWORD`
-- R2 write/read/delete E2E
-- legacy `car-lx600.html` check intentionally removed because that page was explicitly deleted
+PR #82 fixes the source asset divergence and was deployed. However, fresh post-deploy HTTP evidence for all three URLs is still required. This environment cannot directly resolve the production hostname, so no post-deploy runtime GREEN claim is made without evidence.
 
-A previous smoke run failed at the obsolete `car-lx600.html` HTTP-307 check; that dependency has now been removed from both production source and the smoke gate.
+### 4.5 Security E2E — BLOCKED / NOT PROVEN
 
-The production smoke workflow must remain a release gate. A skipped legacy-page check must never be interpreted as a production pass.
+Source review confirms:
+- `src/admin-auth.js` issues and verifies HMAC-SHA-256 signed Admin session tokens with a 60-minute TTL.
+- malformed/random/tampered/expired tokens are rejected.
+- `src/app-admin.js` requires both `ADMIN_PASSWORD` and `ADMIN_TOKEN` for login.
+- protected Admin routes require a valid signed session.
+- Admin D1 CRUD and R2 media E2E exist in `production-smoke.yml`.
 
-## 7. CAR-LX600 CLEANUP
+Production smoke did not reach authenticated D1/R2 E2E because the Admin authentication boundary failed first.
 
-`public/car-lx600.html` was intentionally removed from `main`:
+### 4.6 Password reset — SOURCE GREEN / PRODUCTION BLOCKED
 
-- commit `7b380f832565afc51af4a72e79f82eb16b730263`
-- smoke dependency removed in commit `bbba3086b5947568bf065cee85c85b5dda3a281a`
+`public/admin.html` and `public/admin` both contain `Quên mật khẩu?` and the recovery form.
 
-No future implementation should recreate this obsolete example page unless explicitly requested.
+`src/admin-password.js` uses PBKDF2-SHA-256 with 120,000 iterations and a random 16-byte salt; plaintext passwords are not stored.
 
-## 8. GOD'S EYE CLEANUP
+`migrations/0013_admin_credentials.sql` creates the D1 credential table.
 
-The public **XTRA World Intelligence / God's Eye View** feature was explicitly removed.
+`POST /api/admin/forgot-password` requires the server-side `ADMIN_TOKEN`, validates the recovery code and stores only the password hash/salt.
 
-- Removal merged through PR #78.
-- Merge commit: `555d2500269de5a423908e14ffe4eb43f91cfca8`.
-- Repository search confirmed no remaining `gods-eye` code reference at the time of the audit.
+Production reset E2E is NOT proven because the required recovery secret is not yet independently confirmed in the live Worker.
 
-Do not restore this feature unless explicitly requested.
+### 4.7 Regression — PARTIALLY PROVEN / GATES REMAIN
 
-## 9. APK STATUS
+CI test suite includes Telegram, AI chat, PT Xtra media/plate, production-gates and VIP vehicle intelligence tests. Production smoke also contains Gateway, Admin D1 and R2 E2E gates, but these were skipped after the Admin boundary failure.
 
-Current source:
-- Application ID: `com.phanthuanxtra.app`
-- Version: `1.2.0`
-- versionCode: `3`
-- minSdk: `26`
-- targetSdk: `35`
-- Production App API: `https://phanthuanxtra.com/api/app/v1`
+Still unproven by this audit:
+- Telegram Auto Bot production E2E.
+- VIP webhook/idempotency production E2E.
+- Developer Gateway production smoke completion for this release.
+- Fresh APK 1.2.0 artifact/hash tied to a current CI run plus material S21 device regression.
+- Real backup plus restore/readability test.
 
-**APK 1.2.0 source: PRESENT. Fresh independent CI artifact/hash + material S21 regression: NOT YET PROVEN by this audit.**
+Do not mark these GREEN from source presence alone.
 
-Do not call APK 1.2.0 release-ready until the intended build is independently evidenced and the required device gate is tied to that build.
+## 5. CURRENT BLOCKERS
 
-### APK hardening queue
-- Vehicle detail/edit.
-- Create/update/delete.
-- available/reserved/sold status.
-- Explicit destructive confirmation.
-- Featured toggle.
-- Gallery/cover management.
-- Lead status/note editing.
-- Search/filter.
-- Retry/offline/error UX.
-- Token validation and clear auth failures.
-- Production-safe validation before destructive operations.
+1. **ADMIN_TOKEN live configuration is not independently proven.** Do not guess or expose it.
+2. **Production Smoke #15 failed at Admin authentication boundary.**
+3. **Post-deploy `/admin`, `/admin/`, `/admin.html` runtime evidence is still required.**
+4. **Authenticated Admin D1/R2 E2E did not execute in the failed smoke run.**
+5. **Password-reset E2E is not proven.**
+6. **APK, Telegram/VIP production E2E and backup/restore gates remain open.**
 
-## 10. BACKUP STATUS
+## 6. IMMEDIATE EXECUTION ORDER
 
-Backup workflow exists with integrity-hardening code, but backup is **NOT OPERATIONALLY GREEN** until a real successful backup plus restore/readability test is evidenced.
+1. Obtain fresh authorized Cloudflare secret/config evidence for `ADMIN_TOKEN` without exposing the value.
+2. If missing, configure it through the authorized Cloudflare secret-management path; do not store it in GitHub files, Markdown, issues or chat.
+3. Re-run Production Smoke and require the Admin boundary, D1 CRUD and R2 CRUD gates to pass.
+4. Recheck `/admin`, `/admin/`, `/admin.html` from a network with production DNS access and record status/content-type/cache behavior.
+5. Run password-reset E2E using the live recovery path without revealing the recovery code.
+6. Complete Telegram/VIP production E2E, APK artifact/device gate and backup restore/readability gate.
+7. Only then perform duplicate infrastructure/branch/Worker cleanup.
 
-Do not create a second backup workflow or repurpose the existing `*/5` Telegram self-healing cron.
+## 7. SAFETY / CONTINUITY
 
-## 11. TELEGRAM / AI RULES
-
-- Auto webhook: `/api/telegram/webhook`.
-- VIP webhook: `/api/telegram/vip-webhook`.
-- Do not recreate stale `/api/telegram/auto-webhook`.
-- Auto publish requires real `brand` + `model` and confidence `>= 0.85`.
-- Duplicate processing must remain idempotent.
-- Unknown AI questions must use human handoff rather than fabricated answers.
-- PT Xtra media branding is a display/publish artifact; original R2 source media remains unchanged.
-
-## 12. ACTIVE PR / WORKSTREAM RULE
-
-Current work must continue through existing PRs where applicable rather than creating duplicate implementations. Recheck each PR against current `main` before merge.
-
-Known workstreams include PR #53, #54, #55, #66 and #49, plus other currently open PRs discoverable from GitHub. Historical PR descriptions do not override current source or CI evidence.
-
-Rule: **one logical task → one implementation path → one release gate.**
-
-## 13. REQUIRED RELEASE GATES
-
-Production is GREEN only when applicable gates are all evidenced:
-
-1. Current source commit identified.
-2. Relevant CI validation passes.
-3. Cloudflare dry-run/config validation passes.
-4. D1 migration safety verified when migrations change.
-5. Production deployment directly evidenced.
-6. Reachable production runtime smoke/E2E passes.
-7. Intended APK build and artifact hash recorded.
-8. Required real-device APK regression passes.
-9. Backup succeeds and restore/readability is verified.
-
-## 14. NEXT EXECUTION ORDER — IMMEDIATE
-
-1. Run the unified AI-1 → AI-6 audit against current `main` and the actual Cloudflare production architecture.
-2. Re-run/inspect Production Smoke after the obsolete `car-lx600.html` gate removal.
-3. Close the Admin production gate with fresh runtime evidence; if `ADMIN_PASSWORD` is missing, configure it in the proper secret stores without exposing it in chat.
-4. Verify Worker/domain/route alignment before any destructive Cloudflare cleanup.
-5. Verify fresh APK 1.2.0 artifact/hash and S21 regression.
-6. Verify real backup + restore/readability.
-7. Complete Auto Bot E2E, vehicle lookup E2E and VIP idempotency E2E where not independently proven.
-8. Only after runtime gates are green, audit consolidation/cleanup of duplicate infrastructure.
-
-## 15. DOCUMENTATION POLICY
-
-**This file is the only project-status/handoff Markdown file.**
-
-Superseded root project audit/checkpoint/status/handoff documents have been removed to prevent stale instructions from being followed.
-
-Future substantive continuity updates must update this file rather than creating another project-status/checkpoint Markdown file.
-
-## 16. SAFETY PRINCIPLE
-
-- No secret guessing.
-- No force-push.
-- No unreviewed destructive production changes.
-- No duplicate infrastructure from historical documentation.
-- No false GREEN claim from CI/merge alone.
-- Source + current CI + runtime evidence outrank historical documentation.
-- When privileged Cloudflare access is unavailable, report that limitation explicitly rather than simulating a Cloudflare audit or mutation.
+- Never put secrets in chat, Markdown, GitHub issues, source or logs.
+- Never force-push.
+- Never delete a Worker, repo, branch, route or database without current dependency evidence.
+- Never convert skipped tests or missing runtime evidence into GREEN.
+- This file is the only canonical continuity document.
