@@ -3,9 +3,7 @@
 > **DUY NHẤT — CANONICAL PROJECT STATUS / HANDOFF**  
 > Date: 2026-09-12 (UTC+7)  
 > Repository: `phanthuanxtra-v9/phanthuanxtra-v9`  
-> Main: `cea32fdafd68bf8b6ccd90b1c23e081243b4a23b`  
-> Audit branch: `audit/production-workers-ai-20260912`  
-> PR: `#90`
+> Main: `4ca4d722befdb9bdaa37268ba8fb845fea593ecb`
 
 ## 1. SOURCE OF TRUTH
 Current `main` source, CI/CD evidence, production/runtime evidence and this file are authoritative. Do not create competing checkpoint/status Markdown files.
@@ -17,7 +15,7 @@ Complete `phanthuanxtra.com` and the AI PT.XTRA APK as one integrated production
 `AI agents → GitHub branch/PR → CI/audit → protected main → Cloudflare deployment → production runtime verification → production E2E → APK/device verification`
 
 ## 4. CURRENT ARCHITECTURE
-- Main: `cea32fdafd68bf8b6ccd90b1c23e081243b4a23b`
+- Main: `4ca4d722befdb9bdaa37268ba8fb845fea593ecb`
 - Production Worker: `phanthuanxtra-v2`
 - Entry: `src/entry.js`
 - Website: `https://phanthuanxtra.com`
@@ -28,30 +26,51 @@ Complete `phanthuanxtra.com` and the AI PT.XTRA APK as one integrated production
 - APK: `com.phanthuanxtra.app`, source version 1.2.0 / versionCode 3
 
 ## 5. VERIFIED RELEASE EVIDENCE
-### 5.1 Admin source security — SOURCE GREEN
-PR #84 hardens Admin credential verification so D1 credential-store failure fails closed instead of escaping as HTTP 500. Latest main trigger commit is `cea32fdafd68bf8b6ccd90b1c23e081243b4a23b`.
+### 5.1 Production API baseline — VERIFIED GREEN
+Fresh production smoke run `34659917286` after the PR #93 deployment verified:
+- Website HTTP 200
+- `/api/health` HTTP 200
+- `/api/cars` HTTP 200
+- `/admin.html` HTTP 200
+- Production Worker HTTP 200
+- Invalid Admin login boundary HTTP 401
+- Unauthenticated Admin dashboard boundary HTTP 401
 
-### 5.2 Production deployment — RED / NOT PROVEN
-No independent evidence in this session proves the latest Admin hardening or PR #90 changes are deployed to the production Worker. Do not infer deployment from source/PR state.
+### 5.2 Developer Gateway authentication — VERIFIED GREEN
+The earlier Gateway smoke failure `401 unauthorized` was traced to credential-source mismatch between repository and `production` environment secrets. PR #91 aligned the production smoke job with the `production` environment, and the Developer Gateway deployment workflow now synchronizes `GATEWAY_READ_TOKEN` into the Cloudflare Worker before deploy.
 
-### 5.3 Production smoke — RED / PRE-FIX EVIDENCE
-Production Smoke run `34573941824` passed basic website, `/api/health`, `/api/cars`, `/admin.html` and Worker checks, then failed invalid Admin credentials with HTTP 500 instead of required HTTP 401; downstream D1/R2/Gateway E2E stages were skipped. This predates PR #84.
+Fresh smoke evidence in run `34659917286`:
+- Gateway `/health` HTTP 200
+- Gateway unauthenticated boundary HTTP 401
+- Authenticated `/v1/ai/unified` succeeded
 
-### 5.4 Reproduced defect — R2 DELETE contract mismatch
-`.github/workflows/production-smoke.yml` requires `DELETE /api/admin/media/:key`, while current `main` Admin routing had no handler for that endpoint. `src/media.js` exposes only public `GET/HEAD /media/...`. PR #90 adds authenticated `/api/admin/media/:key` DELETE, restricts keys to `admin/` and `vehicles/`, rejects traversal/invalid keys, and adds regression coverage.
+### 5.3 Workers AI model — VERIFIED GREEN
+Fresh authenticated Gateway evidence in run `34659917286` returned:
+- `ok: true`
+- `logical_agent: xtra-unified-ai`
+- `engine: cloudflare-workers-ai`
+- `model: @cf/meta/llama-3.1-8b-instruct-fast`
+- `production_mutation: false`
 
-### 5.5 Workers AI — SOURCE VERIFIED / RUNTIME PARTIAL
-Website AI uses Cloudflare Workers AI primary `@cf/zai-org/glm-4.7-flash` with fallback `@cf/meta/llama-3.2-3b-instruct`. Developer Gateway `/v1/ai/unified` requires Bearer auth, validates request size/fields, and reports `production_mutation: false`. PR #90 makes the executor read this canonical status file and serialize executor tasks through one global queue. Runtime remains RED until Gateway/AI production E2E evidence exists.
+Root cause of the preceding 502 was the deprecated `@cf/meta/llama-3.1-8b-instruct` model. PR #93 changed the Developer Gateway Wrangler model to the active `@cf/meta/llama-3.1-8b-instruct-fast`, and Deploy Developer Gateway run `34659917178` completed successfully.
 
-### 5.6 CI evidence
-Existing Admin pipeline run `34580451768` completed successfully for the earlier main commit. It does not validate PR #90. No PR #90 workflow result is being invented.
+### 5.4 Admin + D1 production E2E — RED / CURRENT BLOCKER
+The same fresh smoke run reached valid Admin login but received HTTP 401 using the configured `production` environment `ADMIN_PASSWORD`. Therefore the D1 create/read/delete E2E did not run.
+
+Do not infer that the Admin credential is correct merely because the invalid-login boundary is 401. Current evidence proves the production Admin valid-credential gate is still RED.
+
+### 5.5 R2 production E2E — NOT RUN
+Blocked downstream by the valid Admin login gate in the current smoke workflow.
+
+### 5.6 Production GREEN — NOT REACHED
+Production remains **RED**. Gateway/AI is now runtime-verified, but Admin valid login + D1/R2 E2E and the remaining release gates are not complete.
 
 ## 6. SINGLE EXECUTION QUEUE / OWNERSHIP
 ### QUEUE-01 — Admin production E2E
-**Status:** OPEN / highest priority. PR #90 contains the R2 DELETE contract fix awaiting CI/review/merge/deploy.
+**Status:** OPEN / highest priority. Current blocker: production valid Admin credential returns HTTP 401. Resolve the credential/credential-store state without exposing or guessing secrets, then rerun Admin + D1 + R2 E2E.
 
 ### QUEUE-02 — Gateway/AI production E2E
-**Status:** BLOCKED by QUEUE-01 baseline.
+**Status:** BASELINE NOW VERIFIED; do not advance to broader Gateway work until QUEUE-01 release baseline is green.
 
 ### QUEUE-03 — PR #66 VIP hardening
 **Status:** OPEN; reconcile against current main before merge.
@@ -71,13 +90,13 @@ Existing Admin pipeline run `34580451768` completed successfully for the earlier
 ## 7. RELEASE GATES
 1. Current main deployed to production.
 2. Invalid Admin login → HTTP 401, never 500.
-3. Valid Admin login → HTTP 200 + signed session.
+3. Valid Admin login → HTTP 200 + signed session. **CURRENTLY RED**.
 4. Unauthenticated dashboard → HTTP 401.
 5. Authenticated dashboard access.
 6. D1 create/read/delete E2E.
 7. R2 write/read/delete E2E.
 8. Password reset production E2E.
-9. Gateway/AI production gate.
+9. Gateway/AI production gate. **VERIFIED**.
 10. Fresh APK artifact/hash + S21 Ultra regression.
 11. Telegram Auto Bot production E2E.
 12. VIP webhook/idempotency production E2E.
@@ -86,16 +105,19 @@ Existing Admin pipeline run `34580451768` completed successfully for the earlier
 15. Only then declare **PRODUCTION GREEN / COMPLETE**.
 
 ## 8. CHANGE LOG — CANONICAL
+### 2026-09-12 — Gateway credential + Workers AI production repair
+- Read `MASTER_PROJECT_STATUS.md` before the repair workflow.
+- Fixed production Gateway credential-source alignment via PR #91.
+- Production Gateway deployment now synchronizes the `GATEWAY_READ_TOKEN` secret before deploy.
+- Fixed deprecated Workers AI model via PR #93: `@cf/meta/llama-3.1-8b-instruct` → `@cf/meta/llama-3.1-8b-instruct-fast`.
+- Verified deployment run `34659917178` completed successfully.
+- Fresh authenticated Gateway smoke passed with the active model.
+- Fresh Admin/D1 gate remains RED because valid Admin login returned HTTP 401.
+- No secret value was exposed or committed.
+
 ### 2026-09-12 — Production API + Workers AI audit / PR #90
 - Read `MASTER_PROJECT_STATUS.md` before changes.
-- Verified current main `cea32fdafd68bf8b6ccd90b1c23e081243b4a23b`.
-- Audited Admin auth/routing, R2 media delivery, production smoke workflow, Developer Gateway Workers AI path, and AI Unified Executor workflow.
-- Reproduced the R2 smoke-test contract mismatch from source and fixed it on isolated branch `audit/production-workers-ai-20260912`.
-- Added authenticated R2 media deletion with namespace allowlist/traversal protection.
-- Added regression contract coverage.
-- Changed AI Unified Executor to read this canonical status file and serialize tasks through one concurrency group.
-- Created PR #90: `audit: harden production E2E and Workers AI queue`.
-- No production deployment, Cloudflare secret mutation, destructive DB action, force-push, or rollback was attempted.
+- PR #90 hardened the production R2 DELETE contract and serialized AI Unified Executor work through the canonical status file/queue rules.
 
 ## 9. SAFETY / CONTINUITY
 - Never put secrets in chat, Markdown, GitHub issues, source or logs.
@@ -103,7 +125,8 @@ Existing Admin pipeline run `34580451768` completed successfully for the earlier
 - Never delete production infrastructure without current dependency evidence.
 - Never convert skipped tests or missing runtime evidence into GREEN.
 - One team, one queue, one canonical status file: `MASTER_PROJECT_STATUS.md`.
+- The obsolete repository `phanthuanxtra-v9/phanthuanxtra` is excluded from all audit/deploy/repair/CI/E2E workflows.
 
 ## 10. NEXT CHECKPOINT
-**Current task:** QUEUE-01 / PR #90 validation.  
-**Next exact action:** obtain completed CI evidence for PR #90; if green, review/merge through the protected release path, allow Cloudflare deployment, then run fresh production Admin + D1 + R2 E2E. Only after those pass continue to QUEUE-02 Gateway/AI E2E.
+**Current task:** QUEUE-01 / Admin production E2E.  
+**Next exact action:** resolve the production Admin credential/credential-store mismatch without guessing or exposing secrets, then obtain fresh valid Admin + D1 + R2 E2E evidence. Production remains RED until the complete release-gate chain passes.
