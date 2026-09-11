@@ -4,8 +4,11 @@ on:
   push:
     branches:
       - main
-    paths:
-      - '.github/workflows/production-smoke.yml'
+    paths-ignore:
+      - "docs/**"
+      - "AUDIT_*.md"
+      - "backup/README.md"
+      - "**/*.md"
   workflow_dispatch:
 
 permissions:
@@ -20,7 +23,7 @@ jobs:
       WORKER_URL: https://phanthuanxtra-v2.phanthuanmodelactor.workers.dev
       GATEWAY_URL: https://phanthuanxtra-developer-gateway.phanthuanmodelactor.workers.dev
       GATEWAY_READ_TOKEN: ${{ secrets.GATEWAY_READ_TOKEN }}
-      ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
       CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       R2_BUCKET: phanthuanxtra-media
@@ -105,31 +108,34 @@ jobs:
           exit 1
 
       - name: E2E Admin login and D1 create/read/delete
-        if: ${{ env.ADMIN_TOKEN != '' }}
+        if: ${{ env.ADMIN_PASSWORD != '' }}
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$ADMIN_TOKEN"
+          test -n "$ADMIN_PASSWORD"
           TEST_CAR_ID="ci-e2e-${GITHUB_RUN_ID}"
           export TEST_CAR_ID
-          trap 'curl --silent --show-error --retry 2 --max-time 20 -X DELETE "$SITE_URL/api/admin/cars" -H "Authorization: Bearer $ADMIN_TOKEN" -H "content-type: application/json" --data "{\"id\":\"$TEST_CAR_ID\"}" >/dev/null || true' EXIT
 
           status="$(curl --silent --show-error --retry 2 --max-time 20 -o /tmp/admin-login.json -w '%{http_code}' \
             -X POST "$SITE_URL/api/admin/login" -H 'content-type: application/json' \
-            --data "{\"password\":\"$ADMIN_TOKEN\"}")"
+            --data "$(jq -nc --arg password "$ADMIN_PASSWORD" '{password:$password}')")"
           echo "Admin login HTTP $status"
           test "$status" = "200"
-          jq -e '.ok == true and (.token|type == "string")' /tmp/admin-login.json >/dev/null
+          ADMIN_SESSION="$(jq -r '.token // empty' /tmp/admin-login.json)"
+          test -n "$ADMIN_SESSION"
+          export ADMIN_SESSION
+
+          trap 'curl --silent --show-error --retry 2 --max-time 20 -X DELETE "$SITE_URL/api/admin/cars" -H "Authorization: Bearer $ADMIN_SESSION" -H "content-type: application/json" --data "{\"id\":\"$TEST_CAR_ID\"}" >/dev/null || true' EXIT
 
           curl --fail-with-body --silent --show-error --retry 2 --max-time 20 \
             -X POST "$SITE_URL/api/admin/cars" \
-            -H "Authorization: Bearer $ADMIN_TOKEN" -H 'content-type: application/json' \
+            -H "Authorization: Bearer $ADMIN_SESSION" -H 'content-type: application/json' \
             --data "{\"id\":\"$TEST_CAR_ID\",\"brand\":\"PT XTRA TEST\",\"model\":\"CI E2E Vehicle\",\"year\":2026,\"mileage\":1,\"price\":1,\"fuel\":\"test\",\"category\":\"suv\",\"color\":\"test\",\"status\":\"available\",\"description\":\"CI production E2E test record; automatically deleted.\",\"features\":[\"e2e\"]}" \
             | tee /tmp/admin-create.json
           jq -e '.ok == true and .id == env.TEST_CAR_ID' /tmp/admin-create.json >/dev/null
 
           curl --fail-with-body --silent --show-error --retry 2 --max-time 20 \
-            -H "Authorization: Bearer $ADMIN_TOKEN" "$SITE_URL/api/admin/cars" \
+            -H "Authorization: Bearer $ADMIN_SESSION" "$SITE_URL/api/admin/cars" \
             | tee /tmp/admin-cars.json
           jq -e --arg id "$TEST_CAR_ID" '.cars | any(.[]; .id == $id and .brand == "PT XTRA TEST")' /tmp/admin-cars.json >/dev/null
 
@@ -139,44 +145,48 @@ jobs:
 
           curl --fail-with-body --silent --show-error --retry 2 --max-time 20 \
             -X DELETE "$SITE_URL/api/admin/cars" \
-            -H "Authorization: Bearer $ADMIN_TOKEN" -H 'content-type: application/json' \
+            -H "Authorization: Bearer $ADMIN_SESSION" -H 'content-type: application/json' \
             --data "{\"id\":\"$TEST_CAR_ID\"}" | tee /tmp/admin-delete.json
           jq -e '.ok == true and .id == env.TEST_CAR_ID' /tmp/admin-delete.json >/dev/null
 
           curl --fail-with-body --silent --show-error --retry 2 --max-time 20 \
-            -H "Authorization: Bearer $ADMIN_TOKEN" "$SITE_URL/api/admin/cars" \
+            -H "Authorization: Bearer $ADMIN_SESSION" "$SITE_URL/api/admin/cars" \
             | tee /tmp/admin-cars-after-delete.json
           jq -e --arg id "$TEST_CAR_ID" '(.cars | any(.[]; .id == $id)) | not' /tmp/admin-cars-after-delete.json >/dev/null
 
       - name: Require Admin credential for production E2E gate
-        if: ${{ env.ADMIN_TOKEN == '' }}
+        if: ${{ env.ADMIN_PASSWORD == '' }}
         run: |
-          echo 'BLOCKED: ADMIN_TOKEN is not available in GitHub Actions.'
+          echo 'BLOCKED: ADMIN_PASSWORD is not available in GitHub Actions.'
           exit 1
 
       - name: E2E R2 media write/read/delete
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$ADMIN_TOKEN"
+          test -n "$ADMIN_PASSWORD"
           test -n "$CF_TOKEN"
           test -n "$CF_ACCOUNT_ID"
+          test -s /tmp/admin-login.json
+          ADMIN_SESSION="$(jq -r '.token // empty' /tmp/admin-login.json)"
+          test -n "$ADMIN_SESSION"
           printf 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' | base64 -d > /tmp/xtra-e2e.png
           curl --fail-with-body --silent --show-error --retry 2 --max-time 20 \
             -X POST "$SITE_URL/api/admin/media" \
-            -H "Authorization: Bearer $ADMIN_TOKEN" \
+            -H "Authorization: Bearer $ADMIN_SESSION" \
             -H 'content-type: image/png' --data-binary @/tmp/xtra-e2e.png \
             | tee /tmp/r2-upload.json
           key="$(jq -r '.key // empty' /tmp/r2-upload.json)"
           test -n "$key"
-          curl --fail --silent --show-error --retry 2 --max-time 20 "$SITE_URL/media/$(python -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=""))' "$key")" -o /tmp/r2-read.png
+          encoded_key="$(python -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=""))' "$key")"
+          curl --fail --silent --show-error --retry 2 --max-time 20 "$SITE_URL/media/$encoded_key" -o /tmp/r2-read.png
           test -s /tmp/r2-read.png
           curl --fail --silent --show-error --retry 2 --max-time 20 \
-            -X DELETE "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/r2/buckets/$R2_BUCKET/objects/$key" \
+            -X DELETE "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/r2/buckets/$R2_BUCKET/objects/$encoded_key" \
             -H "Authorization: Bearer $CF_TOKEN" -H 'Content-Type: application/json' \
             | tee /tmp/r2-delete.json
           jq -e '.success == true' /tmp/r2-delete.json >/dev/null
-          status="$(curl --silent --show-error --retry 2 --max-time 20 -o /dev/null -w '%{http_code}' "$SITE_URL/media/$(python -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=""))' "$key")")"
+          status="$(curl --silent --show-error --retry 2 --max-time 20 -o /dev/null -w '%{http_code}' "$SITE_URL/media/$encoded_key")"
           echo "R2 post-delete GET HTTP $status"
           test "$status" = "404"
 
