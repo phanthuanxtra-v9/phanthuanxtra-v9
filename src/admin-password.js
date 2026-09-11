@@ -35,6 +35,7 @@ export async function verifyAdminPassword(env, password) {
   } catch {
     // Authentication must fail closed when the credential store is unavailable.
     // Do not fall back to ADMIN_PASSWORD during a D1 outage/schema error.
+    // This invariant is part of the QUEUE-01 production Admin release gate.
     return false;
   }
 
