@@ -1,31 +1,51 @@
 # Audit Checkpoint — 2026-09-11
 
 ## Current gate
-**PRODUCTION RELEASE: BLOCKED** until Admin authentication and live production E2E are proven.
+**PRODUCTION: NOT YET GREEN** — Admin security and CI gates are green, but live production E2E and deployed-SHA verification remain required.
 
-## Evidence
-- `main` baseline: `e50d95e1eba916c3fc3a7eab88dd6e6c9f0b5493`
-- PR: #72 — `security: harden Admin authentication`
-- Audit found the previous Admin auth path accepted any `Bearer ...` header by checking only the prefix.
-- The login path generated a random token that was not validated by the protected API.
+## Verified main history
+- PR #72 merged: `0c211cd8de16ff4ad0fde5f458a4237f5f43126f`.
+- Post-merge Admin PT Xtra Pipeline run `34560451685`: **SUCCESS**.
+- PR #73 merged: `080e013ebb154d9c880e188c7f1d0e8fd28009a9`.
 
-## Remediation in PR #72
-- Added `src/admin-auth.js` with HMAC-SHA-256 signed stateless sessions.
+## Security remediation completed
+- Added `src/admin-auth.js` with HMAC-SHA-256 signed stateless Admin sessions.
 - Session TTL: 60 minutes.
-- Protected Admin APIs and vehicle pipeline now verify the signed token.
+- Protected Admin APIs and vehicle pipeline verify the signed token.
 - Login fails closed if `ADMIN_PASSWORD` or `ADMIN_TOKEN` is missing.
-- Added regression tests for valid, malformed, random, tampered, and wrong-secret tokens.
+- Regression tests cover valid, malformed, random, tampered, and wrong-secret tokens.
 - No production secret values were changed or committed.
 
-## Remaining gates
-1. CI on PR #72 must pass.
-2. Review security/auth implementation and regression output.
-3. Run safe production smoke/E2E against `https://phanthuanxtra.com` using only existing configured secrets; never invent credentials.
-4. Confirm `/admin`, `/admin.html`, login, protected API, `/api/health`, D1 read path, and public site behavior.
-5. Only after all gates are green: request merge confirmation. Do not deploy or perform destructive production CRUD before approval.
+## Production smoke correction completed in PR #73
+Finding: the old `production-smoke.yml` treated `ADMIN_TOKEN` as both the Admin password and bearer credential. That is incompatible with the hardened design: `ADMIN_TOKEN` is the server-side HMAC secret and login returns a signed session token.
 
-## Dependency finding
-Current Admin CI previously reported 3 high-severity npm audit findings. They must be identified and compatibility-reviewed before any `npm audit fix`; no blind dependency upgrade is authorized.
+Remediation:
+- Use `ADMIN_PASSWORD` only for `/api/admin/login`.
+- Capture the signed login session and use it for protected Admin/D1/R2 calls.
+- Keep `ADMIN_TOKEN` out of the smoke credential flow.
+- Run production smoke on normal `main` pushes for non-document changes rather than only when its own YAML changes.
+- Preserve invalid-login/unauthenticated boundaries and safe disposable D1 CRUD + R2 write/read/delete E2E.
 
-## Continuity rule
-Future AI agents must continue from this checkpoint and preserve: no direct `main` edits, no force-push, no production deployment before gates, no secret guessing, and no destructive production tests without a dedicated safe test mechanism.
+## Remaining production gates
+1. Verify Cloudflare deployment for `main` SHA `080e013ebb154d9c880e188c7f1d0e8fd28009a9` or later.
+2. Verify Production Smoke execution and all results.
+3. Confirm `/`, `/api/health`, `/api/cars`, `/admin.html`, login, unauthenticated Admin API = 401, signed-session Admin access, D1 CRUD, R2 write/read/delete, Worker health, Developer Gateway health/auth, and vehicle detail page.
+4. Identify and remediate the previously reported 3 high npm vulnerabilities only after package-level compatibility review; no blind `npm audit fix`.
+5. Only after all runtime gates are green: begin GitHub/Cloudflare consolidation and cleanup.
+
+## Post-APK consolidation plan
+- Treat AI-1 through AI-6 as one engineering/audit team.
+- Keep `phanthuanxtra-v9/phanthuanxtra-v9` as the source of truth unless evidence proves otherwise.
+- Audit branches/PRs before cleanup; delete only proven dead branches.
+- Audit GitHub Actions for duplicate/dead workflows before consolidation.
+- Verify Cloudflare Worker routes/custom domains, D1/R2 bindings, and deployment linkage before removing anything.
+- Do not delete duplicate repository `phanthuanxtra` until Cloudflare linkage is verified.
+- Preserve rollback and recovery paths throughout consolidation.
+
+## Continuity / safety rules
+- No direct unreviewed code edits on `main`.
+- No force-push.
+- No secret guessing or secret values in repository.
+- No destructive production test without a unique fixture and automatic cleanup.
+- Do not claim Production GREEN from merge/CI alone.
+- Every substantive step must leave a GitHub checkpoint for the next AI to continue.
