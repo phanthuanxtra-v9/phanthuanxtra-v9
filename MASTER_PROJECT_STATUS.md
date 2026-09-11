@@ -21,7 +21,7 @@ AI-1 through AI-6 operate as one engineering/audit team. Evidence is shared thro
 
 ## 4. CURRENT ARCHITECTURE
 
-- Main: `65e7c4bd853f6def83b080fce65149e9b9f464f8` (PR #86 status consolidation)
+- Main: `1b43f578c0e94ebbfa6179ebe930bafa106e0a4e` (current main)
 - Production Worker: `phanthuanxtra-v2`
 - Entry: `src/entry.js`
 - Website: `https://phanthuanxtra.com`
@@ -37,61 +37,90 @@ AI-1 through AI-6 operate as one engineering/audit team. Evidence is shared thro
 PR #82 canonicalized the direct Admin asset path. PR #84 hardened Admin credential verification so a D1 credential-store exception fails closed instead of escaping as HTTP 500.
 
 - PR #84 merge commit: `7f1347acede603826608dd0d5bdf6762fe425294`
-- PR #86 merge commit: `65e7c4bd853f6def83b080fce65149e9b9f464f8`
+- PR #87 status consolidation merge commit: `1b43f578c0e94ebbfa6179ebe930bafa106e0a4e`
 - PR #84 CI checks passed before merge.
 - D1 lookup failure returns authentication failure; it does not fall back to `ADMIN_PASSWORD` during a D1 outage.
 
-### 5.2 Production deployment — RED / NOT PROVEN
+### 5.2 Repository documentation cleanup — COMPLETE / NO DELETIONS REQUIRED
 
-No current evidence in this audit proves that the PR #84 Admin fix is deployed to the production Worker. The latest `main` push has triggered CI, including Android APK workflow run `34576279580`, currently/most recently observed in progress. Do not infer Cloudflare deployment from source merge or APK CI.
+A complete recursive Git tree audit was performed against current `main` commit `1b43f578c0e94ebbfa6179ebe930bafa106e0a4e` before cleanup. The tree is marked `truncated:false`. Exactly **one `.md` file exists in the repository tree: `MASTER_PROJECT_STATUS.md`**. No legacy checkpoint/status/handoff `.md` remains to delete. `README`, license and technical documentation were not touched.
 
-### 5.3 Production smoke — RED / PRE-FIX EVIDENCE
+Therefore no destructive Markdown deletion was performed. This preserves the canonical source of truth exactly as requested and avoids a false cleanup commit containing unrelated changes.
+
+### 5.3 Production deployment — RED / NOT PROVEN
+
+No current evidence in this audit proves that the PR #84 Admin fix is deployed to the production Worker. Do not infer Cloudflare deployment from source merge or APK CI.
+
+### 5.4 Production smoke — RED / PRE-FIX EVIDENCE
 
 Production Smoke run `34573941824` injected the GitHub Actions `ADMIN_PASSWORD` secret and passed basic website, `/api/health`, `/api/cars`, `/admin.html` and Worker checks, then failed because invalid Admin credentials returned HTTP 500 instead of required HTTP 401. Downstream D1/R2/Gateway E2E stages were skipped. This run predates PR #84 and cannot validate the fix.
 
-### 5.4 Production E2E — OPEN
+### 5.5 Production E2E — OPEN
 
 Required gates remain open: Admin invalid/valid login and session, dashboard authorization, D1 CRUD, R2 media CRUD, password reset, Gateway/AI, Telegram Auto Bot, VIP webhook/idempotency, backup/restore, and fresh APK artifact/device verification.
 
-### 5.5 Cloudflare runtime evidence — PARTIAL
+### 5.6 Cloudflare runtime evidence — PARTIAL
 
 This ChatGPT session does not have a privileged Cloudflare management connector for independent secret/route/binding enumeration. Do not guess or mutate Cloudflare secrets, routes or bindings without evidence.
 
-## 6. PR CONSOLIDATION / NO OVERLAP
+## 6. SINGLE EXECUTION QUEUE / OWNERSHIP
 
-The stale/open PR inventory was audited. Superseded or duplicate work was closed without deleting branches or infrastructure:
+### QUEUE-01 — Complete Admin page / production Admin E2E
+**Owner:** next available AI/Work AI.  
+**Scope:** prove current deployment; verify `/admin`, `/admin/`, `/admin.html` canonical behavior; invalid login 401; valid login/session; dashboard authorization; D1 CRUD; R2 media CRUD; password reset.  
+**Status:** OPEN / highest priority.
 
-- Closed #1 — obsolete mobile performance branch.
-- Closed #37 — superseded by the newer VIP hardening track.
-- Closed #47 — obsolete checkpoint; this file is now the sole canonical status.
-- Closed #49 — stale draft; production verification is handled by the current production-smoke/deploy gates.
-- Closed #53 — stale Admin UI track superseded by current Admin/security work.
-- Closed #54 — stale AI plate-branding track; must be reintroduced only if current main still needs the capability.
-- Closed #55 — stale website detail-page track; must be reintroduced only after current UX/API audit.
-- Closed #62 — duplicate documentation/checkpoint track.
-- Closed #77 — obsolete/redundant God's Eye revert track.
-- Closed #85 — superseded status-sync PR; replaced by #86.
+### QUEUE-02 — Gateway/AI production E2E
+**Status:** BLOCKED by QUEUE-01 baseline.
 
-PR #66 remains the only retained open implementation candidate from the stale set because it contains concrete VIP document-ingestion hardening. It is not approved for merge: its branch must be reconciled against current `main` and pass current CI/runtime gates before any merge.
+### QUEUE-03 — PR #66 VIP hardening
+**Status:** OPEN / retained candidate; reconcile against current `main` before any merge.
 
-## 7. EXECUTION PRIORITIES
+### QUEUE-04 — APK production readiness
+**Status:** OPEN; fresh artifact/hash + S21 Ultra regression.
 
-1. Prove production deployment of the current Admin fix.
-2. Run fresh production smoke and close Admin 401/login/session/D1/R2 gates.
-3. Close password-reset production E2E.
-4. Audit Gateway/AI production paths.
-5. Reconcile PR #66 VIP hardening against current `main`, then CI + production E2E.
-6. Audit APK artifact/hash tied to current `main` and complete S21 Ultra regression.
-7. Validate Telegram Auto Bot and VIP webhook/idempotency in production.
-8. Execute backup/restore/readability verification.
-9. Only then reconsider valuable closed/stale features using fresh branches from current `main`.
-10. Declare **PRODUCTION GREEN / COMPLETE** only when every required gate has current evidence.
+### QUEUE-05 — Telegram/VIP production E2E
+**Status:** OPEN; execute after API/Gateway baseline.
 
-## 8. SAFETY / CONTINUITY
+### QUEUE-06 — Backup/restore
+**Status:** OPEN.
+
+### QUEUE-07 — Final cleanup + GREEN gate
+**Status:** OPEN / last.
+
+## 7. RELEASE GATES
+
+1. Current main deployed to production.
+2. Invalid Admin login → HTTP 401, never 500.
+3. Valid Admin login → HTTP 200 + signed session.
+4. Unauthenticated dashboard → HTTP 401.
+5. Authenticated dashboard access.
+6. D1 create/read/delete E2E.
+7. R2 write/read/delete E2E.
+8. Password reset production E2E.
+9. Gateway/AI production gate where configured.
+10. Fresh APK artifact/hash + S21 Ultra regression.
+11. Telegram Auto Bot production E2E.
+12. VIP webhook/idempotency production E2E.
+13. Backup + restore/readability evidence.
+14. Final security/UX/maintainability/testability audit.
+15. Only then declare **PRODUCTION GREEN / COMPLETE**.
+
+## 8. CHANGE LOG — CANONICAL
+
+### 2026-09-11 — Repository Markdown cleanup audit
+- Read `MASTER_PROJECT_STATUS.md` from current `main` before work.
+- Audited the complete recursive Git tree at `1b43f578c0e94ebbfa6179ebe930bafa106e0a4e`; GitHub reports `truncated:false`.
+- Classification result: exactly one Markdown file exists: `MASTER_PROJECT_STATUS.md` — **KEEP / CANONICAL**.
+- No old checkpoint/status/handoff Markdown files exist, so **zero `.md` deletions** were made.
+- README/license/technical docs were not deleted or modified.
+- Next action is QUEUE-01: complete Admin page and production Admin E2E.
+
+## 9. SAFETY / CONTINUITY
 
 - Never put secrets in chat, Markdown, GitHub issues, source or logs.
 - Never force-push.
 - Never delete a Worker, repo, branch, route or database without current dependency evidence.
 - Never convert skipped tests, source-only checks, or missing runtime evidence into GREEN.
 - One team, one queue, one canonical status file: `MASTER_PROJECT_STATUS.md`.
-- Every AI must record completed work, evidence, blockers and next action in this file only.
+- Every AI must read this file before work and record completed work, evidence, blockers and next action here only.
