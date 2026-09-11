@@ -11,30 +11,19 @@ This is the only project-status / continuity document. Current `main` source, cu
 
 ## 2. PROJECT COMPLETION MANDATE
 
-The objective is to complete the entire `phanthuanxtra.com` project and `AI PT.XTRA` APK as one integrated production system.
+The objective is to complete `phanthuanxtra.com` and the AI PT.XTRA APK as one integrated production system.
 
-All ChatGPT connections/agents participating in this project must operate under the **same audit/deploy authority model** where the connected GitHub permissions allow it:
+AI-1 through AI-6 operate as one engineering/audit team. Evidence is shared through GitHub source, PRs, CI/CD, production runtime checks and this file. No secret guessing, no force-push, no unreviewed destructive production change, and no false GREEN claim.
 
-- AI-1 through AI-6 are one engineering/audit team, not separate competing project owners.
-- No ChatGPT connection should be intentionally treated as read-only while another has execution authority if equivalent GitHub permissions have been granted.
-- Each authorized ChatGPT connection may inspect source, audit, run/dispatch permitted CI checks, propose or apply controlled code changes, create/update PRs and participate in the same release-gate chain.
-- Audit, test and deployment evidence must be shared through GitHub Actions, repository state and this Master Status file rather than private/unrecorded checkpoints.
-- No secret guessing, no force-push, no unreviewed destructive production change and no false GREEN claim.
-- A deployment is not considered complete merely because a GitHub deployment job succeeds; production runtime gates must also pass.
+## 3. UNIFIED RELEASE WORKFLOW
 
-## 3. UNIFIED CLOUDFLARE + AI WORKFLOW
+`AI agents → GitHub branch/PR → CI/audit → protected main → Cloudflare deployment → production runtime verification → production E2E → APK/device verification`
 
-The project uses the combined workflow:
-
-`ChatGPT AI agents → GitHub source/PR → GitHub Actions audit/test → Cloudflare Workers deployment → Cloudflare runtime verification → production E2E → APK release/device verification`
-
-Cloudflare Workers AI / AI Gateway / Workflows and related Cloudflare AI capabilities are part of the engineering system where configured. They complement the GitHub audit/deploy chain; they do not replace production evidence.
-
-Audit/test must not depend on paid OpenAI API credit when a zero-cost repository/CI/Cloudflare/runtime test can provide the required evidence. Do not use OpenAI API for audit/test merely to manufacture a GREEN result.
+Cloudflare AI/AI Gateway/Workflows may be used where configured and useful, but they never replace runtime evidence. Audit must prefer zero-cost repository/CI/runtime evidence over paid API calls when equivalent evidence exists.
 
 ## 4. CURRENT ARCHITECTURE
 
-- Main: `f5ac7d411c199a240cd263dbb0e409e3d113f8f6` (PR #83 merge)
+- Main: `7f1347acede603826608dd0d5bdf6762fe425294` (PR #84 merge)
 - Production Worker: `phanthuanxtra-v2`
 - Entry: `src/entry.js`
 - Website: `https://phanthuanxtra.com`
@@ -43,115 +32,74 @@ Audit/test must not depend on paid OpenAI API credit when a zero-cost repository
 - R2: `phanthuanxtra-media`
 - APK: `com.phanthuanxtra.app`, source version 1.2.0 / versionCode 3
 
-## 5. UNIFIED AI-1 → AI-6 AUDIT RULE
+## 5. VERIFIED RELEASE EVIDENCE
 
-AI-1 through AI-6 are one engineering/audit team using one source of truth, one production architecture and one release-gate chain. No secret guessing, no force-push, no unreviewed destructive production change, and no false GREEN claim.
+### 5.1 Source / Admin security — GREEN
 
-## 6. AUDIT CHAIN — CURRENT EVIDENCE
+PR #82 canonicalized the direct Admin asset path. PR #84 hardened Admin credential verification so a D1 credential-store exception fails closed instead of escaping as HTTP 500.
 
-### 6.1 GitHub source / commit — GREEN
+- PR #84 merge commit: `7f1347acede603826608dd0d5bdf6762fe425294`
+- PR #84 CI checks passed before merge.
+- D1 lookup failure returns authentication failure; it does not fall back to `ADMIN_PASSWORD` during a D1 outage.
+- Regression coverage includes D1 lookup failure and bootstrap fallback behavior.
 
-PR #82 `fix: canonicalize direct Admin asset` was merged successfully.
+### 5.2 Production deployment — NOT YET PROVEN FOR PR #84
 
-- Merge commit: `5fa34d0511e710794c2072d3de7d8d2d238dc9f0`
-- `public/admin` SHA is exactly the same as canonical `public/admin.html`: `d1331862b0c5e74f2c22da70849b53c73c2f25f2`.
-- `src/entry.js` explicitly canonicalizes `/admin` and `/admin/` to `/admin.html`, sets UTF-8 content type and `no-store`.
+The last independently recorded successful production deployment was workflow `34570211871`, which deployed an earlier commit in the D1 migration-drift remediation lineage.
 
-PR #83 was then merged as the evidence/status continuity update:
-- Merge commit: `f5ac7d411c199a240cd263dbb0e409e3d113f8f6`.
-- `MASTER_PROJECT_STATUS.md` remains the only canonical continuity document.
+No post-merge deployment run for `7f1347a` has yet been evidenced in this audit session. Therefore the PR #84 code must not be considered production-deployed until a deployment run explicitly proves it.
 
-### 6.2 CI/CD — DEPLOYMENT GREEN / PRODUCTION SMOKE RED
+### 5.3 Production smoke — RED / PRE-FIX EVIDENCE
 
-Deploy workflow run `34570211871` successfully validated and deployed commit `d090744b757095d3e75160ebedaf69cecfea40f5` after the D1 migration-drift remediation. The production Worker deployment job completed successfully.
+Production Smoke run `34573941824` injected the GitHub Actions `ADMIN_PASSWORD` secret and passed basic website, `/api/health`, `/api/cars`, `/admin.html` and Worker checks. It then failed because invalid Admin credentials returned HTTP 500 instead of required HTTP 401. Downstream D1/R2/Gateway E2E stages were skipped.
 
-Production Smoke run `34573941824` was dispatched after the GitHub Actions `ADMIN_PASSWORD` secret was created. The job environment showed `ADMIN_PASSWORD: ***`, proving the GitHub secret is injected. Basic website, `/api/health`, `/api/cars`, `/admin.html`, and Worker smoke checks passed.
+This smoke run predates PR #84 and therefore cannot validate the fix.
 
-The Admin authentication boundary then failed because an invalid password returned **HTTP 500** instead of the required **HTTP 401**. All authenticated D1/R2/Gateway E2E stages were therefore skipped.
+### 5.4 Cloudflare runtime evidence — PARTIAL
 
-### 6.3 Admin login — ROOT CAUSE NARROWED / FIX PR OPEN
+GitHub Actions provides evidence for Wrangler authentication and repository-controlled deployment steps. This ChatGPT session does not have a privileged Cloudflare management connector for independent secret/route/binding enumeration. Do not guess or mutate Cloudflare secrets, routes or bindings without evidence.
 
-Runtime path is confirmed by current `main` source:
+### 5.5 Admin runtime — OPEN
 
-`src/entry.js` → `handleAppAdmin()` → `adminLogin()` → `verifyAdminPassword()` → D1 `admin_credentials` query.
+Fresh post-PR #84 production evidence is required for `/admin`, `/admin/` and `/admin.html`, including correct UTF-8 content, canonical asset behavior and cache headers.
 
-`src/admin-password.js` on `main` performs:
+### 5.6 Password reset — SOURCE GREEN / PRODUCTION OPEN
 
-`SELECT password_hash,salt FROM admin_credentials WHERE id=1`
+Admin recovery uses PBKDF2-SHA-256 with 120,000 iterations and a random 16-byte salt. Plaintext passwords are not stored. Migration `0013_admin_credentials.sql` creates the credential table. Production recovery E2E remains unproven.
 
-outside the existing PBKDF2/base64 `try/catch`. If that D1 query throws because of a runtime database/schema/binding failure, the exception escapes `verifyAdminPassword()` and the Worker-level handler converts it to HTTP 500.
+## 6. PRODUCTION RELEASE GATES — OPEN
 
-The exact underlying D1 exception text is **not yet independently captured** in this session because privileged Cloudflare runtime logs are unavailable. Therefore the audit does not claim a specific missing table/binding/migration error without evidence.
+1. Post-merge production deployment of `7f1347a` or an explicitly equivalent deployed commit.
+2. Invalid Admin login → HTTP 401, never 500.
+3. Valid Admin login → HTTP 200 + signed session.
+4. Unauthenticated Admin dashboard → HTTP 401.
+5. Authenticated Admin dashboard access.
+6. Admin D1 create/read/delete E2E.
+7. Admin R2 media write/read/delete E2E.
+8. Developer Gateway health/auth/unified-AI production gate where configured.
+9. Password-reset production E2E.
+10. Fresh APK CI artifact/hash tied to current main plus S21 Ultra regression.
+11. Telegram Auto Bot production E2E.
+12. VIP webhook/idempotency production E2E.
+13. Backup plus restore/readability evidence.
+14. Only after all gates pass: stale PR/branch/infrastructure cleanup with dependency evidence.
 
-Remediation PR **#84** is open:
-- Branch: `fix/admin-login-d1-fail-closed-v1`
-- Current head: `e8c3ab0b515a7ddbeee4faf02858891dc7953ff3`
-- Change: D1 credential lookup now fails closed (`false`) instead of throwing.
-- Security behavior: when D1 credential storage is unavailable, the code does **not** fall back to `ADMIN_PASSWORD`; fallback remains only when the query succeeds and no persisted credential row exists.
-- Regression tests cover D1 lookup failure and the intended bootstrap fallback.
-- Admin CI and deploy validation were expanded to execute the Admin password regression suite.
+## 7. STALE PR POLICY
 
-PR #84 has **not been merged** and production has not been mutated by this remediation.
+Stale or highly diverged PRs must not be merged directly. Useful work must first be reconciled against current `main`, revalidated by CI, and reviewed for compatibility, security, maintainability and production value.
 
-### 6.4 Credential model — SOURCE INCONSISTENCY DOCUMENTED
+## 8. EXECUTION PRIORITIES
 
-The Admin implementation intentionally has two credential layers:
-- `ADMIN_PASSWORD` is the bootstrap fallback when `admin_credentials` has no row.
-- D1 `admin_credentials` becomes the persisted password after recovery.
-- `ADMIN_TOKEN` signs the Admin session token and authorizes password recovery.
-
-`app-admin.js` currently requires both `ADMIN_PASSWORD` and `ADMIN_TOKEN` before invoking `verifyAdminPassword()`. This is a separate design inconsistency because `verifyAdminPassword()` already supports a D1 persisted password override. It is not being changed in PR #84 unless later runtime evidence proves it is part of the release blocker.
-
-User has confirmed `ADMIN_TOKEN` was configured in Production and redeployed. This is user-provided configuration evidence; the secret value is neither requested nor exposed. This session has no privileged Cloudflare connector to independently enumerate Worker secrets.
-
-### 6.5 Cloudflare production — DEPLOYMENT PROVEN / PRIVILEGED RUNTIME STATE PARTIALLY PROVEN
-
-GitHub Actions proves Wrangler authentication, dry-run, migration/deploy execution and Worker deployment. Repository configuration identifies Worker `phanthuanxtra-v2`, D1 `phanthuanxtra-db`, R2 `phanthuanxtra-media`, AI/AI_SEARCH/IMAGES/ASSETS bindings and the expected cron.
-
-This ChatGPT session has GitHub access but no privileged Cloudflare management connector. Do not guess or mutate Worker secrets/routes/bindings from ChatGPT.
-
-### 6.6 Runtime `/admin` — NOT YET REPROVEN AFTER LATEST DEPLOY
-
-PR #82 fixes the source asset divergence and was included in the deployed main lineage. Fresh post-deploy evidence for `/admin`, `/admin/`, and `/admin.html` is still required before declaring the Admin UI route GREEN.
-
-### 6.7 Password reset — SOURCE GREEN / PRODUCTION BLOCKED
-
-`public/admin.html` and `public/admin` contain the recovery UI. `src/admin-password.js` uses PBKDF2-SHA-256 with 120,000 iterations and a random 16-byte salt; plaintext passwords are not stored. `migrations/0013_admin_credentials.sql` creates the credential table. Production reset E2E is not proven.
-
-### 6.8 Regression / release gates — OPEN
-
-Still unproven:
-- Invalid Admin login → 401 in production after remediation deployment.
-- Valid Admin login → signed session and protected dashboard.
-- Authenticated Admin D1 CRUD.
-- Authenticated Admin R2 media write/read/delete.
-- Gateway production smoke completion.
-- Telegram Auto Bot production E2E.
-- VIP webhook/idempotency production E2E.
-- Fresh APK artifact/hash tied to a current CI run plus material S21 device regression.
-- Real backup plus restore/readability test.
-
-## 7. CURRENT BLOCKERS
-
-1. **Production Admin invalid-credential boundary returns 500 instead of 401.** PR #84 is the controlled remediation.
-2. **The exact underlying D1 runtime exception is not yet captured by privileged Cloudflare logs.** Do not invent its cause beyond the proven uncaught-query boundary.
-3. **PR #84 is not merged; production remains RED.**
-4. **Authenticated Admin D1/R2 E2E did not execute in the failed smoke run.**
-5. **Password-reset E2E is not proven.**
-6. **APK, Telegram/VIP production E2E and backup/restore gates remain open.**
-
-## 8. IMMEDIATE EXECUTION ORDER
-
-1. Complete CI/review validation for PR #84.
-2. Only after CI is green, obtain merge confirmation before merging PR #84.
-3. After merge, let the protected production deployment execute; then rerun Production Smoke.
-4. Require Admin invalid-login 401, valid login/session, unauthenticated 401, authenticated dashboard, D1 CRUD and R2 CRUD to pass.
-5. Run password-reset E2E using the live recovery path without revealing the recovery code.
-6. Complete Telegram/VIP production E2E, APK artifact/device gate and backup restore/readability gate.
-7. Use Cloudflare AI capabilities/workflows where they materially improve automation, validation or application behavior, while keeping GitHub as the auditable source/release chain.
-8. Only then perform duplicate infrastructure/branch/Worker cleanup.
-9. Only after every required production gate passes may the project be declared **PRODUCTION GREEN / COMPLETE**.
-10. Never declare Production GREEN from source presence or skipped tests alone.
+1. Prove deployment of PR #84 to production.
+2. Run fresh production smoke and close Admin 401/login/session/D1/R2 gates.
+3. Close password-reset production E2E.
+4. Audit Gateway and AI production paths.
+5. Audit and validate APK artifact plus real-device regression.
+6. Validate Telegram Auto Bot and VIP webhook/idempotency in production.
+7. Execute backup/restore/readability verification.
+8. Reconcile valuable stale PRs only after the production baseline is stable.
+9. Cleanup duplicate branches/workers/infrastructure only with current dependency evidence.
+10. Declare **PRODUCTION GREEN / COMPLETE** only when every required gate has current evidence.
 
 ## 9. SAFETY / CONTINUITY
 
@@ -159,5 +107,4 @@ Still unproven:
 - Never force-push.
 - Never delete a Worker, repo, branch, route or database without current dependency evidence.
 - Never convert skipped tests or missing runtime evidence into GREEN.
-- All authorized ChatGPT agents must use this same Master Status as their continuity reference.
 - This file is the only canonical continuity document.
