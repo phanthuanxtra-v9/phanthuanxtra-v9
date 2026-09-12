@@ -126,7 +126,7 @@ jobs:
           test -n "$ADMIN_SESSION"
           export ADMIN_SESSION
 
-          trap 'curl --silent --show-error --retry 2 --max-time 20 -X DELETE "$SITE_URL/api/admin/cars" -H "Authorization: Bearer $ADMIN_SESSION" -H "content-type: application/json" --data "{\"id\":\"$TEST_CAR_ID\"}" >/dev/null || true' EXIT
+          trap 'curl --silent --show-error --retry 2 --max-time 20 -X DELETE "$SITE_URL/api/admin/cars/$TEST_CAR_ID" -H "Authorization: Bearer $ADMIN_SESSION" >/dev/null || true' EXIT
 
           curl --fail-with-body --silent --show-error --retry 2 --max-time 20 \
             -X POST "$SITE_URL/api/admin/cars" \
@@ -145,10 +145,9 @@ jobs:
           jq -e --arg id "$TEST_CAR_ID" '.cars | any(.[]; .id == $id and .brand == "PT XTRA TEST")' /tmp/public-cars.json >/dev/null
 
           curl --fail-with-body --silent --show-error --retry 2 --max-time 20 \
-            -X DELETE "$SITE_URL/api/admin/cars" \
-            -H "Authorization: Bearer $ADMIN_SESSION" -H 'content-type: application/json' \
-            --data "{\"id\":\"$TEST_CAR_ID\"}" | tee /tmp/admin-delete.json
-          jq -e '.ok == true and .id == env.TEST_CAR_ID' /tmp/admin-delete.json >/dev/null
+            -X DELETE "$SITE_URL/api/admin/cars/$TEST_CAR_ID" \
+            -H "Authorization: Bearer $ADMIN_SESSION" | tee /tmp/admin-delete.json
+          jq -e '.ok == true and .deleted == env.TEST_CAR_ID' /tmp/admin-delete.json >/dev/null
 
           curl --fail-with-body --silent --show-error --retry 2 --max-time 20 \
             -H "Authorization: Bearer $ADMIN_SESSION" "$SITE_URL/api/admin/cars" \
