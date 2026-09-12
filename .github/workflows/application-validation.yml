@@ -23,10 +23,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with: { fetch-depth: 0 }
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with: { node-version: 24, cache: npm }
       - name: Validate JavaScript syntax
         run: |
@@ -43,7 +43,7 @@ jobs:
         run: |
           set -euo pipefail
           if grep -R -n --exclude-dir=node_modules --exclude-dir=.git \
-            -E '@cf/meta/llama-3\.1-8b-instruct(["@]|[^a-zA-Z0-9_-])' src tests; then
+            -E '@cf/meta/llama-3\\.1-8b-instruct(["@]|[^a-zA-Z0-9_-])' src tests; then
             echo "ERROR: deprecated Workers AI model ID detected"; exit 1
           fi
           grep -n '@cf/meta/llama-3.2-3b-instruct' src/ai-chat.js
@@ -65,7 +65,7 @@ jobs:
           changed_files="$(git diff --name-only "$base_sha" "$head_sha" -- 'src/**' 'public/**' 'developer-gateway/**')"
           if [ -z "$changed_files" ]; then echo "NO RUNTIME FILES CHANGED"; exit 0; fi
           printf '%s\n' "$changed_files"
-          if git diff --unified=0 "$base_sha" "$head_sha" -- $changed_files | grep -E '^\+.*(CREATE TABLE|CREATE INDEX|ALTER TABLE|DROP TABLE|DROP INDEX)'; then
+          if git diff --unified=0 "$base_sha" "$head_sha" -- $changed_files | grep -E '^\\+.*(CREATE TABLE|CREATE INDEX|ALTER TABLE|DROP TABLE|DROP INDEX)'; then
             echo "ERROR: runtime DDL added by this pull request"; exit 1
           fi
           echo "NO RUNTIME DDL ADDED BY THIS PULL REQUEST"
