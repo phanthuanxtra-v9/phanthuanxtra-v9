@@ -52,9 +52,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          status="$(curl --silent --show-error --retry 2 --retry-delay 1 --max-time 20 -o /tmp/admin.json -w '%{http_code}' \
-            -X POST "$SITE_URL/api/admin/login" -H 'content-type: application/json' \
-            --data '{"password":"__invalid_smoke_password__"}')"
+          status="$(curl --silent --show-error --retry 2 --retry-delay 1 --max-time 20 -o /tmp/admin.json -w '%{http_code}' -X POST "$SITE_URL/api/admin/login" -H 'content-type: application/json' --data '{"password":"__invalid_smoke_password__"}')"
           echo "Admin login invalid-credential boundary HTTP $status"
           test "$status" = "401"
           status="$(curl --silent --show-error --retry 2 --retry-delay 1 --max-time 20 -o /tmp/dashboard.json -w '%{http_code}' "$SITE_URL/api/admin/dashboard")"
@@ -72,8 +70,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          status="$(curl --silent --show-error --retry 2 --retry-delay 1 --max-time 20 -o /tmp/gateway-unauth.json -w '%{http_code}' \
-            -X POST "$GATEWAY_URL/v1/ai/unified" -H 'content-type: application/json' --data '{"instruction":"smoke unauthorized test"}')"
+          status="$(curl --silent --show-error --retry 2 --retry-delay 1 --max-time 20 -o /tmp/gateway-unauth.json -w '%{http_code}' -X POST "$GATEWAY_URL/v1/ai/unified" -H 'content-type: application/json' --data '{"instruction":"smoke unauthorized test"}')"
           echo "Gateway unauthenticated boundary HTTP $status"
           test "$status" = "401"
           jq -e '.ok == false and .error == "unauthorized"' /tmp/gateway-unauth.json >/dev/null
@@ -83,9 +80,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail-with-body --silent --show-error --retry 2 --retry-delay 1 --max-time 60 \
-            -X POST "$GATEWAY_URL/v1/ai/unified" -H "Authorization: Bearer $GATEWAY_READ_TOKEN" -H 'content-type: application/json' \
-            --data '{"task_id":"production-smoke","mode":"audit","instruction":"Return exactly: XTRA_UNIFIED_AI_OK"}' | tee /tmp/unified-ai.json
+          curl --fail-with-body --silent --show-error --retry 2 --retry-delay 1 --max-time 60 -X POST "$GATEWAY_URL/v1/ai/unified" -H "Authorization: Bearer $GATEWAY_READ_TOKEN" -H 'content-type: application/json' --data '{"task_id":"production-smoke","mode":"audit","instruction":"Return exactly: XTRA_UNIFIED_AI_OK"}' | tee /tmp/unified-ai.json
           jq -e '.ok == true and .logical_agent == "xtra-unified-ai" and .engine == "cloudflare-workers-ai" and .production_mutation == false' /tmp/unified-ai.json >/dev/null
           jq -e '.response | contains("XTRA_UNIFIED_AI_OK")' /tmp/unified-ai.json >/dev/null
 
@@ -111,8 +106,7 @@ jobs:
           test -n "$ADMIN_SESSION"
           export ADMIN_SESSION
           trap 'curl --silent --show-error --retry 2 --max-time 20 -X DELETE "$SITE_URL/api/admin/cars/$TEST_CAR_ID" -H "Authorization: Bearer $ADMIN_SESSION" >/dev/null || true' EXIT
-          curl --fail-with-body --silent --show-error --retry 2 --max-time 20 -X POST "$SITE_URL/api/admin/cars" -H "Authorization: Bearer $ADMIN_SESSION" -H 'content-type: application/json' \
-            --data "{\"id\":\"$TEST_CAR_ID\",\"brand\":\"PT XTRA TEST\",\"model\":\"CI E2E Vehicle\",\"year\":2026,\"mileage\":1,\"price\":1,\"fuel\":\"test\",\"category\":\"suv\",\"color\":\"test\",\"status\":\"available\",\"description\":\"CI production E2E test record; automatically deleted.\",\"features\":[\"e2e\"],\"images\":[\"$TEST_IMAGE_URL\"]}" | tee /tmp/admin-create.json
+          curl --fail-with-body --silent --show-error --retry 2 --max-time 20 -X POST "$SITE_URL/api/admin/cars" -H "Authorization: Bearer $ADMIN_SESSION" -H 'content-type: application/json' --data "{\"id\":\"$TEST_CAR_ID\",\"brand\":\"PT XTRA TEST\",\"model\":\"CI E2E Vehicle\",\"year\":2026,\"mileage\":1,\"price\":1,\"fuel\":\"test\",\"category\":\"suv\",\"color\":\"test\",\"status\":\"available\",\"description\":\"CI production E2E test record; automatically deleted.\",\"features\":[\"e2e\"],\"images\":[\"$TEST_IMAGE_URL\"]}" | tee /tmp/admin-create.json
           jq -e '.ok == true and .id == env.TEST_CAR_ID' /tmp/admin-create.json >/dev/null
           curl --fail-with-body --silent --show-error --retry 2 --max-time 20 -H "Authorization: Bearer $ADMIN_SESSION" "$SITE_URL/api/admin/cars" | tee /tmp/admin-cars.json
           jq -e --arg id "$TEST_CAR_ID" '.cars | any(.[]; .id == $id and .brand == "PT XTRA TEST")' /tmp/admin-cars.json >/dev/null
@@ -132,18 +126,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          status="$(curl --silent --show-error --retry 2 --max-time 20 -o /tmp/admin-login-r2.json -w '%{http_code}' -X POST "$SITE_URL/api/admin/login" -H 'content-type: application/json' --data "$(jq -nc --arg password "$ADMIN_PASSWORD" '{password:$password}')")"
+          echo "Admin login for R2 E2E HTTP $status"
+          test "$status" = "200"
+          R2_SESSION="$(jq -r '.token // empty' /tmp/admin-login-r2.json)"
+          test -n "$R2_SESSION"
           printf 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' | base64 -d > /tmp/xtra-e2e.png
-          status="$(curl --silent --show-error --retry 2 --max-time 20 -o /tmp/media-upload.json -w '%{http_code}' \
-            -X POST "$SITE_URL/api/admin/media" -H "Authorization: Bearer $ADMIN_SESSION" -H 'content-type: image/png' --data-binary @/tmp/xtra-e2e.png)"
+          status="$(curl --silent --show-error --retry 2 --max-time 20 -o /tmp/media-upload.json -w '%{http_code}' -X POST "$SITE_URL/api/admin/media" -H "Authorization: Bearer $R2_SESSION" -H 'content-type: image/png' --data-binary @/tmp/xtra-e2e.png)"
           echo "R2 write/upload HTTP $status"
           test "$status" = "200"
           MEDIA_KEY="$(jq -r '.key // empty' /tmp/media-upload.json)"
           test -n "$MEDIA_KEY"
-          export MEDIA_KEY
           curl --fail-with-body --silent --show-error --retry 2 --max-time 20 "$SITE_URL/media/$MEDIA_KEY" -o /tmp/xtra-e2e-download.png
           cmp /tmp/xtra-e2e.png /tmp/xtra-e2e-download.png
           echo 'R2 write/read: OK'
-          status="$(curl --silent --show-error --retry 2 --max-time 20 -o /tmp/media-delete.json -w '%{http_code}' -X DELETE "$SITE_URL/api/admin/media/$MEDIA_KEY" -H "Authorization: Bearer $ADMIN_SESSION")"
+          status="$(curl --silent --show-error --retry 2 --max-time 20 -o /tmp/media-delete.json -w '%{http_code}' -X DELETE "$SITE_URL/api/admin/media/$MEDIA_KEY" -H "Authorization: Bearer $R2_SESSION")"
           echo "R2 delete HTTP $status"
           test "$status" = "200"
           status="$(curl --silent --show-error --retry 2 --max-time 20 -o /tmp/media-after.json -w '%{http_code}' "$SITE_URL/media/$MEDIA_KEY")"
