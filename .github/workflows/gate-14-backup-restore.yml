@@ -1,0 +1,71 @@
+name: Gate 14 Backup Restore Readability
+
+on:
+  workflow_dispatch:
+    inputs:
+      backup_run_id:
+        description: 'Successful Full System Backup workflow run ID'
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  restore-readability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Download backup artifact from the selected successful run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.backup_run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p restore
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name "phanthuanxtra-full-system-backup-$RUN_ID" --dir restore
+          test -s "restore/full-system-backup.tar.gz"
+          test -s "restore/full-system-backup.tar.gz.sha256"
+      - name: Verify archive checksum and extract
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd restore
+          sha256sum -c full-system-backup.tar.gz.sha256
+          mkdir extracted
+          tar -xzf full-system-backup.tar.gz -C extracted
+          test -s extracted/manifest.json
+          test -s extracted/SHA256SUMS
+          (cd extracted && sha256sum -c SHA256SUMS)
+      - name: Verify D1 restore readability with SQLite
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq sqlite3
+          test -s restore/extracted/d1/production.sql
+          sqlite3 restore/restore-check.db < restore/extracted/d1/production.sql
+          test "$(sqlite3 restore/restore-check.db 'PRAGMA integrity_check;')" = 'ok'
+      - name: Verify R2 object readability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s restore/extracted/r2/object-manifest.json
+          count="$(node -e "const m=require('./restore/extracted/r2/object-manifest.json'); process.stdout.write(String(m.object_count||0))")"
+          files="$(find restore/extracted/r2/objects -type f 2>/dev/null | wc -l | tr -d ' ')"
+          echo "manifest_objects=$count restored_files=$files"
+          test "$count" = "$files"
+      - name: Restore/readability evidence summary
+        run: |
+          {
+            echo '# Gate 14 Backup + Restore/Readability'
+            echo
+            echo '- Archive SHA-256: PASS'
+            echo '- Archive extraction: PASS'
+            echo '- Internal backup SHA-256 manifest: PASS'
+            echo '- D1 SQL restore into a clean SQLite database: PASS'
+            echo '- SQLite integrity_check: PASS'
+            echo '- R2 object manifest/file-count readability: PASS'
+            echo '- Production infrastructure was not mutated.'
+          } >> "$GITHUB_STEP_SUMMARY"
