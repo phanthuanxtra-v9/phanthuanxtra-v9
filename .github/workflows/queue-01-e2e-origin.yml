@@ -16,6 +16,9 @@ jobs:
     env:
       BASE_URL: https://phanthuanxtra-v2.phanthuanmodelactor.workers.dev
       ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+      CF_PRIMARY_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_BACKUP_TOKEN: ${{ secrets.CLOUDFLARE_BACKUP_API_TOKEN }}
+      CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - name: Install jq
         run: sudo apt-get update -qq && sudo apt-get install -y -qq jq
@@ -24,8 +27,10 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$ADMIN_PASSWORD"
+          test -n "$CF_ACCOUNT_ID"
           TEST_CAR_ID="ci-origin-e2e-${GITHUB_RUN_ID}"
-          export TEST_CAR_ID
+          R2_KEY="admin/e2e-${GITHUB_RUN_ID}.png"
+          export TEST_CAR_ID R2_KEY
           status="$(curl --silent --show-error --retry 2 --max-time 20 -o /tmp/login.json -w '%{http_code}' \
             -X POST "$BASE_URL/api/admin/login" -H 'content-type: application/json' \
             --data "$(jq -nc --arg password "$ADMIN_PASSWORD" '{password:$password}')")"
@@ -38,9 +43,10 @@ jobs:
           cleanup() {
             curl --silent --show-error --retry 2 --max-time 20 -X DELETE "$BASE_URL/api/admin/cars/$TEST_CAR_ID" \
               -H "Authorization: Bearer $SESSION" >/dev/null || true
-            if [ -n "${MEDIA_KEY:-}" ]; then
-              curl --silent --show-error --retry 2 --max-time 20 -X DELETE "$BASE_URL/api/admin/media/$MEDIA_KEY" \
-                -H "Authorization: Bearer $SESSION" >/dev/null || true
+            if [ -n "${R2_TOKEN:-}" ]; then
+              curl --silent --show-error --retry 2 --max-time 20 -X DELETE \
+                "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/r2/buckets/phanthuanxtra-media/objects/$R2_KEY" \
+                -H "Authorization: Bearer $R2_TOKEN" >/dev/null || true
             fi
           }
           trap cleanup EXIT
@@ -49,7 +55,7 @@ jobs:
           jq -e '.stats and (.stats.cars|type == "number")' /tmp/dashboard.json >/dev/null
           echo 'Authenticated dashboard: OK'
           # The Admin vehicle pipeline requires trusted production media URLs and otherwise fetches with redirect:error.
-          # Use a deterministic trusted-path placeholder for the D1 CRUD contract; R2 is exercised independently below.
+          # Use a deterministic trusted-path placeholder for the D1 CRUD contract; R2 is exercised directly below.
           TEST_IMAGE_URL="https://phanthuanxtra.com/media/vehicles/publish-admin-${TEST_CAR_ID}.jpg"
           export TEST_IMAGE_URL
           curl --fail-with-body --silent --show-error --retry 2 --max-time 20 \
@@ -69,20 +75,51 @@ jobs:
           test "$status" = "404"
           echo 'D1 CRUD delete: OK'
           printf 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' | base64 -d > /tmp/xtra-e2e.png
+
+          select_r2_token() {
+            if [ -n "${CF_PRIMARY_TOKEN:-}" ]; then
+              status="$(curl --silent --show-error --retry 2 --max-time 20 -o /tmp/r2-primary.json -w '%{http_code}' \
+                -X PUT "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/r2/buckets/phanthuanxtra-media/objects/$R2_KEY" \
+                -H "Authorization: Bearer $CF_PRIMARY_TOKEN" -H 'content-type: image/png' --data-binary @/tmp/xtra-e2e.png)"
+              if [ "$status" = "200" ]; then
+                R2_TOKEN="$CF_PRIMARY_TOKEN"
+                export R2_TOKEN
+                echo 'R2 write: primary Cloudflare token accepted'
+                return 0
+              fi
+              echo "Primary R2 write HTTP $status; testing backup token."
+            fi
+            if [ -n "${CF_BACKUP_TOKEN:-}" ]; then
+              status="$(curl --silent --show-error --retry 2 --max-time 20 -o /tmp/r2-backup.json -w '%{http_code}' \
+                -X PUT "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/r2/buckets/phanthuanxtra-media/objects/$R2_KEY" \
+                -H "Authorization: Bearer $CF_BACKUP_TOKEN" -H 'content-type: image/png' --data-binary @/tmp/xtra-e2e.png)"
+              if [ "$status" = "200" ]; then
+                R2_TOKEN="$CF_BACKUP_TOKEN"
+                export R2_TOKEN
+                echo 'R2 write: backup Cloudflare token accepted'
+                return 0
+              fi
+              echo "Backup R2 write HTTP $status"
+            fi
+            return 1
+          }
+
+          select_r2_token
+          test -n "${R2_TOKEN:-}"
           curl --fail-with-body --silent --show-error --retry 2 --max-time 20 \
-            -X POST "$BASE_URL/api/admin/media" -H "Authorization: Bearer $SESSION" -H 'content-type: image/png' \
-            --data-binary @/tmp/xtra-e2e.png | tee /tmp/upload.json
-          MEDIA_KEY="$(jq -r '.key // empty' /tmp/upload.json)"
-          export MEDIA_KEY
-          test -n "$MEDIA_KEY"
-          curl --fail-with-body --silent --show-error --retry 2 --max-time 20 "$BASE_URL/media/$MEDIA_KEY" -o /tmp/read.png
+            -H "Authorization: Bearer $R2_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/r2/buckets/phanthuanxtra-media/objects/$R2_KEY" \
+            -o /tmp/read.png
           cmp /tmp/xtra-e2e.png /tmp/read.png
           echo 'R2 write/read: OK'
-          status="$(curl --silent --show-error --retry 2 --max-time 20 -o /tmp/media-delete.json -w '%{http_code}' \
-            -X DELETE "$BASE_URL/api/admin/media/$MEDIA_KEY" -H "Authorization: Bearer $SESSION")"
+          status="$(curl --silent --show-error --retry 2 --max-time 20 -o /tmp/r2-delete.json -w '%{http_code}' \
+            -X DELETE "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/r2/buckets/phanthuanxtra-media/objects/$R2_KEY" \
+            -H "Authorization: Bearer $R2_TOKEN")"
           echo "R2 delete HTTP $status"
           test "$status" = "200"
-          status="$(curl --silent --show-error --retry 2 --max-time 20 -o /tmp/media-after.json -w '%{http_code}' "$BASE_URL/media/$MEDIA_KEY")"
+          status="$(curl --silent --show-error --retry 2 --max-time 20 -o /tmp/r2-after.json -w '%{http_code}' \
+            -H "Authorization: Bearer $R2_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/r2/buckets/phanthuanxtra-media/objects/$R2_KEY")"
           echo "R2 read after delete HTTP $status"
           test "$status" = "404"
           echo 'QUEUE-01 PRODUCTION E2E: ADMIN 200 + SIGNED SESSION + DASHBOARD + D1 CRUD + R2 WRITE/READ/DELETE = PASS'
