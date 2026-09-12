@@ -80,7 +80,10 @@ jobs:
             tests/production-gates.test.mjs \
             tests/vip-vehicle-intelligence.test.mjs
 
+      # Pull-request validation must not consume or depend on production Cloudflare credentials.
+      # The production push job performs the authoritative credential/deploy gate after merge.
       - name: Resolve credentials and Wrangler dry-run
+        if: github.event_name != 'pull_request'
         shell: bash
         env:
           CF_PRIMARY_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -229,7 +232,7 @@ jobs:
 
             migration_0012_pending="$(npx --no-install wrangler d1 execute phanthuanxtra-db --remote --json --command="SELECT COUNT(*) AS migration_count FROM d1_migrations WHERE name='0012_leads_management.sql';" | jq -er '.[0].results[0].migration_count')"
             lead_columns="$(npx --no-install wrangler d1 execute phanthuanxtra-db --remote --json --command="SELECT COUNT(*) AS column_count FROM pragma_table_info('leads') WHERE name IN ('status','note','updated_at');" | jq -er '.[0].results[0].column_count')"
-            lead_index="$(npx --no-install wrangler d1 execute phanthuanxtra-db --remote --json --command="SELECT COUNT(*) AS index_count FROM sqlite_master WHERE type='index' AND name='idx_leads_status_created';" | jq -er '.[0].results[0].index_count')"
+            lead_index="$(npx --no-install wrangler d1 execute phanthuanxtra-db --remote --json --command="SELECT COUNT(*) AS index_count FROM sqlite_master WHERE type='index' AND name='idx_leads_status_created';" | jq -er '.[0].results[0].column_count')"
 
             echo "D1 migration drift check: 0012_recorded=${migration_0012_pending}, lead_columns=${lead_columns}, lead_index=${lead_index}"
 
