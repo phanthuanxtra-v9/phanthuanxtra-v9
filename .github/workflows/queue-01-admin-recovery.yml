@@ -56,22 +56,45 @@ jobs:
           test -n "${RECOVERY_ROTATE_TOKEN:-}"
           test -n "${ADMIN_PASSWORD:-}"
 
-          rotate_response="$(curl --silent --show-error --retry 2 --retry-delay 1 --max-time 20 \
+          rotate_body="$(mktemp)"
+          rotate_status="$(curl --silent --show-error --retry 2 --retry-delay 1 --max-time 20 \
+            -o "$rotate_body" \
+            -w '%{http_code}' \
             -H 'content-type: application/json' \
             -d "$(jq -nc --arg token "$RECOVERY_ROTATE_TOKEN" '{rotateToken:$token}')" \
             https://phanthuanxtra.com/api/admin/recovery/rotate)"
 
-          recovery_code="$(printf '%s' "$rotate_response" | jq -er '.recoveryCode')"
-          test -n "$recovery_code"
+          echo "Recovery rotate HTTP ${rotate_status}"
+          echo "Recovery rotate response keys: $(jq -r 'if type == "object" then (keys | join(",")) else (type) end' "$rotate_body" 2>/dev/null || echo "non-json")"
+          rotate_error="$(jq -r 'if type == "object" then (.error // .message // "") else "" end' "$rotate_body" 2>/dev/null || true)"
+          if [ -n "$rotate_error" ]; then
+            echo "Recovery rotate error: ${rotate_error:0:300}"
+          fi
+          test "$rotate_status" = "200"
 
-          reset_response="$(curl --silent --show-error --retry 2 --retry-delay 1 --max-time 20 \
+          recovery_code="$(jq -er '.recoveryCode' "$rotate_body")"
+          test -n "$recovery_code"
+          rm -f "$rotate_body"
+
+          reset_body="$(mktemp)"
+          reset_status="$(curl --silent --show-error --retry 2 --retry-delay 1 --max-time 20 \
+            -o "$reset_body" \
+            -w '%{http_code}' \
             -H 'content-type: application/json' \
             -d "$(jq -nc --arg code "$recovery_code" --arg password "$ADMIN_PASSWORD" '{recoveryCode:$code,password:$password,confirm:$password}')" \
             https://phanthuanxtra.com/api/admin/forgot-password)"
 
-          printf '%s' "$reset_response" | jq -e '.ok == true' >/dev/null
+          echo "Admin password reset HTTP ${reset_status}"
+          echo "Admin password reset response keys: $(jq -r 'if type == "object" then (keys | join(",")) else (type) end' "$reset_body" 2>/dev/null || echo "non-json")"
+          reset_error="$(jq -r 'if type == "object" then (.error // .message // "") else "" end' "$reset_body" 2>/dev/null || true)"
+          if [ -n "$reset_error" ]; then
+            echo "Admin password reset error: ${reset_error:0:300}"
+          fi
+          test "$reset_status" = "200"
+          jq -e '.ok == true' "$reset_body" >/dev/null
 
-          unset recovery_code rotate_response reset_response
+          rm -f "$reset_body"
+          unset recovery_code rotate_body rotate_status rotate_error reset_body reset_status reset_error
           unset RECOVERY_ROTATE_TOKEN ADMIN_PASSWORD
           echo "Admin credential recovery completed."
 
@@ -91,7 +114,6 @@ jobs:
           )"
 
           echo "Valid Admin login HTTP ${status}"
-          test "$status" = "200"
           jq -e '.ok == true and (.token | type == "string")' "$login_body" >/dev/null
           rm -f "$login_body"
 
