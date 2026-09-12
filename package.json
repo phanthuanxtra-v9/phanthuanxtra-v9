@@ -15,7 +15,7 @@
     "d1:local": "wrangler d1 migrations apply phanthuanxtra-db --local"
   },
   "devDependencies": {
-    "wrangler": "4.121.0"
+    "wrangler": "^4.121.0"
   },
   "engines": {
     "node": ">=20.0.0"
