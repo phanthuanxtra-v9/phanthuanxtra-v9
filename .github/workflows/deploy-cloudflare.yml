@@ -80,7 +80,10 @@ jobs:
             tests/production-gates.test.mjs \
             tests/vip-vehicle-intelligence.test.mjs
 
+      # Pull-request validation must not consume or depend on production Cloudflare credentials.
+      # The production push job performs the authoritative credential/deploy gate after merge.
       - name: Resolve credentials and Wrangler dry-run
+        if: github.event_name != 'pull_request'
         shell: bash
         env:
           CF_PRIMARY_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
