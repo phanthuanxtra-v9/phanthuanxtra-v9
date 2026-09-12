@@ -2,7 +2,8 @@ const json=(data,status=200,extra={})=>new Response(JSON.stringify(data),{status
 
 export async function storeMedia(env,key,body,contentType="application/octet-stream"){
   if(!env.MEDIA)throw new Error("MEDIA binding is not configured");
-  await env.MEDIA.put(key,body,{httpMetadata:{contentType,cacheControl:"public, max-age=31536000, immutable"}});
+  const mutable=String(key).startsWith("admin/");
+  await env.MEDIA.put(key,body,{httpMetadata:{contentType,cacheControl:mutable?"no-store":"public, max-age=31536000, immutable"}});
   return key;
 }
 
@@ -35,6 +36,7 @@ export async function handleMediaApi(request,env){
   const headers=new Headers();
   object.writeHttpMetadata(headers);
   headers.set("etag",object.httpEtag);
-  headers.set("cache-control",headers.get("cache-control")||"public, max-age=31536000, immutable");
+  if(String(key).startsWith("admin/"))headers.set("cache-control","no-store");
+  else headers.set("cache-control",headers.get("cache-control")||"public, max-age=31536000, immutable");
   return request.method==="HEAD"?new Response(null,{headers}):new Response(object.body,{headers});
 }
