@@ -1,0 +1,16 @@
+{
+  "name": "deepseek-harness",
+  "upstream": "https://github.com/deepseek-ai/deepseek-harness.git",
+  "commit": "c291e7961a515f6d7af9304e7fd1d257929aef26",
+  "license": "MIT",
+  "integration": "isolated-reasoning-evidence",
+  "production_access": false,
+  "production_secrets": false,
+  "allowed_profile": "headless",
+  "model_execution": false,
+  "purpose": [
+    "Gate 10 isolation validation",
+    "Gates 8-15 evidence review",
+    "non-production reasoning and audit only"
+  ]
+}
