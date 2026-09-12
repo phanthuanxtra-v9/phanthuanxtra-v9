@@ -3,7 +3,7 @@
 > **DUY NHẤT — CANONICAL PROJECT STATUS / HANDOFF**  
 > Date: 2026-09-12 (UTC+7)  
 > Repository: `phanthuanxtra-v9/phanthuanxtra-v9`  
-> Main source: `9783abb9ca783c18ec674edf15ca9e98cdde0aa2`  
+> Main source: `d9ee29ede4a9592e8b988c2bad8f6b5738f7604e`  
 > Production deployment remains separately tracked below and is not implied by the current main source SHA.
 
 ## 1. SOURCE OF TRUTH
@@ -16,7 +16,7 @@ Complete `phanthuanxtra.com` and the AI PT.XTRA APK as one integrated production
 `AI agents → GitHub branch/PR → CI/audit → protected main → Cloudflare deployment → production runtime verification → production E2E → APK/device verification`
 
 ## 4. CURRENT ARCHITECTURE
-- Main source: `9783abb9ca783c18ec674edf15ca9e98cdde0aa2`
+- Main source: `d9ee29ede4a9592e8b988c2bad8f6b5738f7604e`
 - Production Worker: `phanthuanxtra-v2`
 - Entry: `src/entry.js`
 - Website: `https://phanthuanxtra.com`
@@ -28,7 +28,7 @@ Complete `phanthuanxtra.com` and the AI PT.XTRA APK as one integrated production
 
 ## 5. VERIFIED RELEASE EVIDENCE
 ### 5.1 Production API baseline — VERIFIED GREEN
-Fresh production smoke run `34659917286` verified:
+Fresh production smoke baseline verified:
 - Website HTTP 200
 - `/api/health` HTTP 200
 - `/api/cars` HTTP 200
@@ -54,14 +54,27 @@ Fresh authenticated Gateway evidence returned:
 Website AI path is configured for the faster `@cf/zai-org/glm-4.7-flash` primary model with `@cf/meta/llama-3.2-3b-instruct` fallback, bounded history/output and a short in-memory response cache. Audit found no evidence that further acceleration is worth weakening current safety/grounding gates.
 
 ### 5.4 Current production deployment — VERIFIED
-Current reported production evidence:
-- Deployment SHA: `b593b713b871b241303201e5c88276ca8718c384`
-- Cloudflare Version: `c728d389-2373-4785-a2fa-19183dbc2a89`
+Fresh production deployment from `main`:
+- Deployment SHA: `d9ee29ede4a9592e8b988c2bad8f6b5738f7604e`
+- Cloudflare Version: `2abd60b3-5301-4d01-9d59-716fdbb77cc3`
 - Wrangler: `4.121.0`
-- Production deployment: proven
+- Production deployment: **VERIFIED SUCCESS**
+- Deployment log confirmed `env.MEDIA (phanthuanxtra-media)` R2 binding.
 
-### 5.5 Admin + D1/R2 production E2E — RED / CURRENT BLOCKER
-Current valid Admin login is **not proven**. D1 E2E and R2 E2E have not run. Production remains RED until valid Admin authentication and the downstream E2E gates are freshly proven.
+### 5.5 Admin + D1/R2 production E2E — VERIFIED GREEN
+Fresh QUEUE-01 rerun was executed **after** the above Cloudflare deployment completed.
+- Worker-origin valid Admin login: HTTP **200**
+- Signed session: `ptx1` HMAC token shape verified
+- Authenticated dashboard: **PASS**
+- D1 create/read: **PASS**
+- D1 delete/read-after-delete: HTTP **404**, **PASS**
+- R2 write/upload: HTTP **200**, **PASS**
+- R2 read: byte-for-byte comparison **PASS**
+- R2 delete: HTTP **200**, **PASS**
+- R2 read-after-delete: HTTP **404**, **PASS**
+- Final QUEUE-01 result: **ADMIN 200 + SIGNED SESSION + DASHBOARD + D1 CRUD + R2 WRITE/READ/DELETE = PASS**
+
+The R2 read-after-delete gate initially exposed production cache behavior. PR #129 fixed mutable `admin/` media to use `no-store` while preserving immutable caching for vehicle media. The fresh post-deployment rerun then produced the required HTTP 404 evidence.
 
 ### 5.6 Admin recovery deployment gate — IMPLEMENTED
 - Canonical production asset gate is present in `production-asset-gate.yml`.
@@ -70,15 +83,15 @@ Current valid Admin login is **not proven**. D1 E2E and R2 E2E have not run. Pro
 - This gate is evidence-producing infrastructure; it does not itself prove a passing runtime result.
 - No secret values were exposed or committed.
 
-### 5.7 Production GREEN — NOT REACHED
-Production remains **RED**. Current deployment is proven, but valid Admin login, authenticated dashboard access, D1 E2E, R2 E2E, password-reset E2E and the remaining release gates are not complete.
+### 5.7 Production GREEN — QUEUE-01 RELEASE BASELINE REACHED; FINAL PROJECT GREEN NOT YET DECLARED
+The requested Admin → D1 → R2 production gate is now **GREEN**. The canonical project still keeps the overall `PRODUCTION GREEN / COMPLETE` state closed until the remaining release gates in §7 are also evidenced.
 
 ## 6. SINGLE EXECUTION QUEUE / OWNERSHIP
 ### QUEUE-01 — Admin production E2E
-**Status:** OPEN / READY TO DISPATCH / highest priority. Execute only this queue: verify current production asset delivery, resolve the valid Admin credential-store mismatch without exposing or guessing secrets, then rerun valid Admin + D1 + R2 E2E.
+**Status:** **GREEN / COMPLETED for Admin + Dashboard + D1 CRUD + R2 E2E.** The queue was executed serially, with the final rerun performed only after Cloudflare Version `2abd60b3-5301-4d01-9d59-716fdbb77cc3` was deployed.
 
 ### QUEUE-02 — Gateway/AI production E2E
-**Status:** BASELINE VERIFIED; do not broaden Gateway work until QUEUE-01 release baseline is green.
+**Status:** BASELINE VERIFIED; do not broaden Gateway work until remaining release gates are scheduled.
 
 ### QUEUE-03 — PR #66 VIP hardening
 **Status:** OPEN; reconcile against current main before merge.
@@ -129,13 +142,13 @@ The dual-AI layer must first be designed and tested so that it cannot weaken, by
 The project records the desired 10,000-Neuron/day Workers AI budget and two-role model here. The current engineering tool environment does not expose a control that can provision two ChatGPT Work AI instances or allocate a Neutron budget directly; therefore no false claim of resource provisioning is made. The XTRA implementation target is the Cloudflare Workers AI two-role architecture above.
 
 ## 7. RELEASE GATES
-1. Current main deployed to production. **VERIFIED for the previously proven deployment; current main source is tracked separately above.**
-2. Invalid Admin login → HTTP 401, never 500. **VERIFIED in latest baseline**.
-3. Valid Admin login → HTTP 200 + signed session. **CURRENTLY RED / NOT PROVEN**.
-4. Unauthenticated dashboard → HTTP 401. **VERIFIED in latest baseline**.
-5. Authenticated dashboard access. **NOT PROVEN**.
-6. D1 create/read/delete E2E. **NOT RUN**.
-7. R2 write/read/delete E2E. **NOT RUN**.
+1. Current main deployed to production. **VERIFIED** — SHA `d9ee29ede4a9592e8b988c2bad8f6b5738f7604e`, Cloudflare Version `2abd60b3-5301-4d01-9d59-716fdbb77cc3`.
+2. Invalid Admin login → HTTP 401, never 500. **VERIFIED**.
+3. Valid Admin login → HTTP 200 + signed session. **VERIFIED** — QUEUE-01 post-deployment rerun.
+4. Unauthenticated dashboard → HTTP 401. **VERIFIED**.
+5. Authenticated dashboard access. **VERIFIED** — QUEUE-01 post-deployment rerun.
+6. D1 create/read/delete E2E. **VERIFIED** — QUEUE-01 post-deployment rerun.
+7. R2 write/read/delete E2E. **VERIFIED** — HTTP 200 write, successful read, HTTP 200 delete, HTTP 404 read-after-delete.
 8. Password reset production E2E. **NOT COMPLETE**.
 9. Gateway/AI production gate. **VERIFIED**.
 10. Dual Workers AI layer isolated validation against Admin/D1/R2 non-interference. **NOT RUN / BLOCKED FROM PRODUCTION PROMOTION**.
@@ -147,6 +160,18 @@ The project records the desired 10,000-Neuron/day Workers AI budget and two-role
 16. Only then declare **PRODUCTION GREEN / COMPLETE**.
 
 ## 8. CHANGE LOG — CANONICAL
+### 2026-09-12 — QUEUE-01 Admin/D1/R2 production gate verified
+- Read `MASTER_PROJECT_STATUS.md` before execution.
+- Executed QUEUE-01 serially; no competing execution queue was opened.
+- PR #128 changed the QUEUE-01 R2 gate to use the freshly issued signed Admin session instead of an unset secondary `ADMIN_TOKEN` secret.
+- Initial post-merge QUEUE-01 proved Admin 200, signed session, dashboard, D1 CRUD and R2 write/read/delete, but read-after-delete returned HTTP 200 because mutable Admin media was cached.
+- PR #129 changed only mutable `admin/` media caching to `no-store`, preserving immutable caching for vehicle media.
+- PR #129 merged as `d9ee29ede4a9592e8b988c2bad8f6b5738f7604e`.
+- Cloudflare production deployment completed successfully as Version `2abd60b3-5301-4d01-9d59-716fdbb77cc3`.
+- After that deployment completed, QUEUE-01 was rerun and produced: Admin HTTP 200; signed session PASS; authenticated dashboard PASS; D1 create/read PASS; D1 delete/read-after-delete HTTP 404 PASS; R2 write HTTP 200 PASS; R2 read byte comparison PASS; R2 delete HTTP 200 PASS; R2 read-after-delete HTTP 404 PASS.
+- Updated only `MASTER_PROJECT_STATUS.md` for the canonical status checkpoint.
+- No secret values were exposed or committed.
+
 ### 2026-09-12 — Dual Workers AI reasoning baseline established
 - Read `MASTER_PROJECT_STATUS.md` before work.
 - Established the XTRA dual-role reasoning model: Deep AI + Wide AI, with one execution queue only.
@@ -197,6 +222,6 @@ The project records the desired 10,000-Neuron/day Workers AI budget and two-role
 - The obsolete repository `phanthuanxtra-v9/phanthuanxtra` is excluded from all audit/deploy/repair/CI/E2E workflows.
 
 ## 10. NEXT CHECKPOINT
-**Current task:** QUEUE-01 / Admin production E2E.  
-**Immediate operating mode:** use the Deep + Wide reasoning protocol for analysis, but keep execution serialized through QUEUE-01.  
-**Next exact action:** obtain fresh valid Admin authentication evidence; only after valid Admin succeeds, run D1 create/read/delete and R2 write/read/delete E2E in the same queue. In parallel conceptually, audit the future dual-AI layer for non-interference, but do not promote it into production until its isolation gate passes. Production remains RED until the complete release-gate chain passes.
+**Current task:** QUEUE-01 / Admin production E2E is complete for its defined release baseline.  
+**Immediate operating mode:** keep execution serialized through the single queue rule.  
+**Next exact action:** proceed to the remaining release gates only after explicitly opening the next queue item; do not claim final `PRODUCTION GREEN / COMPLETE` until gates 8–15 are evidenced.
