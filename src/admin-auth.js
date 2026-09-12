@@ -27,8 +27,12 @@ function fromBase64Url(value) {
   return Uint8Array.from(binary, char => char.charCodeAt(0));
 }
 
+function signingSecret(env) {
+  return String(env.ADMIN_TOKEN || env.ADMIN_PASSWORD || "");
+}
+
 export async function issueAdminToken(env) {
-  const secret = String(env.ADMIN_TOKEN || "");
+  const secret = signingSecret(env);
   if (!secret) return null;
   const exp = Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS;
   const nonce = crypto.randomUUID().replaceAll("-", "");
@@ -39,7 +43,7 @@ export async function issueAdminToken(env) {
 }
 
 export async function verifyAdminToken(request, env) {
-  const secret = String(env.ADMIN_TOKEN || "");
+  const secret = signingSecret(env);
   const header = String(request.headers.get("Authorization") || "");
   if (!secret || !/^Bearer\s+\S+$/i.test(header)) return unauthorized();
   const token = header.replace(/^Bearer\s+/i, "").trim();
