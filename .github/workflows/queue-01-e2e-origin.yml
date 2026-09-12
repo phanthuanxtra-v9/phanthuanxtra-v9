@@ -48,9 +48,13 @@ jobs:
             -H "Authorization: Bearer $SESSION" "$BASE_URL/api/admin/dashboard" | tee /tmp/dashboard.json
           jq -e '.stats and (.stats.cars|type == "number")' /tmp/dashboard.json >/dev/null
           echo 'Authenticated dashboard: OK'
+          # The Admin vehicle pipeline requires trusted production media URLs and otherwise fetches the URL with redirect:error.
+          # Use a deterministic trusted-path placeholder for the D1 CRUD contract; R2 is exercised separately below.
+          TEST_IMAGE_URL="https://phanthuanxtra.com/media/vehicles/publish-admin-${TEST_CAR_ID}.jpg"
+          export TEST_IMAGE_URL
           curl --fail-with-body --silent --show-error --retry 2 --max-time 20 \
             -X POST "$BASE_URL/api/admin/cars" -H "Authorization: Bearer $SESSION" -H 'content-type: application/json' \
-            --data "{\"id\":\"$TEST_CAR_ID\",\"brand\":\"PT XTRA TEST\",\"model\":\"CI E2E Origin\",\"year\":2026,\"mileage\":1,\"price\":1,\"fuel\":\"test\",\"category\":\"suv\",\"color\":\"test\",\"status\":\"available\",\"description\":\"Queue-01 production E2E; automatically deleted.\",\"features\":[\"e2e\"],\"images\":[\"https://phanthuanxtra.com/e2e/queue-01.png\"]}" | tee /tmp/create.json
+            --data "{\"id\":\"$TEST_CAR_ID\",\"brand\":\"PT XTRA TEST\",\"model\":\"CI E2E Origin\",\"year\":2026,\"mileage\":1,\"price\":1,\"fuel\":\"test\",\"category\":\"suv\",\"color\":\"test\",\"status\":\"available\",\"description\":\"Queue-01 production E2E; automatically deleted.\",\"features\":[\"e2e\"],\"images\":[\"$TEST_IMAGE_URL\"]}" | tee /tmp/create.json
           jq -e '.ok == true and .id == env.TEST_CAR_ID' /tmp/create.json >/dev/null
           curl --fail-with-body --silent --show-error --retry 2 --max-time 20 \
             -H "Authorization: Bearer $SESSION" "$BASE_URL/api/admin/cars/$TEST_CAR_ID" | tee /tmp/read-one.json
