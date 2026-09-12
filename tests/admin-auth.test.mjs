@@ -17,6 +17,13 @@ test("issued admin token verifies", async () => {
   assert.ok(result.exp > Math.floor(Date.now() / 1000));
 });
 
+test("password-backed admin token verifies when separate token is unavailable", async () => {
+  const passwordEnv = { ADMIN_PASSWORD: "unit-test-admin-password" };
+  const token = await issueAdminToken(passwordEnv);
+  const result = await verifyAdminToken(await requestWith(token), passwordEnv);
+  assert.equal(result.ok, true);
+});
+
 test("missing and malformed authorization are rejected", async () => {
   assert.equal((await verifyAdminToken(await requestWith(""), env)).ok, false);
   assert.equal((await verifyAdminToken(await requestWith("random"), env)).ok, false);
