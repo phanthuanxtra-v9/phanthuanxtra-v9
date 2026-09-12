@@ -25,6 +25,7 @@ concurrency:
 jobs:
   validate:
     name: CI / Validate
+    environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -142,8 +143,6 @@ jobs:
 
   deploy:
     name: Deploy production Worker (Production)
-    # Production mutation is intentionally restricted to a verified push to main.
-    # workflow_dispatch remains validation-only; it must never bypass the production gate.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: validate
     environment: production
@@ -232,7 +231,7 @@ jobs:
 
             migration_0012_pending="$(npx --no-install wrangler d1 execute phanthuanxtra-db --remote --json --command="SELECT COUNT(*) AS migration_count FROM d1_migrations WHERE name='0012_leads_management.sql';" | jq -er '.[0].results[0].migration_count')"
             lead_columns="$(npx --no-install wrangler d1 execute phanthuanxtra-db --remote --json --command="SELECT COUNT(*) AS column_count FROM pragma_table_info('leads') WHERE name IN ('status','note','updated_at');" | jq -er '.[0].results[0].column_count')"
-            lead_index="$(npx --no-install wrangler d1 execute phanthuanxtra-db --remote --json --command="SELECT COUNT(*) AS index_count FROM sqlite_master WHERE type='index' AND name='idx_leads_status_created';" | jq -er '.[0].results[0].column_count')"
+            lead_index="$(npx --no-install wrangler d1 execute phanthuanxtra-db --remote --json --command="SELECT COUNT(*) AS index_count FROM sqlite_master WHERE type='index' AND name='idx_leads_status_created';" | jq -er '.[0].results[0].index_count')"
 
             echo "D1 migration drift check: 0012_recorded=${migration_0012_pending}, lead_columns=${lead_columns}, lead_index=${lead_index}"
 
