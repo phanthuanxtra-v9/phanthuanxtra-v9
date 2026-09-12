@@ -19,6 +19,12 @@ test('app admin exposes authenticated lead CRUD contract',()=>{
   assert.match(source,/Unauthorized/);
 });
 
+test('app admin reconciles stale D1 password from the configured ADMIN_PASSWORD',()=>{
+  assert.match(source,/!valid&&password===String\(env\.ADMIN_PASSWORD\)/);
+  assert.match(source,/await setAdminPassword\(env,password\)/);
+  assert.match(source,/D1 chưa kết nối để đồng bộ credential/);
+});
+
 test('app admin exposes authenticated R2 media delete with key allowlist',()=>{
   assert.match(source,/handleMediaDelete/);
   assert.match(source,/MEDIA_KEY_RE/);
