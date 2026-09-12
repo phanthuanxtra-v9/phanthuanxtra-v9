@@ -13,6 +13,10 @@ function base64ToBytes(value) {
   return Uint8Array.from(binary, char => char.charCodeAt(0));
 }
 
+function bytesToBase64Url(bytes) {
+  return bytesToBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
 async function derive(password, salt) {
   const baseKey = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
   return new Uint8Array(await crypto.subtle.deriveBits({name:"PBKDF2",salt,iterations:ITERATIONS,hash:"SHA-256"}, baseKey, KEY_LEN));
@@ -33,9 +37,6 @@ export async function verifyAdminPassword(env, password) {
   try {
     row = await env.DB.prepare("SELECT password_hash,salt FROM admin_credentials WHERE id=1").first();
   } catch {
-    // Authentication must fail closed when the credential store is unavailable.
-    // Do not fall back to ADMIN_PASSWORD during a D1 outage/schema error.
-    // This invariant is part of the QUEUE-01 production Admin release gate.
     return false;
   }
 
@@ -54,4 +55,32 @@ export async function setAdminPassword(env, password) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const hash = await derive(String(password), salt);
   await env.DB.prepare("INSERT INTO admin_credentials (id,password_hash,salt,updated_at) VALUES (1,?,?,CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET password_hash=excluded.password_hash,salt=excluded.salt,updated_at=CURRENT_TIMESTAMP").bind(bytesToBase64(hash), bytesToBase64(salt)).run();
+}
+
+export async function verifyAdminRecoveryCode(env, code) {
+  const candidate = String(code || "");
+  if (!env.DB || !candidate) return false;
+  let row;
+  try {
+    row = await env.DB.prepare("SELECT code_hash,salt FROM admin_recovery_credentials WHERE id=1").first();
+  } catch {
+    return false;
+  }
+  if (!row) return candidate === String(env.ADMIN_TOKEN || "");
+  try {
+    const hash = await derive(candidate, base64ToBytes(row.salt));
+    return equalBytes(hash, base64ToBytes(row.code_hash));
+  } catch {
+    return false;
+  }
+}
+
+export async function rotateAdminRecoveryCode(env) {
+  if (!env.DB) throw new Error("D1 chưa kết nối");
+  const raw = crypto.getRandomValues(new Uint8Array(32));
+  const code = bytesToBase64Url(raw);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const hash = await derive(code, salt);
+  await env.DB.prepare("INSERT INTO admin_recovery_credentials (id,code_hash,salt,updated_at) VALUES (1,?,?,CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET code_hash=excluded.code_hash,salt=excluded.salt,updated_at=CURRENT_TIMESTAMP").bind(bytesToBase64(hash), bytesToBase64(salt)).run();
+  return code;
 }
