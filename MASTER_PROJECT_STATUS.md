@@ -3,7 +3,8 @@
 > **DUY NHẤT — CANONICAL PROJECT STATUS / HANDOFF**  
 > Date: 2026-09-12 (UTC+7)  
 > Repository: `phanthuanxtra-v9/phanthuanxtra-v9`  
-> Main: `b593b713b871b241303201e5c88276ca8718c384`
+> Main source: `9783abb9ca783c18ec674edf15ca9e98cdde0aa2`  
+> Production deployment remains separately tracked below and is not implied by the current main source SHA.
 
 ## 1. SOURCE OF TRUTH
 Current `main` source, CI/CD evidence, production/runtime evidence and this file are authoritative. Do not create competing checkpoint/status Markdown files.
@@ -15,7 +16,7 @@ Complete `phanthuanxtra.com` and the AI PT.XTRA APK as one integrated production
 `AI agents → GitHub branch/PR → CI/audit → protected main → Cloudflare deployment → production runtime verification → production E2E → APK/device verification`
 
 ## 4. CURRENT ARCHITECTURE
-- Main: `b593b713b871b241303201e5c88276ca8718c384`
+- Main source: `9783abb9ca783c18ec674edf15ca9e98cdde0aa2`
 - Production Worker: `phanthuanxtra-v2`
 - Entry: `src/entry.js`
 - Website: `https://phanthuanxtra.com`
@@ -94,8 +95,41 @@ Production remains **RED**. Current deployment is proven, but valid Admin login,
 ### QUEUE-07 — Final cleanup + GREEN gate
 **Status:** OPEN / last.
 
+### 6.1 — DUAL WORKERS AI REASONING MODEL — ESTABLISHED
+This is now the canonical future AI operating model for XTRA and is to be used immediately for reasoning/audit work while remaining isolated from production mutation until its safety gates pass.
+
+**Single queue rule:** QUEUE-01 remains the only execution queue. Deep and Wide reasoning may be logically independent, but they must never perform conflicting repository or production mutations in parallel.
+
+**DEEP AI — root-cause / verification role**
+- Preferred Workers AI model: `@cf/nvidia/nemotron-3-120b-a12b`
+- Responsibilities: root-cause analysis, security review, architecture consistency, hidden failure modes, evidence validation, adversarial checking.
+
+**WIDE AI — broad-scan / alternatives role**
+- Preferred Workers AI model: `@cf/zai-org/glm-4.7-flash`
+- Responsibilities: broad dependency scan, regression risks, alternative explanations, overlooked edge cases, implementation options and cross-component impact.
+
+**Fallback**
+- `@cf/google/gemma-4-26b-a4b-it` may be used as a fallback/recovery reasoning model when appropriate.
+
+**Daily Free quota guard**
+- Target ceiling: 10,000 Workers AI Neurons/day total across the XTRA reasoning layer.
+- Do not assume 10,000 Neurons per model; the budget is shared.
+- Reserve a portion of the daily budget for retries, fallback and production diagnosis.
+- No quota exhaustion may be allowed to interfere with Admin/D1/R2 release verification.
+
+**Arbitration protocol**
+`Task → Deep analysis + Wide scan → evidence comparison → conflict resolution → one execution plan → test → verify → status update`
+
+The two roles are reasoning peers, not two independent deployers. No AI reasoning result is itself production evidence.
+
+**Production safety gate**
+The dual-AI layer must first be designed and tested so that it cannot weaken, bypass, rate-limit, mutate or otherwise interfere with the Admin authentication, D1 CRUD or R2 write/read/delete E2E gates. Only after isolated validation is complete may the AI layer be promoted into production execution paths.
+
+**Neutron / Work AI transparency**
+The project records the desired 10,000-Neuron/day Workers AI budget and two-role model here. The current engineering tool environment does not expose a control that can provision two ChatGPT Work AI instances or allocate a Neutron budget directly; therefore no false claim of resource provisioning is made. The XTRA implementation target is the Cloudflare Workers AI two-role architecture above.
+
 ## 7. RELEASE GATES
-1. Current main deployed to production. **VERIFIED**.
+1. Current main deployed to production. **VERIFIED for the previously proven deployment; current main source is tracked separately above.**
 2. Invalid Admin login → HTTP 401, never 500. **VERIFIED in latest baseline**.
 3. Valid Admin login → HTTP 200 + signed session. **CURRENTLY RED / NOT PROVEN**.
 4. Unauthenticated dashboard → HTTP 401. **VERIFIED in latest baseline**.
@@ -104,17 +138,29 @@ Production remains **RED**. Current deployment is proven, but valid Admin login,
 7. R2 write/read/delete E2E. **NOT RUN**.
 8. Password reset production E2E. **NOT COMPLETE**.
 9. Gateway/AI production gate. **VERIFIED**.
-10. Fresh APK artifact/hash + S21 Ultra regression. **OPEN**.
-11. Telegram Auto Bot production E2E. **OPEN**.
-12. VIP webhook/idempotency production E2E. **OPEN**.
-13. Backup + restore/readability evidence. **OPEN**.
-14. Final security/UX/maintainability/testability audit. **OPEN**.
-15. Only then declare **PRODUCTION GREEN / COMPLETE**.
+10. Dual Workers AI layer isolated validation against Admin/D1/R2 non-interference. **NOT RUN / BLOCKED FROM PRODUCTION PROMOTION**.
+11. Fresh APK artifact/hash + S21 Ultra regression. **OPEN**.
+12. Telegram Auto Bot production E2E. **OPEN**.
+13. VIP webhook/idempotency production E2E. **OPEN**.
+14. Backup + restore/readability evidence. **OPEN**.
+15. Final security/UX/maintainability/testability audit. **OPEN**.
+16. Only then declare **PRODUCTION GREEN / COMPLETE**.
 
 ## 8. CHANGE LOG — CANONICAL
+### 2026-09-12 — Dual Workers AI reasoning baseline established
+- Read `MASTER_PROJECT_STATUS.md` before work.
+- Established the XTRA dual-role reasoning model: Deep AI + Wide AI, with one execution queue only.
+- Preferred Deep model: `@cf/nvidia/nemotron-3-120b-a12b`.
+- Preferred Wide model: `@cf/zai-org/glm-4.7-flash`.
+- Recorded Gemma 4 26B as fallback.
+- Recorded the shared 10,000-Neuron/day Free budget target with an explicit reserve; no claim that two ChatGPT Work AI instances or Neutron resources were provisioned.
+- Added the production safety gate: the AI layer must prove non-interference with Admin authentication, D1 CRUD and R2 E2E before production promotion.
+- This change updates only `MASTER_PROJECT_STATUS.md`; no competing checkpoint Markdown was created.
+- QUEUE-01 remains the sole active execution queue.
+
 ### 2026-09-12 — Production deployment evidence synchronized
 - Read `MASTER_PROJECT_STATUS.md` before status work.
-- Synchronized canonical `main` SHA to `b593b713b871b241303201e5c88276ca8718c384`.
+- Synchronized canonical `main` source to `9783abb9ca783c18ec674edf15ca9e98cdde0aa2` after merged PR #117; production deployment evidence remains separately tracked at `b593b713b871b241303201e5c88276ca8718c384` until a new deployment is proven.
 - Recorded current proven Cloudflare Version `c728d389-2373-4785-a2fa-19183dbc2a89` and Wrangler `4.121.0`.
 - Confirmed production deployment is proven, while valid Admin login, D1 E2E and R2 E2E remain unproven.
 - Kept Production GREEN **RED**; no skipped or missing evidence was converted to GREEN.
@@ -152,4 +198,5 @@ Production remains **RED**. Current deployment is proven, but valid Admin login,
 
 ## 10. NEXT CHECKPOINT
 **Current task:** QUEUE-01 / Admin production E2E.  
-**Next exact action:** dispatch/execute the existing production asset-delivery gate and obtain fresh valid Admin authentication evidence; only after valid Admin succeeds, run D1 create/read/delete and R2 write/read/delete E2E in the same queue. Production remains RED until the complete release-gate chain passes.
+**Immediate operating mode:** use the Deep + Wide reasoning protocol for analysis, but keep execution serialized through QUEUE-01.  
+**Next exact action:** obtain fresh valid Admin authentication evidence; only after valid Admin succeeds, run D1 create/read/delete and R2 write/read/delete E2E in the same queue. In parallel conceptually, audit the future dual-AI layer for non-interference, but do not promote it into production until its isolation gate passes. Production remains RED until the complete release-gate chain passes.
