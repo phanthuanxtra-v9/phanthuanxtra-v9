@@ -47,7 +47,8 @@ const IDENTITY_QUERY_RE = /(?:phan\s*thuần|phan\s*thuan|phanthuan|xtra intelli
 const VEHICLE_RE = /\b(mua xe|bán xe|xe nào|xe gì|mẫu xe|dòng xe|lái thử|thu đổi|định giá|giá xe|giá bao nhiêu|phù hợp|lexus|porsche|mercedes|bmw|audi|toyota|land rover|landrover|range rover|rolls royce|ferrari|aston martin|cadillac|suv|sport|sedan|coupe|pickup)\b/i;
 const PHONE_RE = /(?:\+?84|0)(?:\D*\d){9,10}/;
 const PHONE_MASK = "[PHONE_REDACTED]";
-const maskPhones = (value) => String(value ?? "").replace(PHONE_RE, PHONE_MASK);
+const PHONE_RE_GLOBAL = new RegExp(PHONE_RE.source, "g");
+const maskPhones = (value) => String(value ?? "").replace(PHONE_RE_GLOBAL, PHONE_MASK);
 function systemPrompt(cars, knowledge) {
   const catalog = cars.length ? JSON.stringify(cars.map(c => ({ id:c.id,brand:c.brand,model:c.model,year:c.year,mileage:c.mileage,price:c.price,fuel:c.fuel,category:c.category,color:c.color,status:c.status,description:c.description }))) : "[]";
   return `Bạn là XTRA Intelligence, chatbot chính thức của PHAN THUẦN XTRA (Vietnam).
