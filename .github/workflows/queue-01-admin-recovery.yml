@@ -1,3 +1,99 @@
-# DÁN TOÀN BỘ NỘI DUNG
-# queue-01-admin-recovery.yml
-# vào giữa hai dòng '@ này
+name: QUEUE-01 Admin Recovery
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type QUEUE-01-ADMIN-RECOVERY to authorize"
+        required: true
+        type: string
+      reason:
+        description: "Audit reason"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: queue-01-admin-recovery-production
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    name: QUEUE-01 / Admin credential recovery
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+
+    steps:
+      - name: Verify authorization
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+          REASON: ${{ inputs.reason }}
+        run: |
+          set -euo pipefail
+          test "$CONFIRM" = "QUEUE-01-ADMIN-RECOVERY"
+          test -n "$REASON"
+          echo "QUEUE-01 authorization accepted."
+
+      - name: Verify production health
+        run: |
+          set -euo pipefail
+          body="$(mktemp)"
+          status="$(curl --silent --show-error --retry 3 --retry-delay 1 --max-time 20 -o "$body" -w '%{http_code}' https://phanthuanxtra.com/api/health)"
+          echo "Production health HTTP ${status}"
+          test "$status" = "200"
+          jq -e '.ok == true' "$body" >/dev/null
+          rm -f "$body"
+
+      - name: Rotate recovery code and reset Admin password
+        env:
+          RECOVERY_ROTATE_TOKEN: ${{ secrets.ADMIN_RECOVERY_ROTATE_TOKEN }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "${RECOVERY_ROTATE_TOKEN:-}"
+          test -n "${ADMIN_PASSWORD:-}"
+
+          rotate_response="$(curl --silent --show-error --retry 2 --retry-delay 1 --max-time 20 \
+            -H 'content-type: application/json' \
+            -d "$(jq -nc --arg token "$RECOVERY_ROTATE_TOKEN" '{rotateToken:$token}')" \
+            https://phanthuanxtra.com/api/admin/recovery/rotate)"
+
+          recovery_code="$(printf '%s' "$rotate_response" | jq -er '.recoveryCode')"
+          test -n "$recovery_code"
+
+          reset_response="$(curl --silent --show-error --retry 2 --retry-delay 1 --max-time 20 \
+            -H 'content-type: application/json' \
+            -d "$(jq -nc --arg code "$recovery_code" --arg password "$ADMIN_PASSWORD" '{recoveryCode:$code,password:$password,confirm:$password}')" \
+            https://phanthuanxtra.com/api/admin/forgot-password)"
+
+          printf '%s' "$reset_response" | jq -e '.ok == true' >/dev/null
+
+          unset recovery_code rotate_response reset_response
+          unset RECOVERY_ROTATE_TOKEN ADMIN_PASSWORD
+          echo "Admin credential recovery completed."
+
+      - name: Verify valid Admin login
+        env:
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          login_body="$(mktemp)"
+          status="$(
+            curl --silent --show-error --retry 2 --retry-delay 1 --max-time 20 \
+              -o "$login_body" \
+              -w '%{http_code}' \
+              -H 'content-type: application/json' \
+              -d "$(jq -nc --arg password "$ADMIN_PASSWORD" '{password:$password}')" \
+              https://phanthuanxtra.com/api/admin/login
+          )"
+
+          echo "Valid Admin login HTTP ${status}"
+          test "$status" = "200"
+          jq -e '.ok == true and (.token | type == "string")' "$login_body" >/dev/null
+          rm -f "$login_body"
+
+          unset ADMIN_PASSWORD
+          echo "Valid Admin login VERIFIED."
