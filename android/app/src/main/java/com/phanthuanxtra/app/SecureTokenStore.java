@@ -51,6 +51,10 @@ public final class SecureTokenStore {
     public synchronized String getGitHub() { return get(GH_TOKEN, GH_IV); }
     public synchronized void clearCloudflare() { clear(CF_TOKEN, CF_IV); }
     public synchronized void clearGitHub() { clear(GH_TOKEN, GH_IV); }
+    public synchronized void clearAll() {
+        clearCloudflare();
+        clearGitHub();
+    }
 
     private void save(String valueKey, String ivKey, String token) throws Exception {
         String value = token == null ? "" : token.trim();
