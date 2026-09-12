@@ -3,7 +3,7 @@
 > **DUY NHẤT — CANONICAL PROJECT STATUS / HANDOFF**  
 > Date: 2026-09-12 (UTC+7)  
 > Repository: `phanthuanxtra-v9/phanthuanxtra-v9`  
-> Main: `4ca4d722befdb9bdaa37268ba8fb845fea593ecb`
+> Main: `3509471f579c31d0cdd6d96d1ab211919e8fcfd0`
 
 ## 1. SOURCE OF TRUTH
 Current `main` source, CI/CD evidence, production/runtime evidence and this file are authoritative. Do not create competing checkpoint/status Markdown files.
@@ -15,7 +15,7 @@ Complete `phanthuanxtra.com` and the AI PT.XTRA APK as one integrated production
 `AI agents → GitHub branch/PR → CI/audit → protected main → Cloudflare deployment → production runtime verification → production E2E → APK/device verification`
 
 ## 4. CURRENT ARCHITECTURE
-- Main: `4ca4d722befdb9bdaa37268ba8fb845fea593ecb`
+- Main: `3509471f579c31d0cdd6d96d1ab211919e8fcfd0`
 - Production Worker: `phanthuanxtra-v2`
 - Entry: `src/entry.js`
 - Website: `https://phanthuanxtra.com`
@@ -57,17 +57,19 @@ Root cause of the preceding 502 was the deprecated `@cf/meta/llama-3.1-8b-instru
 ### 5.4 Admin + D1 production E2E — RED / CURRENT BLOCKER
 The same fresh smoke run reached valid Admin login but received HTTP 401 using the configured `production` environment `ADMIN_PASSWORD`. Therefore the D1 create/read/delete E2E did not run.
 
-Do not infer that the Admin credential is correct merely because the invalid-login boundary is 401. Current evidence proves the production Admin valid-credential gate is still RED.
+PR #95 is now merged as commit `3509471f579c31d0cdd6d96d1ab211919e8fcfd0`. It adds hashed D1 recovery-code storage, authenticated recovery-code rotation, and a break-glass rotation path protected by the Cloudflare Worker secret `ADMIN_RECOVERY_ROTATE_TOKEN`. CI Admin Pipeline run `34660932705` passed.
+
+The new recovery mechanism is source-verified but **not yet production-runtime verified**. No recovery secret has been exposed or committed. Production remains RED until deployment, recovery rotation/reset E2E, valid Admin login, D1 and R2 E2E all pass.
 
 ### 5.5 R2 production E2E — NOT RUN
 Blocked downstream by the valid Admin login gate in the current smoke workflow.
 
 ### 5.6 Production GREEN — NOT REACHED
-Production remains **RED**. Gateway/AI is now runtime-verified, but Admin valid login + D1/R2 E2E and the remaining release gates are not complete.
+Production remains **RED**. Gateway/AI is runtime-verified, but Admin recovery deployment/reset + valid login + D1/R2 E2E and the remaining release gates are not complete.
 
 ## 6. SINGLE EXECUTION QUEUE / OWNERSHIP
 ### QUEUE-01 — Admin production E2E
-**Status:** OPEN / highest priority. Current blocker: production valid Admin credential returns HTTP 401. Resolve the credential/credential-store state without exposing or guessing secrets, then rerun Admin + D1 + R2 E2E.
+**Status:** OPEN / highest priority. PR #95 merged. Next: deploy the recovery mechanism, configure `ADMIN_RECOVERY_ROTATE_TOKEN` in the production Worker secret store without exposing it, perform recovery-code rotation/reset E2E, then rerun valid Admin + D1 + R2 E2E.
 
 ### QUEUE-02 — Gateway/AI production E2E
 **Status:** BASELINE NOW VERIFIED; do not advance to broader Gateway work until QUEUE-01 release baseline is green.
@@ -95,7 +97,7 @@ Production remains **RED**. Gateway/AI is now runtime-verified, but Admin valid 
 5. Authenticated dashboard access.
 6. D1 create/read/delete E2E.
 7. R2 write/read/delete E2E.
-8. Password reset production E2E.
+8. Password reset production E2E. **NEW RECOVERY ROTATION SOURCE READY; RUNTIME NOT YET VERIFIED.**
 9. Gateway/AI production gate. **VERIFIED**.
 10. Fresh APK artifact/hash + S21 Ultra regression.
 11. Telegram Auto Bot production E2E.
@@ -105,6 +107,18 @@ Production remains **RED**. Gateway/AI is now runtime-verified, but Admin valid 
 15. Only then declare **PRODUCTION GREEN / COMPLETE**.
 
 ## 8. CHANGE LOG — CANONICAL
+### 2026-09-12 — Admin recovery-code rotation security repair / PR #95
+- Read `MASTER_PROJECT_STATUS.md` before the repair workflow.
+- Added D1 table `admin_recovery_credentials` storing only PBKDF2-derived recovery-code hash + salt.
+- Added authenticated Admin recovery-code rotation endpoint.
+- Added break-glass rotation protected by `ADMIN_RECOVERY_ROTATE_TOKEN`; the token value is never stored in source.
+- Added noindex `/admin-recovery.html`; generated recovery code is displayed once and instructed to be stored in a password manager/secret store.
+- Added Admin entry point for recovery rotation.
+- CI Admin Pipeline run `34660932705` passed.
+- PR #95 merged to main as `3509471f579c31d0cdd6d96d1ab211919e8fcfd0`.
+- No recovery secret value was exposed or committed.
+- Production deployment/runtime E2E is still pending; production remains RED.
+
 ### 2026-09-12 — Gateway credential + Workers AI production repair
 - Read `MASTER_PROJECT_STATUS.md` before the repair workflow.
 - Fixed production Gateway credential-source alignment via PR #91.
@@ -129,4 +143,4 @@ Production remains **RED**. Gateway/AI is now runtime-verified, but Admin valid 
 
 ## 10. NEXT CHECKPOINT
 **Current task:** QUEUE-01 / Admin production E2E.  
-**Next exact action:** resolve the production Admin credential/credential-store mismatch without guessing or exposing secrets, then obtain fresh valid Admin + D1 + R2 E2E evidence. Production remains RED until the complete release-gate chain passes.
+**Next exact action:** deploy PR #95, configure `ADMIN_RECOVERY_ROTATE_TOKEN` as a production-only secret without exposing its value, execute recovery rotation/reset E2E, then obtain fresh valid Admin + D1 + R2 evidence. Production remains RED until the complete release-gate chain passes.
