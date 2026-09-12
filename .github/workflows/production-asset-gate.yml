@@ -28,8 +28,10 @@ jobs:
           check_asset() {
             local path="$1" marker="$2"
             body="$(mktemp)"
-            status="$(curl --silent --show-error --retry 3 --retry-delay 1 --max-time 20 -o "$body" -w '%{http_code}' "$SITE_URL$path")"
-            echo "$path HTTP $status"
+            status="$(curl --silent --show-error --retry 3 --retry-delay 1 --max-time 20 \
+              --location --proto '=https' --proto-redir '=https' \
+              -o "$body" -w '%{http_code}' "$SITE_URL$path")"
+            echo "$path final HTTP $status"
             test "$status" = "200"
             grep -Fq "$marker" "$body"
           }
