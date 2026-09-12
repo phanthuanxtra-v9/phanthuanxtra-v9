@@ -1,0 +1,38 @@
+name: Production Asset Delivery Gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "public/**"
+      - "src/entry.js"
+      - "src/index.js"
+      - "wrangler.json"
+      - ".github/workflows/production-asset-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  asset-gate:
+    name: Verify production asset delivery
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check canonical recovery/admin assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          SITE_URL="https://phanthuanxtra.com"
+          check_asset() {
+            local path="$1" marker="$2"
+            body="$(mktemp)"
+            status="$(curl --silent --show-error --retry 3 --retry-delay 1 --max-time 20 -o "$body" -w '%{http_code}' "$SITE_URL$path")"
+            echo "$path HTTP $status"
+            test "$status" = "200"
+            grep -Fq "$marker" "$body"
+          }
+          check_asset "/admin.html" "PHAN THUẦN XTRA"
+          check_asset "/admin-recovery.html" "Admin Recovery"
+          check_asset "/api/health" '"ok":true'
