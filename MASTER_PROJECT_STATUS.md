@@ -147,6 +147,13 @@ The project records the desired 10,000-Neuron/day Workers AI budget and two-role
 16. Only then declare **PRODUCTION GREEN / COMPLETE**.
 
 ## 8. CHANGE LOG — CANONICAL
+### 2026-09-12 — S21 Ultra / Termux Wrangler limitation recorded
+- Read `MASTER_PROJECT_STATUS.md` before status update.
+- Recorded the operational limitation: on the Samsung S21 Ultra via Termux, Wrangler is practically unusable for the project's Cloudflare deployment/verification workflow.
+- Cloudflare Wrangler deployment and credential verification should therefore be treated as CI/GitHub Actions operations rather than depending on local Wrangler execution on the S21 Ultra.
+- This note does not change the single-queue rule, production gates, or GREEN criteria.
+- This change updates only `MASTER_PROJECT_STATUS.md`; no competing checkpoint Markdown was created.
+
 ### 2026-09-12 — Dual Workers AI reasoning baseline established
 - Read `MASTER_PROJECT_STATUS.md` before work.
 - Established the XTRA dual-role reasoning model: Deep AI + Wide AI, with one execution queue only.
