@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS admin_recovery_credentials (
+  id INTEGER PRIMARY KEY CHECK (id=1),
+  code_hash TEXT NOT NULL,
+  salt TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
