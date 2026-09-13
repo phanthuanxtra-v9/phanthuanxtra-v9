@@ -51,9 +51,9 @@ jobs:
       - name: Read canonical project checkpoint
         run: |
           set -euo pipefail
-          test -f MASTER_PROJECT_STATUS.md
-          cp MASTER_PROJECT_STATUS.md ai-task-checkpoint.md
-          test -s ai-task-checkpoint.md
+          test -s MASTER_PROJECT_STATUS.md
+          printf 'Canonical checkpoint: MASTER_PROJECT_STATUS.md\n'
+          wc -c MASTER_PROJECT_STATUS.md
 
       - name: Run unified Cloudflare Workers AI executor
         shell: bash
