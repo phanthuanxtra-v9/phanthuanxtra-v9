@@ -38,10 +38,10 @@ jobs:
           set -euo pipefail
           find src developer-gateway -type f -name '*.js' -o -name '*.mjs' | sort | while read -r file; do node --check "$file"; done
       - name: APK build and reproducible artifact metadata
-        working-directory: android
         shell: bash
         run: |
           set -euo pipefail
+          cd android
           ./gradlew :app:assembleDebug --no-daemon
           apk="app/build/outputs/apk/debug/app-debug.apk"
           test -s "$apk"
