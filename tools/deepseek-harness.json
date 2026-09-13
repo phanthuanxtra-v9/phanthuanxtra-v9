@@ -8,9 +8,20 @@
   "production_secrets": false,
   "allowed_profile": "headless",
   "model_execution": false,
+  "companion": {
+    "name": "obra-superpowers",
+    "upstream": "https://github.com/obra/superpowers.git",
+    "commit": "b36e0829c6d0140e93cfef2ca599b1b07d4a7797",
+    "license": "MIT",
+    "integration": "reference-only-development-methodology",
+    "production_access": false,
+    "production_secrets": false,
+    "runtime_execution": false
+  },
   "purpose": [
     "Gate 10 isolation validation",
     "Gates 8-15 evidence review",
-    "non-production reasoning and audit only"
+    "non-production reasoning and audit only",
+    "reference Superpowers development methodology without vendoring or runtime execution"
   ]
 }
