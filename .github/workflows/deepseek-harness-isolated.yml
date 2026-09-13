@@ -1,0 +1,122 @@
+name: DeepSeek Harness Isolated Evidence
+
+on:
+  pull_request:
+    paths:
+      - "tools/deepseek-harness.json"
+      - ".github/workflows/deepseek-harness-isolated.yml"
+      - "scripts/deepseek-harness-isolation.mjs"
+      - "MASTER_PROJECT_STATUS.md"
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/deepseek-harness.json"
+      - ".github/workflows/deepseek-harness-isolated.yml"
+      - "scripts/deepseek-harness-isolation.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: "--disable-warning=ExperimentalWarning"
+      DSH_HOME: /tmp/xtra-dsh-home
+      XTRA_PRODUCTION_ACCESS: "false"
+      XTRA_PRODUCTION_SECRETS: "false"
+
+    steps:
+      - name: Checkout XTRA without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Verify XTRA isolation policy
+        run: node scripts/deepseek-harness-isolation.mjs
+
+      - name: Read pinned upstream revisions
+        id: pin
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e 'const p=require("./tools/deepseek-harness.json"); const c=p.companion; if(!/^[0-9a-f]{40}$/.test(p.commit)) process.exit(1); if(!c || !/^[0-9a-f]{40}$/.test(c.commit)) process.exit(1); if(p.production_access!==false || p.production_secrets!==false || p.model_execution!==false || p.allowed_profile!=="headless") process.exit(1); if(c.production_access!==false || c.production_secrets!==false || c.runtime_execution!==false) process.exit(1); console.log(`deepseek=${p.commit}`); console.log(`superpowers=${c.commit}`);'
+          echo "commit=$(node -p 'require("./tools/deepseek-harness.json").commit')" >> "$GITHUB_OUTPUT"
+          echo "superpowers_commit=$(node -p 'require("./tools/deepseek-harness.json").companion.commit')" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.19.0"
+
+      - name: Install pinned pnpm without third-party action
+        shell: bash
+        run: npm install --global pnpm@11.7.0
+
+      - name: Fetch exact DeepSeek Harness revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/deepseek-harness
+          git clone --no-tags --depth 1 https://github.com/deepseek-ai/deepseek-harness.git /tmp/deepseek-harness
+          cd /tmp/deepseek-harness
+          git fetch --depth 1 origin "${{ steps.pin.outputs.commit }}"
+          git checkout --detach "${{ steps.pin.outputs.commit }}"
+          test "$(git rev-parse HEAD)" = "${{ steps.pin.outputs.commit }}"
+
+      - name: Fetch exact Superpowers reference revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/obra-superpowers
+          git clone --no-tags --depth 1 https://github.com/obra/superpowers.git /tmp/obra-superpowers
+          cd /tmp/obra-superpowers
+          git fetch --depth 1 origin "${{ steps.pin.outputs.superpowers_commit }}"
+          git checkout --detach "${{ steps.pin.outputs.superpowers_commit }}"
+          test "$(git rev-parse HEAD)" = "${{ steps.pin.outputs.superpowers_commit }}"
+          test -f README.md
+
+      - name: Install upstream dependencies
+        working-directory: /tmp/deepseek-harness
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Build exact upstream revision
+        working-directory: /tmp/deepseek-harness
+        run: pnpm run build
+
+      - name: Run harness config inspection with production access removed
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset GITHUB_TOKEN GH_TOKEN GIT_AUTH_TOKEN CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID
+          unset ADMIN_PASSWORD ADMIN_TOKEN GATEWAY_READ_TOKEN SITE_URL WORKER_URL GATEWAY_URL
+          unset TELEGRAM_BOT_TOKEN TELEGRAM_WEBHOOK_SECRET VIP_WEBHOOK_SECRET DEEPSEEK_API_KEY
+          rm -rf "$DSH_HOME"
+          mkdir -p "$DSH_HOME"
+          cd /tmp/deepseek-harness
+          pnpm dsh --profile headless --dump-default-config > /tmp/dsh-default-config.txt
+          grep -q '@deepseek-ai/dsh-headless' /tmp/dsh-default-config.txt
+
+      - name: Verify no production mutation path is exposed
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$XTRA_PRODUCTION_ACCESS" = "false"
+          test "$XTRA_PRODUCTION_SECRETS" = "false"
+          ! grep -R -E 'phanthuanxtra\.com|workers\.dev|CLOUDFLARE_API_TOKEN|ADMIN_PASSWORD|ADMIN_TOKEN|GATEWAY_READ_TOKEN|TELEGRAM_BOT_TOKEN|VIP_WEBHOOK_SECRET' /tmp/dsh-default-config.txt
+          test ! -e "$DSH_HOME/.credentials.yaml"
+
+      - name: Evidence summary
+        run: |
+          echo "DeepSeek Harness isolated evidence run completed"
+          echo "Pinned DeepSeek revision: ${{ steps.pin.outputs.commit }}"
+          echo "Pinned Superpowers reference: ${{ steps.pin.outputs.superpowers_commit }}"
+          echo "Production access: false"
+          echo "Production secrets: false"
+          echo "Model execution: false"
+          echo "Superpowers runtime execution: false"
+          echo "Profile: headless"
+          echo "No XTRA production credentials/endpoints exposed to harness"
