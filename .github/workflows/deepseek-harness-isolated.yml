@@ -51,10 +51,9 @@ jobs:
         with:
           node-version: "22.19.0"
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 11.7.0
+      - name: Install pinned pnpm without third-party action
+        shell: bash
+        run: npm install --global pnpm@11.7.0
 
       - name: Fetch exact upstream revision
         shell: bash
