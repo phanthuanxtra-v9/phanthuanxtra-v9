@@ -213,6 +213,17 @@ The project records the desired 10,000-Neuron/day Workers AI budget and two-role
 - Read `MASTER_PROJECT_STATUS.md` before changes.
 - PR #90 hardened the production R2 DELETE contract and serialized AI Unified Executor work through the canonical status file/queue rules.
 
+
+## 8.1 — WORKERS AI QUOTA EXECUTION DIRECTIVE — 2026-09-13
+- Operational directive: the user confirms that **10,000 Workers AI Neurons are currently available** for XTRA work.
+- **Mandatory utilization window:** prioritize using the available 10,000-Neuron budget before **17:00 (UTC+7, Vietnam time) on 2026-09-13**.
+- The quota is shared across the XTRA reasoning layer; do not assume 10,000 Neurons per model.
+- Execution remains serialized through the single queue.
+- Prioritize Gate 10 recovery, validation/evidence generation, and the next release-gate work that can safely consume Workers AI quota.
+- Do not consume quota through uncontrolled parallel agents, conflicting repository mutations, or production mutations.
+- Preserve reserve only where required for retries, fallback and production diagnosis; do not falsely claim quota exhaustion or provisioning evidence without runtime evidence.
+- This directive does not change the requirement that Production remains RED until all required runtime/E2E gates are evidenced.
+
 ## 9. SAFETY / CONTINUITY
 - Never put secrets in chat, Markdown, GitHub issues, source or logs.
 - Never force-push.
