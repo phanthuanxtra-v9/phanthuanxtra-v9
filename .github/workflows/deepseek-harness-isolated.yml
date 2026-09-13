@@ -38,13 +38,14 @@ jobs:
       - name: Verify XTRA isolation policy
         run: node scripts/deepseek-harness-isolation.mjs
 
-      - name: Read pinned DeepSeek Harness revision
+      - name: Read pinned upstream revisions
         id: pin
         shell: bash
         run: |
           set -euo pipefail
-          node -e 'const p=require("./tools/deepseek-harness.json"); if(!/^[0-9a-f]{40}$/.test(p.commit)) process.exit(1); if(p.production_access!==false || p.production_secrets!==false || p.model_execution!==false || p.allowed_profile!=="headless") process.exit(1); console.log(`commit=${p.commit}`); console.log(`upstream=${p.upstream}`); console.log(`profile=${p.allowed_profile}`);'
+          node -e 'const p=require("./tools/deepseek-harness.json"); const c=p.companion; if(!/^[0-9a-f]{40}$/.test(p.commit)) process.exit(1); if(!c || !/^[0-9a-f]{40}$/.test(c.commit)) process.exit(1); if(p.production_access!==false || p.production_secrets!==false || p.model_execution!==false || p.allowed_profile!=="headless") process.exit(1); if(c.production_access!==false || c.production_secrets!==false || c.runtime_execution!==false) process.exit(1); console.log(`deepseek=${p.commit}`); console.log(`superpowers=${c.commit}`);'
           echo "commit=$(node -p 'require("./tools/deepseek-harness.json").commit')" >> "$GITHUB_OUTPUT"
+          echo "superpowers_commit=$(node -p 'require("./tools/deepseek-harness.json").companion.commit')" >> "$GITHUB_OUTPUT"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -55,7 +56,7 @@ jobs:
         shell: bash
         run: npm install --global pnpm@11.7.0
 
-      - name: Fetch exact upstream revision
+      - name: Fetch exact DeepSeek Harness revision
         shell: bash
         run: |
           set -euo pipefail
@@ -65,6 +66,18 @@ jobs:
           git fetch --depth 1 origin "${{ steps.pin.outputs.commit }}"
           git checkout --detach "${{ steps.pin.outputs.commit }}"
           test "$(git rev-parse HEAD)" = "${{ steps.pin.outputs.commit }}"
+
+      - name: Fetch exact Superpowers reference revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/obra-superpowers
+          git clone --no-tags --depth 1 https://github.com/obra/superpowers.git /tmp/obra-superpowers
+          cd /tmp/obra-superpowers
+          git fetch --depth 1 origin "${{ steps.pin.outputs.superpowers_commit }}"
+          git checkout --detach "${{ steps.pin.outputs.superpowers_commit }}"
+          test "$(git rev-parse HEAD)" = "${{ steps.pin.outputs.superpowers_commit }}"
+          test -f README.md
 
       - name: Install upstream dependencies
         working-directory: /tmp/deepseek-harness
@@ -99,9 +112,11 @@ jobs:
       - name: Evidence summary
         run: |
           echo "DeepSeek Harness isolated evidence run completed"
-          echo "Pinned revision: ${{ steps.pin.outputs.commit }}"
+          echo "Pinned DeepSeek revision: ${{ steps.pin.outputs.commit }}"
+          echo "Pinned Superpowers reference: ${{ steps.pin.outputs.superpowers_commit }}"
           echo "Production access: false"
           echo "Production secrets: false"
           echo "Model execution: false"
+          echo "Superpowers runtime execution: false"
           echo "Profile: headless"
           echo "No XTRA production credentials/endpoints exposed to harness"
